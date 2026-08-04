@@ -1,0 +1,67 @@
+<!doctype html><html lang="zh-Hant"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Investor Twin v0.5</title>
+<link rel="stylesheet" href="style.css"></head>
+<body>
+<aside>
+<h2>投資雙胞胎</h2>
+<div class="nav active" onclick="showPage('today')">🏠 今日工作台</div>
+<div class="nav" onclick="showPage('queue')">📥 研究佇列</div>
+<div class="nav" onclick="showPage('cards')">📄 研究卡</div>
+<div class="nav" onclick="showPage('sources')">📚 資料來源</div>
+<div class="nav" onclick="showPage('portfolio')">💼 投資組合</div>
+</aside>
+<main>
+<h1 id="title">今日工作台</h1>
+
+<div id="today" class="page">
+<section class="box">
+<h2>Morning Brief（示意）</h2>
+<div class="brief">
+<div class="item" onclick="loadCard('全球市場')"><b>🌍 全球市場</b><p>美股收紅，AI 基建持續投資</p></div>
+<div class="item" onclick="loadCard('台灣市場')"><b>🇹🇼 台灣市場</b><p>觀察 AI、PCB、光通訊</p></div>
+<div class="item" onclick="loadCard('今日問題')"><b>❓ 今日問題</b><p>Glass Bridge 是否形成投資機會？</p></div>
+</div>
+</section>
+
+<div class="grid">
+<section class="box">
+<h2>機會雷達</h2>
+<ul>
+<li onclick="loadCard('Glass Bridge')">Glass Bridge</li>
+<li onclick="loadCard('FAU')">FAU</li>
+<li onclick="loadCard('CPO')">CPO</li>
+<li onclick="loadCard('HBM')">HBM</li>
+</ul>
+</section>
+
+<section class="box">
+<h2>研究卡</h2>
+<div id="card">請點擊 Morning Brief 或機會雷達</div>
+</section>
+</div>
+</div>
+
+<div id="queue" class="page" style="display:none">
+<section class="box">
+<h2>研究佇列</h2>
+<input id="topic" placeholder="新增研究主題">
+<button onclick="add()">加入</button>
+<ul id="queueList"></ul>
+</section>
+</div>
+
+<div id="cards" class="page" style="display:none">
+<section class="box"><h2>所有研究卡</h2><ul id="cardList"></ul></section>
+</div>
+
+<div id="sources" class="page" style="display:none">
+<section class="box"><h2>資料來源</h2>
+<p>Morning Brief → 研究卡 → 投資決策</p>
+</section></div>
+
+<div id="portfolio" class="page" style="display:none">
+<section class="box"><h2>投資組合（預留）</h2></section></div>
+
+<script src="app.js"></script>
+</main></body></html>
