@@ -1,0 +1,46 @@
+{
+  "cards": {
+    "FAU": {
+      "id": "FAU",
+      "title": "FAU",
+      "status": "待研究",
+      "related": "上詮",
+      "source": "Opportunity Radar"
+    },
+    "CPO": {
+      "id": "CPO",
+      "title": "CPO",
+      "status": "研究中",
+      "related": "光通訊供應鏈",
+      "source": "Morning Brief"
+    },
+    "HBM": {
+      "id": "HBM",
+      "title": "HBM",
+      "status": "持續追蹤",
+      "related": "SK hynix、Micron",
+      "source": "Research"
+    },
+    "全球市場": {
+      "id": "全球市場",
+      "title": "全球市場",
+      "status": "資訊",
+      "related": "--",
+      "source": "Morning Brief"
+    },
+    "台灣市場": {
+      "id": "台灣市場",
+      "title": "台灣市場",
+      "status": "資訊",
+      "related": "--",
+      "source": "Morning Brief"
+    },
+    "今日問題": {
+      "id": "今日問題",
+      "title": "今日問題",
+      "status": "待研究",
+      "related": "Glass Bridge",
+      "source": "Morning Brief"
+    }
+  }
+}

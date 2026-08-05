@@ -1,0 +1,8 @@
+{
+  "items": [
+    { "id": "glass-bridge", "name": "Glass Bridge" },
+    { "id": "FAU", "name": "FAU" },
+    { "id": "CPO", "name": "CPO" },
+    { "id": "HBM", "name": "HBM" }
+  ]
+}

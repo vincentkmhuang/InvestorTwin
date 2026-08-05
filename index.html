@@ -17,22 +17,13 @@
 <div id="today" class="page">
 <section class="box">
 <h2>Morning Brief（示意）</h2>
-<div class="brief">
-<div class="item" onclick="loadCard('全球市場')"><b>🌍 全球市場</b><p>美股收紅，AI 基建持續投資</p></div>
-<div class="item" onclick="loadCard('台灣市場')"><b>🇹🇼 台灣市場</b><p>觀察 AI、PCB、光通訊</p></div>
-<div class="item" onclick="loadCard('今日問題')"><b>❓ 今日問題</b><p>Glass Bridge 是否形成投資機會？</p></div>
-</div>
+<div class="brief" id="morningBrief"></div>
 </section>
 
 <div class="grid">
 <section class="box">
 <h2>機會雷達</h2>
-<ul>
-<li onclick="loadCard('Glass Bridge')">Glass Bridge</li>
-<li onclick="loadCard('FAU')">FAU</li>
-<li onclick="loadCard('CPO')">CPO</li>
-<li onclick="loadCard('HBM')">HBM</li>
-</ul>
+<ul id="opportunityRadar"></ul>
 </section>
 
 <section class="box">
@@ -63,5 +54,6 @@
 <div id="portfolio" class="page" style="display:none">
 <section class="box"><h2>投資組合（預留）</h2></section></div>
 
+<script src="js/data-engine.js"></script>
 <script src="app.js"></script>
 </main></body></html>

@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "id": "全球市場",
+      "icon": "🌍",
+      "title": "全球市場",
+      "summary": "美股收紅，AI 基建持續投資"
+    },
+    {
+      "id": "台灣市場",
+      "icon": "🇹🇼",
+      "title": "台灣市場",
+      "summary": "觀察 AI、PCB、光通訊"
+    },
+    {
+      "id": "今日問題",
+      "icon": "❓",
+      "title": "今日問題",
+      "summary": "Corning Glass 是否形成投資機會？"
+    }
+  ]
+}
