@@ -1,20 +1,50 @@
 async function init() {
   await DataEngine.init();
   await WorkflowEngine.init();
+  await loadVersionInfo();
 
   for (const id of WorkflowEngine.getQueueIds()) {
     await WorkflowEngine.loadResearch(id);
   }
 
-  DataEngine.renderMorningBrief(document.getElementById('morningBrief'), openResearchCard);
+  DataEngine.renderMorningBrief(document.getElementById('morningBrief'), openFromMorningBrief);
   DataEngine.renderOpportunityRadar(document.getElementById('opportunityRadar'), openResearchCard);
   render();
+}
+
+async function loadVersionInfo() {
+  try {
+    const res = await fetch('/api/version');
+    if (res.ok) {
+      const info = await res.json();
+      document.getElementById('version').textContent = info.version;
+      document.getElementById('sprint').textContent = info.sprint;
+      document.getElementById('build').textContent = info.build;
+      document.getElementById('commit').textContent = info.commit;
+      return;
+    }
+  } catch (_) {}
+
+  const fallback = await fetch('data/version.json').then(r => r.json()).catch(() => null);
+  if (fallback) {
+    document.getElementById('version').textContent = fallback.version;
+    document.getElementById('sprint').textContent = fallback.sprint;
+    document.getElementById('build').textContent = fallback.build;
+    document.getElementById('commit').textContent = '--';
+  }
 }
 
 function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
   document.getElementById(id).style.display = 'block';
   document.getElementById('title').textContent = document.querySelector('[onclick="showPage(\'' + id + '\')"]').textContent.trim();
+}
+
+async function openFromMorningBrief(id) {
+  const researchId = WorkflowEngine.resolveResearchId(id);
+  const added = await WorkflowEngine.ensureInQueue(researchId, 'Morning Brief');
+  if (added) render();
+  await openResearchCard(id);
 }
 
 async function openResearchCard(id) {
@@ -38,11 +68,11 @@ function render() {
   });
 }
 
-function add() {
+async function add() {
   let t = topic.value.trim();
   if (!t) return;
   const slug = t.toLowerCase().replace(/\s+/g, '-');
-  WorkflowEngine.addToQueue(slug, 'Manual');
+  await WorkflowEngine.ensureInQueue(slug, 'Manual');
   if (!DataEngine.investmentThesis.cards[slug]) {
     DataEngine.investmentThesis.cards[slug] = {
       id: slug,

@@ -16,10 +16,33 @@ const WorkflowEngine = {
     return this.queue.items.map(item => item.id);
   },
 
+  isInQueue(id) {
+    return this.queue.items.some(item => item.id === id);
+  },
+
   addToQueue(id, source = 'Manual') {
-    if (!this.queue.items.some(item => item.id === id)) {
+    if (!this.isInQueue(id)) {
       this.queue.items.push({ id, addedFrom: source });
+      return true;
     }
+    return false;
+  },
+
+  async ensureInQueue(id, source) {
+    if (this.isInQueue(id)) return false;
+    try {
+      const res = await fetch('/api/queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, addedFrom: source })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        this.queue.items = data.items;
+        return data.added;
+      }
+    } catch (_) {}
+    return this.addToQueue(id, source);
   },
 
   resolveResearchId(id) {
@@ -47,19 +70,62 @@ const WorkflowEngine = {
     return id;
   },
 
-  createDefaultResearch(id) {
-    const title = this.resolveTitle(id);
+  resolveSummary(id) {
     const briefItem = DataEngine.morningBrief?.items?.find(item =>
       item.id === id || item.cardRef === id
     );
+    if (briefItem?.summary) return briefItem.summary;
+
+    const thesisCard = DataEngine.investmentThesis?.cards?.[id];
+    if (thesisCard?.related && thesisCard.related !== '--') {
+      return `相關：${thesisCard.related}`;
+    }
+    return '';
+  },
+
+  resolveInvestmentThesis(id) {
+    const thesisCard = DataEngine.investmentThesis?.cards?.[id];
+    if (thesisCard?.investmentThesis) return thesisCard.investmentThesis;
+    if (thesisCard?.related && thesisCard.related !== '--') {
+      return `追蹤 ${thesisCard.related} 相關標的與供應鏈動態。`;
+    }
+    return '';
+  },
+
+  resolveQuestions(id) {
+    const briefItem = DataEngine.morningBrief?.items?.find(item =>
+      item.id === id || item.cardRef === id
+    );
+    if (briefItem?.summary?.includes('？') || briefItem?.summary?.includes('?')) {
+      return [briefItem.summary];
+    }
+    return [];
+  },
+
+  createDefaultResearch(id) {
     const card = {
       id,
-      title,
-      summary: briefItem?.summary ?? '',
-      status: 'active',
+      title: this.resolveTitle(id),
+      summary: this.resolveSummary(id),
+      investmentThesis: this.resolveInvestmentThesis(id),
+      questions: this.resolveQuestions(id),
+      status: 'researching',
       updated: new Date().toISOString().slice(0, 10)
     };
     return { id, card, timeline: [], sources: [], notes: [] };
+  },
+
+  async persistResearch(id, bundle) {
+    try {
+      const res = await fetch(`/api/research/${encodeURIComponent(id)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ card: bundle.card })
+      });
+      return res.ok && (await res.json()).created;
+    } catch (_) {
+      return false;
+    }
   },
 
   parseJsonArray(data, key) {
@@ -93,6 +159,7 @@ const WorkflowEngine = {
       notes = this.parseJsonArray(notesData, 'notes');
     } else {
       const bundle = this.createDefaultResearch(id);
+      await this.persistResearch(id, bundle);
       this.researchCache[id] = bundle;
       return bundle;
     }
@@ -113,29 +180,27 @@ const WorkflowEngine = {
     }
 
     const { card, timeline, sources, notes } = bundle;
+    const questions = Array.isArray(card.questions) ? card.questions : [];
+
     let html = `<h3>${card.title}</h3>`;
-    if (card.summary) html += `<p>${card.summary}</p>`;
-    html += `<p><b>狀態：</b>${card.status}</p>
-<p><b>相關：</b>${card.related ?? '--'}</p>
-<p><b>來源：</b>${card.source ?? '--'}</p>`;
-
-    if (timeline.length) {
-      html += '<p><b>時間軸：</b></p><ul>';
-      html += timeline.map(entry => `<li>${entry.date} — ${entry.event}</li>`).join('');
-      html += '</ul>';
-    }
-
-    if (sources.length) {
-      html += '<p><b>資料來源：</b></p><ul>';
-      html += sources.map(entry => `<li>${entry.title}</li>`).join('');
-      html += '</ul>';
-    }
-
-    if (notes.length) {
-      html += '<p><b>筆記：</b></p><ul>';
-      html += notes.map(entry => `<li>${entry.date} — ${entry.text}</li>`).join('');
-      html += '</ul>';
-    }
+    html += `<p><b>Summary</b></p><p>${card.summary || '--'}</p>`;
+    html += `<p><b>Investment Thesis</b></p><p>${card.investmentThesis || '--'}</p>`;
+    html += '<p><b>Questions</b></p>';
+    html += questions.length
+      ? `<ul>${questions.map(q => `<li>${q}</li>`).join('')}</ul>`
+      : '<p>--</p>';
+    html += '<p><b>Timeline</b></p>';
+    html += timeline.length
+      ? `<ul>${timeline.map(entry => `<li>${entry.date} — ${entry.event}</li>`).join('')}</ul>`
+      : '<p>--</p>';
+    html += '<p><b>Sources</b></p>';
+    html += sources.length
+      ? `<ul>${sources.map(entry => `<li>${entry.title}</li>`).join('')}</ul>`
+      : '<p>--</p>';
+    html += '<p><b>Notes</b></p>';
+    html += notes.length
+      ? `<ul>${notes.map(entry => `<li>${entry.date} — ${entry.text}</li>`).join('')}</ul>`
+      : '<p>--</p>';
 
     container.innerHTML = html;
   },

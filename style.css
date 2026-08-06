@@ -1,7 +1,8 @@
 body{margin:0;font-family:'Segoe UI',sans-serif;background:#eef2f6;display:flex}
-aside{width:220px;background:#1f2937;color:#fff;padding:16px;min-height:100vh}
+aside{width:220px;background:#1f2937;color:#fff;padding:16px;min-height:100vh;display:flex;flex-direction:column}
 .nav{padding:10px;margin:8px 0;background:#334155;border-radius:6px;cursor:pointer}
 .active{background:#475569}
+.version-info{margin-top:auto;padding-top:16px;font-size:11px;color:#94a3b8;line-height:1.6}
 main{flex:1;padding:20px}
 .box{background:#fff;border-radius:10px;padding:16px;margin-bottom:16px}
 .brief{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}

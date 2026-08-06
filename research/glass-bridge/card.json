@@ -1,7 +1,13 @@
 {
   "id": "glass-bridge",
   "title": "Glass Bridge",
+  "summary": "Glass Bridge 已開始進入量產驗證，觀察是否形成投資機會。",
+  "investmentThesis": "康寧 Glass Bridge 技術若順利量產，將帶動光通訊供應鏈（正崴、上詮）需求。",
+  "questions": [
+    "Glass Bridge 量產驗證進度如何？",
+    "哪些台廠將率先受惠？",
+    "量產時程是否形成投資機會？"
+  ],
   "status": "研究中",
-  "related": "康寧、正崴、上詮",
-  "source": "Morning Brief"
+  "updated": "2026-08-06"
 }
