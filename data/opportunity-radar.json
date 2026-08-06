@@ -1,8 +1,8 @@
 {
   "items": [
     { "id": "glass-bridge", "name": "Glass Bridge" },
-    { "id": "FAU", "name": "FAU" },
-    { "id": "CPO", "name": "CPO" },
-    { "id": "HBM", "name": "HBM" }
+    { "id": "fau", "name": "FAU" },
+    { "id": "cpo", "name": "CPO" },
+    { "id": "hbm", "name": "HBM" }
   ]
 }

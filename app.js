@@ -1,18 +1,13 @@
-let queue = ['glass-bridge', 'FAU'];
-
-function cardTitle(id) {
-  return DataEngine.researchCards[id]?.title
-    ?? DataEngine.investmentThesis?.cards?.[id]?.title
-    ?? id;
-}
-
 async function init() {
   await DataEngine.init();
-  for (const id of queue) {
-    await DataEngine.getCard(id);
+  await WorkflowEngine.init();
+
+  for (const id of WorkflowEngine.getQueueIds()) {
+    await WorkflowEngine.loadResearch(id);
   }
-  DataEngine.renderMorningBrief(document.getElementById('morningBrief'), loadCard);
-  DataEngine.renderOpportunityRadar(document.getElementById('opportunityRadar'), loadCard);
+
+  DataEngine.renderMorningBrief(document.getElementById('morningBrief'), openResearchCard);
+  DataEngine.renderOpportunityRadar(document.getElementById('opportunityRadar'), openResearchCard);
   render();
 }
 
@@ -22,22 +17,23 @@ function showPage(id) {
   document.getElementById('title').textContent = document.querySelector('[onclick="showPage(\'' + id + '\')"]').textContent.trim();
 }
 
-async function loadCard(name) {
-  const card = await DataEngine.getCard(name);
-  DataEngine.renderCard(card, document.getElementById('card'));
+async function openResearchCard(id) {
+  const researchId = WorkflowEngine.resolveResearchId(id);
+  const bundle = await WorkflowEngine.loadResearch(researchId);
+  WorkflowEngine.renderResearch(bundle, document.getElementById('card'));
 }
 
 function render() {
   queueList.innerHTML = '';
   cardList.innerHTML = '';
-  queue.forEach(q => {
+  WorkflowEngine.getQueueIds().forEach(q => {
     let li = document.createElement('li');
-    li.textContent = cardTitle(q);
-    li.onclick = () => loadCard(q);
+    li.textContent = WorkflowEngine.cardTitle(q);
+    li.onclick = () => openResearchCard(q);
     queueList.appendChild(li);
     let li2 = document.createElement('li');
-    li2.textContent = cardTitle(q);
-    li2.onclick = () => loadCard(q);
+    li2.textContent = WorkflowEngine.cardTitle(q);
+    li2.onclick = () => openResearchCard(q);
     cardList.appendChild(li2);
   });
 }
@@ -45,17 +41,16 @@ function render() {
 function add() {
   let t = topic.value.trim();
   if (!t) return;
-  if (!queue.includes(t)) {
-    queue.push(t);
-    if (!DataEngine.investmentThesis.cards[t]) {
-      DataEngine.investmentThesis.cards[t] = {
-        id: t,
-        title: t,
-        status: '待研究',
-        related: '--',
-        source: 'Manual'
-      };
-    }
+  const slug = t.toLowerCase().replace(/\s+/g, '-');
+  WorkflowEngine.addToQueue(slug, 'Manual');
+  if (!DataEngine.investmentThesis.cards[slug]) {
+    DataEngine.investmentThesis.cards[slug] = {
+      id: slug,
+      title: t,
+      status: '待研究',
+      related: '--',
+      source: 'Manual'
+    };
   }
   topic.value = '';
   render();

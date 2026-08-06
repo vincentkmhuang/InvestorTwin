@@ -1,21 +1,21 @@
 {
   "cards": {
-    "FAU": {
-      "id": "FAU",
+    "fau": {
+      "id": "fau",
       "title": "FAU",
       "status": "待研究",
       "related": "上詮",
       "source": "Opportunity Radar"
     },
-    "CPO": {
-      "id": "CPO",
+    "cpo": {
+      "id": "cpo",
       "title": "CPO",
       "status": "研究中",
       "related": "光通訊供應鏈",
       "source": "Morning Brief"
     },
-    "HBM": {
-      "id": "HBM",
+    "hbm": {
+      "id": "hbm",
       "title": "HBM",
       "status": "持續追蹤",
       "related": "SK hynix、Micron",
@@ -40,7 +40,8 @@
       "title": "今日問題",
       "status": "待研究",
       "related": "Glass Bridge",
-      "source": "Morning Brief"
+      "source": "Morning Brief",
+      "cardRef": "glass-bridge"
     }
   }
 }
