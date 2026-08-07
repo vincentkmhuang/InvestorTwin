@@ -8,4 +8,5 @@ main{flex:1;padding:20px}
 .brief{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .item{background:#f4f6fa;padding:12px;border-radius:8px;cursor:pointer}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.explorer-grid{display:grid;grid-template-columns:220px 1fr;gap:16px}
 li{cursor:pointer;margin:6px 0}

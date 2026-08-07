@@ -102,16 +102,58 @@ const WorkflowEngine = {
     return [];
   },
 
+  resolveReason(id) {
+    const queueItem = this.queue?.items?.find(item => item.id === id);
+    if (queueItem?.addedFrom) return queueItem.addedFrom;
+
+    const thesisCard = DataEngine.investmentThesis?.cards?.[id];
+    if (thesisCard?.source) return thesisCard.source;
+
+    return 'Unknown';
+  },
+
+  resolveRelated(id) {
+    const thesisCard = DataEngine.investmentThesis?.cards?.[id];
+    if (!thesisCard?.related || thesisCard.related === '--') return [];
+    return String(thesisCard.related).split(/[、,]/).map(s => s.trim()).filter(Boolean);
+  },
+
+  normalizeCard(card) {
+    if (!card) return card;
+
+    if (card.reason == null || card.reason === '') {
+      card.reason = card.source || 'Unknown';
+    }
+
+    if (!Array.isArray(card.tags)) {
+      card.tags = [];
+    }
+
+    if (card.related == null) {
+      card.related = [];
+    } else if (!Array.isArray(card.related)) {
+      const legacy = String(card.related).trim();
+      card.related = (!legacy || legacy === '--')
+        ? []
+        : legacy.split(/[、,]/).map(s => s.trim()).filter(Boolean);
+    }
+
+    return card;
+  },
+
   createDefaultResearch(id) {
-    const card = {
+    const card = this.normalizeCard({
       id,
       title: this.resolveTitle(id),
       summary: this.resolveSummary(id),
       investmentThesis: this.resolveInvestmentThesis(id),
       questions: this.resolveQuestions(id),
+      reason: this.resolveReason(id),
+      tags: [],
+      related: this.resolveRelated(id),
       status: 'researching',
       updated: new Date().toISOString().slice(0, 10)
-    };
+    });
     return { id, card, timeline: [], sources: [], notes: [] };
   },
 
@@ -149,6 +191,7 @@ const WorkflowEngine = {
     } catch (_) {}
 
     if (card) {
+      card = this.normalizeCard(card);
       const [timelineData, sourcesData, notesData] = await Promise.all([
         fetch(`${base}/timeline.json`).then(r => r.ok ? r.json() : null).catch(() => null),
         fetch(`${base}/sources.json`).then(r => r.ok ? r.json() : null).catch(() => null),
@@ -181,9 +224,20 @@ const WorkflowEngine = {
 
     const { card, timeline, sources, notes } = bundle;
     const questions = Array.isArray(card.questions) ? card.questions : [];
+    const tags = Array.isArray(card.tags) ? card.tags : [];
+    const related = Array.isArray(card.related) ? card.related : [];
 
     let html = `<h3>${card.title}</h3>`;
     html += `<p><b>Summary</b></p><p>${card.summary || '--'}</p>`;
+    html += `<p><b>Research Origin</b></p><p>${card.reason || 'Unknown'}</p>`;
+    html += '<p><b>Tags</b></p>';
+    html += tags.length
+      ? `<ul>${tags.map(tag => `<li>${tag}</li>`).join('')}</ul>`
+      : '<p>--</p>';
+    html += '<p><b>Related Research</b></p>';
+    html += related.length
+      ? `<ul>${related.map(item => `<li>${item}</li>`).join('')}</ul>`
+      : '<p>--</p>';
     html += `<p><b>Investment Thesis</b></p><p>${card.investmentThesis || '--'}</p>`;
     html += '<p><b>Questions</b></p>';
     html += questions.length

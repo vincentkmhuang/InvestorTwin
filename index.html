@@ -8,6 +8,7 @@
 <div class="nav active" onclick="showPage('today')">🏠 今日工作台</div>
 <div class="nav" onclick="showPage('queue')">📥 研究佇列</div>
 <div class="nav" onclick="showPage('cards')">📄 研究卡</div>
+<div class="nav" onclick="showPage('knowledge')">🔍 Knowledge Explorer</div>
 <div class="nav" onclick="showPage('sources')">📚 資料來源</div>
 <div class="nav" onclick="showPage('portfolio')">💼 投資組合</div>
 <div id="versionInfo" class="version-info">
@@ -52,6 +53,21 @@
 <section class="box"><h2>所有研究卡</h2><ul id="cardList"></ul></section>
 </div>
 
+<div id="knowledge" class="page" style="display:none">
+<div class="explorer-grid">
+<section class="box">
+<h2>Tags</h2>
+<ul id="knowledgeTags"></ul>
+</section>
+<section class="box">
+<h2 id="knowledgeResultsTitle">Research Cards</h2>
+<ul id="knowledgeResults"></ul>
+<h2>Research Card</h2>
+<div id="knowledgeExplorerCard">Select a tag, then click a research card</div>
+</section>
+</div>
+</div>
+
 <div id="sources" class="page" style="display:none">
 <section class="box"><h2>資料來源</h2>
 <p>Morning Brief → 研究卡 → 投資決策</p>
@@ -62,5 +78,6 @@
 
 <script src="js/data-engine.js"></script>
 <script src="js/workflow-engine.js"></script>
+<script src="js/knowledge-engine.js"></script>
 <script src="app.js"></script>
 </main></body></html>

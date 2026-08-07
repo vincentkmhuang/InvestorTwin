@@ -1,4 +1,7 @@
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
+. (Join-Path $root 'scripts\generate-knowledge-index.ps1')
+Update-KnowledgeIndex -RootPath $root | Out-Null
+Write-Output 'Knowledge index generated.'
 $port = 8765
 $myPid = $PID
 Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue |
@@ -84,7 +87,8 @@ while ($listener.IsListening) {
         $card = if ($body.card) { $body.card } else {
           [PSCustomObject]@{
             id = $id; title = $id; summary = ''; investmentThesis = ''
-            questions = @(); status = 'researching'; updated = (Get-Date -Format 'yyyy-MM-dd')
+            questions = @(); reason = 'Unknown'; tags = @(); related = @()
+            status = 'researching'; updated = (Get-Date -Format 'yyyy-MM-dd')
           }
         }
         $card | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $dir 'card.json') -Encoding UTF8
@@ -92,6 +96,7 @@ while ($listener.IsListening) {
         '[]' | Set-Content (Join-Path $dir 'timeline.json') -Encoding UTF8
         '[]' | Set-Content (Join-Path $dir 'sources.json') -Encoding UTF8
         $created = $true
+        Update-KnowledgeIndex -RootPath $root | Out-Null
       }
       Send-Json $response @{ created = $created; id = $id }
     }
