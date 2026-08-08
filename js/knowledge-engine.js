@@ -65,6 +65,46 @@ const KnowledgeEngine = {
     return Array.isArray(card.related) ? [...card.related] : [];
   },
 
+  async researchExists(id) {
+    if (id == null || id === '') return false;
+    const researchId = String(id);
+    if (this.cardCache[researchId] || WorkflowEngine.researchCache[researchId]) return true;
+
+    try {
+      const response = await fetch(`research/${researchId}/card.json`);
+      return response.ok;
+    } catch (_) {
+      return false;
+    }
+  },
+
+  async getResolvedRelated(id) {
+    if (id == null || id === '') return [];
+
+    const selfId = String(id);
+    let related = await this.getRelated(selfId);
+
+    if (!related.length) {
+      const cached = WorkflowEngine.researchCache[selfId]?.card;
+      if (cached && Array.isArray(cached.related)) related = cached.related;
+    }
+
+    const seen = new Set();
+    const result = [];
+
+    for (const item of related) {
+      if (item == null || item === '') continue;
+      const relatedId = String(item);
+      if (relatedId === selfId) continue;
+      if (seen.has(relatedId)) continue;
+      seen.add(relatedId);
+      if (!(await this.researchExists(relatedId))) continue;
+      result.push(relatedId);
+    }
+
+    return result;
+  },
+
   dedupeIds(ids) {
     const seen = new Set();
     const result = [];

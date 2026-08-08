@@ -88,12 +88,13 @@ async function openResearchCard(id, container, options) {
   trackResearchHistory(researchId);
 
   const bundle = await WorkflowEngine.loadResearch(researchId);
-  WorkflowEngine.renderResearch(bundle, target);
+  await WorkflowEngine.renderResearch(bundle, target);
   renderResearchNavigation(target);
 
-  const explorerCard = document.getElementById('knowledgeExplorerCard');
-  if (target === explorerCard) {
-    await renderKnowledgeConnections(researchId);
+  if (target && target.id === 'knowledgeExplorerCard') {
+    const graph = await KnowledgeEngine.getGraph(researchId);
+    renderKnowledgeConnections(graph);
+    renderKnowledgeMap(graph);
   }
 }
 
@@ -128,13 +129,14 @@ function trackResearchHistory(researchId) {
   renderRecentResearch();
 }
 
-async function renderKnowledgeConnections(id) {
+function renderKnowledgeConnections(graph) {
   const outgoingEl = document.getElementById('connectionsOutgoing');
   const incomingEl = document.getElementById('connectionsIncoming');
-  if (!outgoingEl || !incomingEl) return;
+  if (!outgoingEl || !incomingEl || !graph) return;
 
-  const graph = await KnowledgeEngine.getGraph(id);
   const cardEl = document.getElementById('knowledgeExplorerCard');
+  const outgoing = Array.isArray(graph.outgoing) ? graph.outgoing : [];
+  const incoming = Array.isArray(graph.incoming) ? graph.incoming : [];
 
   const renderLinks = (listEl, ids) => {
     listEl.innerHTML = '';
@@ -150,8 +152,52 @@ async function renderKnowledgeConnections(id) {
     });
   };
 
-  renderLinks(outgoingEl, graph.outgoing);
-  renderLinks(incomingEl, graph.incoming);
+  renderLinks(outgoingEl, outgoing);
+  renderLinks(incomingEl, incoming);
+}
+
+function renderKnowledgeMap(graph) {
+  const mapEl = document.getElementById('knowledgeMap');
+  if (!mapEl || !graph) return;
+
+  const cardEl = document.getElementById('knowledgeExplorerCard');
+  const outgoing = Array.isArray(graph.outgoing) ? graph.outgoing : [];
+  const incoming = Array.isArray(graph.incoming) ? graph.incoming : [];
+  const center = graph.center;
+
+  mapEl.textContent = '';
+
+  const appendNode = (nodeId) => {
+    const span = document.createElement('span');
+    span.textContent = WorkflowEngine.cardTitle(nodeId);
+    span.style.cursor = 'pointer';
+    span.onclick = () => openResearchCard(nodeId, cardEl);
+    mapEl.appendChild(span);
+  };
+
+  mapEl.appendChild(document.createTextNode('● '));
+  appendNode(center);
+  mapEl.appendChild(document.createTextNode('\n'));
+
+  outgoing.forEach((nodeId, index) => {
+    const branch = index === outgoing.length - 1 ? ' └─ ' : ' ├─ ';
+    mapEl.appendChild(document.createTextNode(branch));
+    appendNode(nodeId);
+    mapEl.appendChild(document.createTextNode('\n'));
+  });
+
+  mapEl.appendChild(document.createTextNode('\nIncoming\n'));
+  if (!incoming.length) {
+    mapEl.appendChild(document.createTextNode('(none)'));
+    return;
+  }
+
+  incoming.forEach((nodeId, index) => {
+    if (index > 0) mapEl.appendChild(document.createTextNode('\n\n'));
+    appendNode(nodeId);
+    mapEl.appendChild(document.createTextNode('\n    │\n    ▼\n   '));
+    appendNode(center);
+  });
 }
 
 function renderRecentResearch() {
@@ -231,8 +277,10 @@ async function selectKnowledgeTag(tag) {
   cardEl.textContent = 'Select a research card';
   const outgoingEl = document.getElementById('connectionsOutgoing');
   const incomingEl = document.getElementById('connectionsIncoming');
+  const mapEl = document.getElementById('knowledgeMap');
   if (outgoingEl) outgoingEl.innerHTML = '';
   if (incomingEl) incomingEl.innerHTML = '';
+  if (mapEl) mapEl.textContent = '';
 
   const ids = KnowledgeEngine.searchByTag(tag);
   if (!ids.length) {

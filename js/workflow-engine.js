@@ -216,7 +216,7 @@ const WorkflowEngine = {
     return this.states?.transitions?.[current] ?? null;
   },
 
-  renderResearch(bundle, container) {
+  async renderResearch(bundle, container) {
     if (!bundle?.card) {
       container.innerHTML = '找不到研究卡';
       return;
@@ -225,7 +225,7 @@ const WorkflowEngine = {
     const { card, timeline, sources, notes } = bundle;
     const questions = Array.isArray(card.questions) ? card.questions : [];
     const tags = Array.isArray(card.tags) ? card.tags : [];
-    const related = Array.isArray(card.related) ? card.related : [];
+    const related = await KnowledgeEngine.getResolvedRelated(card.id);
 
     let html = `<h3>${card.title}</h3>`;
     html += `<p><b>Summary</b></p><p>${card.summary || '--'}</p>`;
@@ -236,8 +236,7 @@ const WorkflowEngine = {
       : '<p>--</p>';
     html += '<p><b>Related Research</b></p>';
     html += related.length
-      ? `<ul>${related.map(item => {
-          const relatedId = String(item);
+      ? `<ul>${related.map(relatedId => {
           const label = this.cardTitle(relatedId);
           return `<li data-related-id="${relatedId}">${label}</li>`;
         }).join('')}</ul>`
