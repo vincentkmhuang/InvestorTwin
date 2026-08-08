@@ -17,11 +17,7 @@ async function init() {
     await WorkflowEngine.loadResearch(id);
   }
 
-  DataEngine.renderMorningBrief(document.getElementById('morningBrief'), openFromMorningBrief);
-  DataEngine.renderOpportunityRadar(
-    document.getElementById('opportunityRadar'),
-    id => openResearchCard(id, undefined, { resetPath: true })
-  );
+  bindMorningBriefLinks();
   renderKnowledgeExplorer();
   renderRecentResearch();
   render();
@@ -52,7 +48,19 @@ async function loadVersionInfo() {
 function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
   document.getElementById(id).style.display = 'block';
-  document.getElementById('title').textContent = document.querySelector('[onclick="showPage(\'' + id + '\')"]').textContent.trim();
+  document.getElementById('title').textContent = id === 'today'
+    ? '🌅 Morning Brief'
+    : document.querySelector('[onclick="showPage(\'' + id + '\')"]').textContent.trim();
+}
+
+function bindMorningBriefLinks() {
+  const cardEl = document.getElementById('card');
+  document.querySelectorAll('#morningOpportunityRadar [data-research-id], #morningNewResearch [data-research-id]').forEach(el => {
+    el.onclick = () => {
+      showPage('cards');
+      openResearchCard(el.dataset.researchId, cardEl, { resetPath: true });
+    };
+  });
 }
 
 async function openFromMorningBrief(id) {

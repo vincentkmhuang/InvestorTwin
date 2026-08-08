@@ -102,6 +102,17 @@ const KnowledgeEngine = {
       result.push(relatedId);
     }
 
+    const incoming = await this.getIncomingLinks(selfId);
+    for (const item of incoming) {
+      if (item == null || item === '') continue;
+      const relatedId = String(item);
+      if (relatedId === selfId) continue;
+      if (seen.has(relatedId)) continue;
+      seen.add(relatedId);
+      if (!(await this.researchExists(relatedId))) continue;
+      result.push(relatedId);
+    }
+
     return result;
   },
 

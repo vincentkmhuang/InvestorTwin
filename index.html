@@ -19,25 +19,47 @@
 </div>
 </aside>
 <main>
-<h1 id="title">今日工作台</h1>
+<h1 id="title">🌅 Morning Brief</h1>
 
-<div id="today" class="page">
+<div id="today" class="page morning-brief">
 <section class="box">
-<h2>Morning Brief（示意）</h2>
-<div class="brief" id="morningBrief"></div>
+<h2>執行摘要</h2>
+<p>市場焦點仍集中在 AI 基礎設施與供應鏈驗證。Glass Bridge 量產進度與相關光通訊標的，是今日觀察重點。</p>
 </section>
 
-<div class="grid">
 <section class="box">
 <h2>機會雷達</h2>
-<ul id="opportunityRadar"></ul>
+<ul id="morningOpportunityRadar">
+<li data-research-id="glass-bridge">Glass Bridge — 量產驗證進行中</li>
+<li data-research-id="fau">FAU — 光互連需求觀察</li>
+<li data-research-id="cpo">CPO — 共封裝光學週期</li>
+<li data-research-id="hbm">HBM — 記憶體供給緊俏</li>
+</ul>
 </section>
 
 <section class="box">
-<h2>研究卡</h2>
-<div id="card">請點擊 Morning Brief 或機會雷達</div>
+<h2>今日問題</h2>
+<p>Glass Bridge 量產驗證，是否已形成台灣光通訊供應鏈的近期待投資機會？</p>
 </section>
-</div>
+
+<section class="box">
+<h2>外部世界</h2>
+<p>美股隔夜表現分歧。AI 基礎設施支出仍是主軸，利率與美元相對穩定。</p>
+</section>
+
+<section class="box">
+<h2>台灣市場</h2>
+<p>台股科技族群持續跟隨 AI 硬體敘事。光通訊與 PCB 相關標的較整體電子族群更受關注。</p>
+</section>
+
+<section class="box">
+<h2>今日新增研究</h2>
+<ul id="morningNewResearch">
+<li data-research-id="glass-bridge">Glass Bridge — 更新時間軸與筆記</li>
+<li data-research-id="fau">FAU — 研究卡（示意）</li>
+<li data-research-id="cpo">CPO — 研究卡（示意）</li>
+</ul>
+</section>
 </div>
 
 <div id="queue" class="page" style="display:none">
@@ -51,6 +73,10 @@
 
 <div id="cards" class="page" style="display:none">
 <section class="box"><h2>所有研究卡</h2><ul id="cardList"></ul></section>
+<section class="box">
+<h2>研究卡</h2>
+<div id="card">請選擇研究卡</div>
+</section>
 </div>
 
 <div id="knowledge" class="page" style="display:none">
