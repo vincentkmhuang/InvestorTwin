@@ -1,4 +1,11 @@
-let navigationPath = [];
+let navigationState = {
+  currentId: null,
+  breadcrumb: [],
+  backStack: [],
+  forwardStack: []
+};
+let navigationContainer = null;
+let researchHistory = [];
 
 async function init() {
   await DataEngine.init();
@@ -16,6 +23,7 @@ async function init() {
     id => openResearchCard(id, undefined, { resetPath: true })
   );
   renderKnowledgeExplorer();
+  renderRecentResearch();
   render();
 }
 
@@ -56,36 +64,150 @@ async function openFromMorningBrief(id) {
 
 async function openResearchCard(id, container, options) {
   const researchId = WorkflowEngine.resolveResearchId(id);
-  if (options?.resetPath) navigationPath = [];
-  navigationPath.push(researchId);
-
+  const fromNavigation = options?.fromNavigation === true;
   const target = container || document.getElementById('card');
+  navigationContainer = target;
+
+  if (!fromNavigation) {
+    if (navigationState.currentId != null) {
+      navigationState.backStack.push({
+        id: navigationState.currentId,
+        breadcrumb: [...navigationState.breadcrumb]
+      });
+    }
+    navigationState.forwardStack = [];
+
+    if (options?.resetPath) {
+      navigationState.breadcrumb = [researchId];
+    } else {
+      navigationState.breadcrumb = [...navigationState.breadcrumb, researchId];
+    }
+  }
+
+  navigationState.currentId = researchId;
+  trackResearchHistory(researchId);
+
   const bundle = await WorkflowEngine.loadResearch(researchId);
   WorkflowEngine.renderResearch(bundle, target);
-  renderResearchBreadcrumb(target);
+  renderResearchNavigation(target);
+
+  const explorerCard = document.getElementById('knowledgeExplorerCard');
+  if (target === explorerCard) {
+    await renderKnowledgeConnections(researchId);
+  }
 }
 
-function renderResearchBreadcrumb(container) {
-  if (!navigationPath.length) return;
+function navigationBack() {
+  if (!navigationState.backStack.length) return;
+
+  navigationState.forwardStack.push({
+    id: navigationState.currentId,
+    breadcrumb: [...navigationState.breadcrumb]
+  });
+  const entry = navigationState.backStack.pop();
+  navigationState.breadcrumb = [...entry.breadcrumb];
+
+  openResearchCard(entry.id, navigationContainer, { fromNavigation: true });
+}
+
+function navigationForward() {
+  if (!navigationState.forwardStack.length) return;
+
+  navigationState.backStack.push({
+    id: navigationState.currentId,
+    breadcrumb: [...navigationState.breadcrumb]
+  });
+  const entry = navigationState.forwardStack.pop();
+  navigationState.breadcrumb = [...entry.breadcrumb];
+
+  openResearchCard(entry.id, navigationContainer, { fromNavigation: true });
+}
+
+function trackResearchHistory(researchId) {
+  researchHistory = [researchId, ...researchHistory.filter(id => id !== researchId)].slice(0, 10);
+  renderRecentResearch();
+}
+
+async function renderKnowledgeConnections(id) {
+  const outgoingEl = document.getElementById('connectionsOutgoing');
+  const incomingEl = document.getElementById('connectionsIncoming');
+  if (!outgoingEl || !incomingEl) return;
+
+  const graph = await KnowledgeEngine.getGraph(id);
+  const cardEl = document.getElementById('knowledgeExplorerCard');
+
+  const renderLinks = (listEl, ids) => {
+    listEl.innerHTML = '';
+    if (!ids.length) {
+      listEl.innerHTML = '<li>--</li>';
+      return;
+    }
+    ids.forEach(nodeId => {
+      const li = document.createElement('li');
+      li.textContent = WorkflowEngine.cardTitle(nodeId);
+      li.onclick = () => openResearchCard(nodeId, cardEl);
+      listEl.appendChild(li);
+    });
+  };
+
+  renderLinks(outgoingEl, graph.outgoing);
+  renderLinks(incomingEl, graph.incoming);
+}
+
+function renderRecentResearch() {
+  const listEl = document.getElementById('recentResearch');
+  if (!listEl) return;
+
+  listEl.innerHTML = '';
+  const cardEl = document.getElementById('knowledgeExplorerCard');
+
+  researchHistory.forEach(id => {
+    const li = document.createElement('li');
+    li.textContent = WorkflowEngine.cardTitle(id);
+    li.onclick = () => openResearchCard(id, cardEl, { resetPath: true });
+    listEl.appendChild(li);
+  });
+}
+
+function renderResearchNavigation(container) {
+  const controls = document.createElement('p');
+  controls.className = 'research-nav-controls';
+
+  const backBtn = document.createElement('span');
+  backBtn.textContent = '← Back';
+  backBtn.style.cursor = 'pointer';
+  backBtn.onclick = () => navigationBack();
+  controls.appendChild(backBtn);
+
+  const forwardBtn = document.createElement('span');
+  forwardBtn.textContent = '→ Forward';
+  forwardBtn.style.cursor = 'pointer';
+  forwardBtn.style.marginLeft = '12px';
+  forwardBtn.onclick = () => navigationForward();
+  controls.appendChild(forwardBtn);
+
+  container.insertBefore(controls, container.firstChild);
+
+  if (!navigationState.breadcrumb.length) return;
 
   const crumb = document.createElement('p');
   crumb.className = 'research-breadcrumb';
 
-  navigationPath.forEach((pathId, index) => {
+  navigationState.breadcrumb.forEach((pathId, index) => {
     if (index > 0) crumb.appendChild(document.createTextNode(' > '));
 
     const item = document.createElement('span');
     item.textContent = WorkflowEngine.cardTitle(pathId);
     item.style.cursor = 'pointer';
     item.onclick = () => {
-      const targetId = navigationPath[index];
-      navigationPath = navigationPath.slice(0, index);
-      openResearchCard(targetId, container);
+      const targetId = navigationState.breadcrumb[index];
+      navigationState.breadcrumb = navigationState.breadcrumb.slice(0, index + 1);
+      openResearchCard(targetId, container, { fromNavigation: true });
     };
     crumb.appendChild(item);
   });
 
-  container.insertBefore(crumb, container.firstChild);
+  controls.insertAdjacentElement('afterend', crumb);
 }
 
 function renderKnowledgeExplorer() {
@@ -107,6 +229,10 @@ async function selectKnowledgeTag(tag) {
   const cardEl = document.getElementById('knowledgeExplorerCard');
   resultsEl.innerHTML = '';
   cardEl.textContent = 'Select a research card';
+  const outgoingEl = document.getElementById('connectionsOutgoing');
+  const incomingEl = document.getElementById('connectionsIncoming');
+  if (outgoingEl) outgoingEl.innerHTML = '';
+  if (incomingEl) incomingEl.innerHTML = '';
 
   const ids = KnowledgeEngine.searchByTag(tag);
   if (!ids.length) {

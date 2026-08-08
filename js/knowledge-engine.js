@@ -65,6 +65,56 @@ const KnowledgeEngine = {
     return Array.isArray(card.related) ? [...card.related] : [];
   },
 
+  dedupeIds(ids) {
+    const seen = new Set();
+    const result = [];
+
+    for (const item of ids ?? []) {
+      if (item == null || item === '') continue;
+      const id = String(item);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      result.push(id);
+    }
+
+    return result;
+  },
+
+  async getNeighbors(id) {
+    return this.dedupeIds(await this.getRelated(id));
+  },
+
+  async getIncomingLinks(id) {
+    if (id == null || id === '') return [];
+
+    const targetId = String(id);
+    const incoming = [];
+    const seen = new Set();
+
+    for (const candidateId of this.indexedIds ?? []) {
+      if (candidateId === targetId || seen.has(candidateId)) continue;
+
+      const card = await this.searchById(candidateId);
+      if (!card) continue;
+
+      const related = Array.isArray(card.related) ? card.related : [];
+      const linksToTarget = related.some(item => item != null && item !== '' && String(item) === targetId);
+      if (!linksToTarget) continue;
+
+      seen.add(candidateId);
+      incoming.push(candidateId);
+    }
+
+    return incoming;
+  },
+
+  async getGraph(id) {
+    const center = String(id);
+    const outgoing = await this.getNeighbors(center);
+    const incoming = await this.getIncomingLinks(center);
+    return { center, outgoing, incoming };
+  },
+
   getTags() {
     return Object.keys(this.index?.tags ?? {}).sort();
   }
