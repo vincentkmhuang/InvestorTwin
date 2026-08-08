@@ -1,3 +1,5 @@
+let navigationPath = [];
+
 async function init() {
   await DataEngine.init();
   await WorkflowEngine.init();
@@ -9,7 +11,10 @@ async function init() {
   }
 
   DataEngine.renderMorningBrief(document.getElementById('morningBrief'), openFromMorningBrief);
-  DataEngine.renderOpportunityRadar(document.getElementById('opportunityRadar'), openResearchCard);
+  DataEngine.renderOpportunityRadar(
+    document.getElementById('opportunityRadar'),
+    id => openResearchCard(id, undefined, { resetPath: true })
+  );
   renderKnowledgeExplorer();
   render();
 }
@@ -46,13 +51,41 @@ async function openFromMorningBrief(id) {
   const researchId = WorkflowEngine.resolveResearchId(id);
   const added = await WorkflowEngine.ensureInQueue(researchId, 'Morning Brief');
   if (added) render();
-  await openResearchCard(id);
+  await openResearchCard(id, undefined, { resetPath: true });
 }
 
-async function openResearchCard(id, container) {
+async function openResearchCard(id, container, options) {
   const researchId = WorkflowEngine.resolveResearchId(id);
+  if (options?.resetPath) navigationPath = [];
+  navigationPath.push(researchId);
+
+  const target = container || document.getElementById('card');
   const bundle = await WorkflowEngine.loadResearch(researchId);
-  WorkflowEngine.renderResearch(bundle, container || document.getElementById('card'));
+  WorkflowEngine.renderResearch(bundle, target);
+  renderResearchBreadcrumb(target);
+}
+
+function renderResearchBreadcrumb(container) {
+  if (!navigationPath.length) return;
+
+  const crumb = document.createElement('p');
+  crumb.className = 'research-breadcrumb';
+
+  navigationPath.forEach((pathId, index) => {
+    if (index > 0) crumb.appendChild(document.createTextNode(' > '));
+
+    const item = document.createElement('span');
+    item.textContent = WorkflowEngine.cardTitle(pathId);
+    item.style.cursor = 'pointer';
+    item.onclick = () => {
+      const targetId = navigationPath[index];
+      navigationPath = navigationPath.slice(0, index);
+      openResearchCard(targetId, container);
+    };
+    crumb.appendChild(item);
+  });
+
+  container.insertBefore(crumb, container.firstChild);
 }
 
 function renderKnowledgeExplorer() {
@@ -85,7 +118,7 @@ async function selectKnowledgeTag(tag) {
     const card = await KnowledgeEngine.searchById(id);
     const li = document.createElement('li');
     li.textContent = card?.title ?? WorkflowEngine.cardTitle(id);
-    li.onclick = () => openResearchCard(id, cardEl);
+    li.onclick = () => openResearchCard(id, cardEl, { resetPath: true });
     resultsEl.appendChild(li);
   }
 }
@@ -96,11 +129,11 @@ function render() {
   WorkflowEngine.getQueueIds().forEach(q => {
     let li = document.createElement('li');
     li.textContent = WorkflowEngine.cardTitle(q);
-    li.onclick = () => openResearchCard(q);
+    li.onclick = () => openResearchCard(q, undefined, { resetPath: true });
     queueList.appendChild(li);
     let li2 = document.createElement('li');
     li2.textContent = WorkflowEngine.cardTitle(q);
-    li2.onclick = () => openResearchCard(q);
+    li2.onclick = () => openResearchCard(q, undefined, { resetPath: true });
     cardList.appendChild(li2);
   });
 }

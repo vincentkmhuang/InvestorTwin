@@ -236,7 +236,11 @@ const WorkflowEngine = {
       : '<p>--</p>';
     html += '<p><b>Related Research</b></p>';
     html += related.length
-      ? `<ul>${related.map(item => `<li>${item}</li>`).join('')}</ul>`
+      ? `<ul>${related.map(item => {
+          const relatedId = String(item);
+          const label = this.cardTitle(relatedId);
+          return `<li data-related-id="${relatedId}">${label}</li>`;
+        }).join('')}</ul>`
       : '<p>--</p>';
     html += `<p><b>Investment Thesis</b></p><p>${card.investmentThesis || '--'}</p>`;
     html += '<p><b>Questions</b></p>';
@@ -257,6 +261,14 @@ const WorkflowEngine = {
       : '<p>--</p>';
 
     container.innerHTML = html;
+
+    container.querySelectorAll('[data-related-id]').forEach(li => {
+      li.onclick = () => {
+        if (typeof openResearchCard === 'function') {
+          openResearchCard(li.dataset.relatedId, container);
+        }
+      };
+    });
   },
 
   cardTitle(id) {
