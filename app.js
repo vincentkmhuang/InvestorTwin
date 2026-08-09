@@ -323,7 +323,13 @@ function render() {
   WorkflowEngine.getQueueIds().forEach(q => {
     let li = document.createElement('li');
     li.textContent = WorkflowEngine.cardTitle(q);
-    li.onclick = () => openResearchCard(q, undefined, { resetPath: true });
+    li.onclick = () => {
+      showPage('cards');
+      openResearchCard(q, document.getElementById('card'), {
+        resetPath: true,
+        fromPage: 'queue'
+      });
+    };
     queueList.appendChild(li);
     let li2 = document.createElement('li');
     li2.textContent = WorkflowEngine.cardTitle(q);
