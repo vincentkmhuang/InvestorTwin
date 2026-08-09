@@ -56,7 +56,10 @@ function showPage(id) {
 
 function openMorningBriefResearch(id) {
   showPage('cards');
-  openResearchCard(id, document.getElementById('card'), { resetPath: true });
+  openResearchCard(id, document.getElementById('card'), {
+    resetPath: true,
+    fromPage: 'today'
+  });
 }
 
 async function openFromMorningBrief(id) {
@@ -73,7 +76,9 @@ async function openResearchCard(id, container, options) {
   navigationContainer = target;
 
   if (!fromNavigation) {
-    if (navigationState.currentId != null) {
+    if (options?.fromPage) {
+      navigationState.backStack = [{ type: 'page', pageId: options.fromPage }];
+    } else if (navigationState.currentId != null) {
       navigationState.backStack.push({
         id: navigationState.currentId,
         breadcrumb: [...navigationState.breadcrumb]
@@ -104,6 +109,13 @@ async function openResearchCard(id, container, options) {
 
 function navigationBack() {
   if (!navigationState.backStack.length) return;
+
+  const top = navigationState.backStack[navigationState.backStack.length - 1];
+  if (top?.type === 'page') {
+    navigationState.backStack.pop();
+    showPage(top.pageId);
+    return;
+  }
 
   navigationState.forwardStack.push({
     id: navigationState.currentId,
