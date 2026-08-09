@@ -54,7 +54,11 @@ function showPage(id) {
     : document.querySelector('[onclick="showPage(\'' + id + '\')"]').textContent.trim();
 }
 
-function openMorningBriefResearch(id) {
+async function openMorningBriefResearch(id) {
+  const researchId = WorkflowEngine.resolveResearchId(id);
+  const added = await WorkflowEngine.ensureInQueue(researchId, 'Morning Brief');
+  if (added) render();
+
   showPage('cards');
   openResearchCard(id, document.getElementById('card'), {
     resetPath: true,
