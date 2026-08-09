@@ -17,7 +17,8 @@ async function init() {
     await WorkflowEngine.loadResearch(id);
   }
 
-  bindMorningBriefLinks();
+  await DataEngine.loadMorningBrief();
+  await DataEngine.renderMorningBrief(openMorningBriefResearch);
   renderKnowledgeExplorer();
   renderRecentResearch();
   render();
@@ -53,14 +54,9 @@ function showPage(id) {
     : document.querySelector('[onclick="showPage(\'' + id + '\')"]').textContent.trim();
 }
 
-function bindMorningBriefLinks() {
-  const cardEl = document.getElementById('card');
-  document.querySelectorAll('#morningOpportunityRadar [data-research-id], #morningNewResearch [data-research-id]').forEach(el => {
-    el.onclick = () => {
-      showPage('cards');
-      openResearchCard(el.dataset.researchId, cardEl, { resetPath: true });
-    };
-  });
+function openMorningBriefResearch(id) {
+  showPage('cards');
+  openResearchCard(id, document.getElementById('card'), { resetPath: true });
 }
 
 async function openFromMorningBrief(id) {

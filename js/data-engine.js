@@ -1,5 +1,6 @@
 const DataEngine = {
   morningBrief: null,
+  morningBriefHome: null,
   opportunityRadar: null,
   investmentThesis: null,
   researchCards: {},
@@ -15,6 +16,18 @@ const DataEngine = {
     this.investmentThesis = investmentThesis;
   },
 
+  async loadMorningBrief() {
+    try {
+      const response = await fetch('data/morning-brief.json');
+      this.morningBriefHome = response.ok
+        ? await response.json()
+        : null;
+    } catch (_) {
+      this.morningBriefHome = null;
+    }
+    return this.morningBriefHome;
+  },
+
   async getCard(id) {
     if (!this.researchCards[id]) {
       try {
@@ -27,16 +40,60 @@ const DataEngine = {
     return this.researchCards[id] ?? this.investmentThesis?.cards?.[id] ?? null;
   },
 
-  renderMorningBrief(container, onItemClick) {
-    container.innerHTML = this.morningBrief.items.map(item => `
-      <div class="item" data-id="${item.id}">
-        <b>${item.icon} ${item.title}</b>
-        <p>${item.summary}</p>
-      </div>
-    `).join('');
-    container.querySelectorAll('.item').forEach(el => {
-      el.onclick = () => onItemClick(el.dataset.id);
-    });
+  async renderMorningBrief(onItemClick) {
+    const data = this.morningBriefHome;
+    if (!data) return;
+
+    const setText = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value || '--';
+    };
+
+    setText('morningExecutiveSummary', data.executiveSummary);
+    setText('morningTodayQuestion', data.todayQuestion);
+    setText('morningGlobalMarket', data.globalMarket);
+    setText('morningTaiwanMarket', data.taiwanMarket);
+
+    const renderList = async (listId, ids) => {
+      const listEl = document.getElementById(listId);
+      if (!listEl) return;
+      listEl.innerHTML = '';
+
+      for (const rawId of ids || []) {
+        const id = typeof rawId === 'string' ? rawId : rawId?.id;
+        if (!id) continue;
+
+        const card = await this.getCard(id);
+        const title = card?.title || id;
+        let summary = (card?.summary || '').trim();
+        if (summary.startsWith(title)) {
+          summary = summary.slice(title.length).replace(/^[\s—\-–：:]+/, '').trim();
+        }
+
+        const li = document.createElement('li');
+        li.dataset.researchId = id;
+
+        const titleEl = document.createElement('div');
+        titleEl.className = 'morning-brief-title';
+        titleEl.textContent = title;
+        li.appendChild(titleEl);
+
+        if (summary) {
+          const summaryEl = document.createElement('div');
+          summaryEl.className = 'morning-brief-summary';
+          summaryEl.textContent = summary;
+          li.appendChild(summaryEl);
+        }
+
+        if (typeof onItemClick === 'function') {
+          li.onclick = () => onItemClick(id);
+        }
+        listEl.appendChild(li);
+      }
+    };
+
+    await renderList('morningOpportunityRadar', data.opportunityRadar);
+    await renderList('morningNewResearch', data.newResearch);
   },
 
   renderOpportunityRadar(container, onItemClick) {
