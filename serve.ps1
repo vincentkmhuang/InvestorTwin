@@ -11,6 +11,7 @@ Start-Sleep -Seconds 1
 
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://localhost:$port/")
+$listener.Prefixes.Add("http://vincent.tailb392b5.ts.net:$port/")
 try {
   $listener.Start()
 } catch {
