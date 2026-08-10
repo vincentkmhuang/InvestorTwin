@@ -170,6 +170,31 @@ const WorkflowEngine = {
     }
   },
 
+  async appendResearchNote(id, text, question) {
+    const appendNote = (text || '').trim();
+    if (!appendNote) return { ok: false, error: 'invalid_payload' };
+
+    const payload = { appendNote };
+    const q = (question || '').trim();
+    if (q) payload.question = q;
+
+    try {
+      const res = await fetch(`/api/research/${encodeURIComponent(id)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return { ok: false, error: data.error || 'persistence_failure', message: data.message };
+      }
+      delete this.researchCache[id];
+      return { ok: true, updated: data.updated === true, id: data.id || id };
+    } catch (_) {
+      return { ok: false, error: 'persistence_failure' };
+    }
+  },
+
   parseJsonArray(data, key) {
     if (Array.isArray(data)) return data;
     if (data && Array.isArray(data[key])) return data[key];
@@ -258,6 +283,10 @@ const WorkflowEngine = {
     html += notes.length
       ? `<ul>${notes.map(entry => `<li>${entry.date} — ${entry.text}</li>`).join('')}</ul>`
       : '<p>--</p>';
+    html += '<p><b>Append Note</b></p>';
+    html += '<textarea data-append-note rows="3" style="width:100%;box-sizing:border-box"></textarea>';
+    html += '<p><input data-append-question placeholder="Optional question" style="width:100%;box-sizing:border-box"></p>';
+    html += '<p><button type="button" data-append-save>Save</button></p>';
 
     container.innerHTML = html;
 
@@ -268,6 +297,29 @@ const WorkflowEngine = {
         }
       };
     });
+
+    const saveBtn = container.querySelector('[data-append-save]');
+    const noteInput = container.querySelector('[data-append-note]');
+    const questionInput = container.querySelector('[data-append-question]');
+    if (saveBtn && noteInput) {
+      saveBtn.onclick = async () => {
+        const result = await this.appendResearchNote(
+          card.id,
+          noteInput.value,
+          questionInput?.value
+        );
+        if (!result.ok) {
+          window.alert(result.message || 'Failed to save note');
+          return;
+        }
+        if (typeof openResearchCard === 'function') {
+          await openResearchCard(card.id, container, { fromNavigation: true });
+        } else {
+          const fresh = await this.loadResearch(card.id);
+          await this.renderResearch(fresh, container);
+        }
+      };
+    }
   },
 
   cardTitle(id) {

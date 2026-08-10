@@ -43,6 +43,49 @@ function Get-GitCommit($rootPath) {
   return 'unknown'
 }
 
+function Get-Utf8NoBom {
+  return New-Object System.Text.UTF8Encoding $false
+}
+
+function Read-Utf8Json($path) {
+  $text = [System.IO.File]::ReadAllText($path, (Get-Utf8NoBom))
+  return $text | ConvertFrom-Json
+}
+
+function Write-Utf8Text($path, $text) {
+  [System.IO.File]::WriteAllText($path, $text, (Get-Utf8NoBom))
+}
+
+function ConvertTo-JsonArrayText($items) {
+  $list = @($items)
+  if ($list.Count -eq 0) { return '[]' }
+  $parts = foreach ($item in $list) {
+    ($item | ConvertTo-Json -Depth 10 -Compress)
+  }
+  return '[' + ($parts -join ',') + ']'
+}
+
+function Write-ResearchCardJson($cardPath, $cardObj, $questions) {
+  $arrayKeys = @('tags', 'related')
+  $parts = New-Object System.Collections.Generic.List[string]
+  $wroteQuestions = $false
+  foreach ($prop in $cardObj.PSObject.Properties) {
+    $key = $prop.Name
+    if ($key -eq 'questions') {
+      $wroteQuestions = $true
+      [void]$parts.Add('"questions":' + (ConvertTo-JsonArrayText $questions))
+    } elseif ($key -in $arrayKeys) {
+      [void]$parts.Add('"' + $key + '":' + (ConvertTo-JsonArrayText @($prop.Value)))
+    } else {
+      [void]$parts.Add('"' + $key + '":' + ($prop.Value | ConvertTo-Json -Depth 10 -Compress))
+    }
+  }
+  if (-not $wroteQuestions) {
+    [void]$parts.Add('"questions":' + (ConvertTo-JsonArrayText $questions))
+  }
+  Write-Utf8Text $cardPath ('{' + ($parts -join ',') + '}')
+}
+
 while ($listener.IsListening) {
   $context = $listener.GetContext()
   $request = $context.Request
@@ -78,27 +121,85 @@ while ($listener.IsListening) {
       Send-Json $response @{ added = $added; items = $queue.items }
     }
     elseif ($localPath -match '^/api/research/(.+)$' -and $method -eq 'POST') {
-      $id = $Matches[1]
-      $dir = Join-Path $root ("research\" + $id)
-      $created = $false
-      if (-not (Test-Path $dir)) {
-        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+      $id = [Uri]::UnescapeDataString($Matches[1])
+      if ([string]::IsNullOrWhiteSpace($id) -or $id -match '[\\/]' -or $id -eq '.' -or $id -eq '..') {
+        Send-Json $response @{ error = 'missing_research'; message = 'Invalid research id' } 400
+      } else {
+        $dir = Join-Path $root ("research\" + $id)
         $body = Read-Body $request
-        $card = if ($body.card) { $body.card } else {
-          [PSCustomObject]@{
-            id = $id; title = $id; summary = ''; investmentThesis = ''
-            questions = @(); reason = 'Unknown'; tags = @(); related = @()
-            status = 'researching'; updated = (Get-Date -Format 'yyyy-MM-dd')
+
+        if (-not (Test-Path $dir)) {
+          New-Item -ItemType Directory -Path $dir -Force | Out-Null
+          $card = if ($body.card) { $body.card } else {
+            [PSCustomObject]@{
+              id = $id; title = $id; summary = ''; investmentThesis = ''
+              questions = @(); reason = 'Unknown'; tags = @(); related = @()
+              status = 'researching'; updated = (Get-Date -Format 'yyyy-MM-dd')
+            }
+          }
+          $card | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $dir 'card.json') -Encoding UTF8
+          '[]' | Set-Content (Join-Path $dir 'notes.json') -Encoding UTF8
+          '[]' | Set-Content (Join-Path $dir 'timeline.json') -Encoding UTF8
+          '[]' | Set-Content (Join-Path $dir 'sources.json') -Encoding UTF8
+          Update-KnowledgeIndex -RootPath $root | Out-Null
+          Send-Json $response @{ created = $true; updated = $false; id = $id }
+        } else {
+          $noteText = $null
+          if ($body -and $body.PSObject.Properties.Name -contains 'appendNote' -and $body.appendNote) {
+            $noteText = [string]$body.appendNote
+          } elseif ($body -and $body.note) {
+            if ($body.note -is [string]) { $noteText = [string]$body.note }
+            elseif ($body.note.PSObject.Properties.Name -contains 'text') { $noteText = [string]$body.note.text }
+          }
+          $noteText = if ($null -eq $noteText) { '' } else { $noteText.Trim() }
+          $questionText = ''
+          if ($body -and $body.PSObject.Properties.Name -contains 'question' -and $body.question) {
+            $questionText = ([string]$body.question).Trim()
+          }
+
+          if (-not $noteText) {
+            Send-Json $response @{ error = 'invalid_payload'; message = 'appendNote/note text is required for update' } 400
+          } else {
+            try {
+              $notesPath = Join-Path $dir 'notes.json'
+              $existingNotes = @()
+              if (Test-Path $notesPath) {
+                $parsedNotes = Read-Utf8Json $notesPath
+                if ($parsedNotes -is [System.Array]) {
+                  $existingNotes = @($parsedNotes)
+                } elseif ($parsedNotes -and ($parsedNotes.PSObject.Properties.Name -contains 'notes')) {
+                  $existingNotes = @($parsedNotes.notes)
+                }
+              }
+              $noteEntry = [PSCustomObject]@{
+                date = (Get-Date -Format 'yyyy-MM-dd')
+                text = $noteText
+              }
+              $allNotes = @($existingNotes + $noteEntry)
+              Write-Utf8Text $notesPath ('{"notes":' + (ConvertTo-JsonArrayText $allNotes) + '}')
+
+              if ($questionText) {
+                $cardPath = Join-Path $dir 'card.json'
+                if (-not (Test-Path $cardPath)) {
+                  throw 'card.json missing for existing research'
+                }
+                $cardObj = Read-Utf8Json $cardPath
+                $questions = @()
+                if ($cardObj.PSObject.Properties.Name -contains 'questions' -and $cardObj.questions) {
+                  $questions = @($cardObj.questions)
+                }
+                $questions += $questionText
+                $cardObj.updated = (Get-Date -Format 'yyyy-MM-dd')
+                Write-ResearchCardJson $cardPath $cardObj $questions
+              }
+
+              Send-Json $response @{ created = $false; updated = $true; id = $id }
+            } catch {
+              Send-Json $response @{ error = 'persistence_failure'; message = $_.Exception.Message } 500
+            }
           }
         }
-        $card | ConvertTo-Json -Depth 10 | Set-Content (Join-Path $dir 'card.json') -Encoding UTF8
-        '[]' | Set-Content (Join-Path $dir 'notes.json') -Encoding UTF8
-        '[]' | Set-Content (Join-Path $dir 'timeline.json') -Encoding UTF8
-        '[]' | Set-Content (Join-Path $dir 'sources.json') -Encoding UTF8
-        $created = $true
-        Update-KnowledgeIndex -RootPath $root | Out-Null
       }
-      Send-Json $response @{ created = $created; id = $id }
     }
     else {
       if ($localPath -eq '/') { $localPath = '/index.html' }
