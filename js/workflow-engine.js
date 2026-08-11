@@ -287,6 +287,7 @@ const WorkflowEngine = {
     html += '<textarea data-append-note rows="3" style="width:100%;box-sizing:border-box"></textarea>';
     html += '<p><input data-append-question placeholder="Optional question" style="width:100%;box-sizing:border-box"></p>';
     html += '<p><button type="button" data-append-save>Save</button></p>';
+    html += '<p><button type="button" data-queue-follow-up>Queue for follow-up</button></p>';
 
     container.innerHTML = html;
 
@@ -318,6 +319,18 @@ const WorkflowEngine = {
           const fresh = await this.loadResearch(card.id);
           await this.renderResearch(fresh, container);
         }
+      };
+    }
+
+    const queueBtn = container.querySelector('[data-queue-follow-up]');
+    if (queueBtn) {
+      queueBtn.onclick = async () => {
+        const added = await this.ensureInQueue(card.id, 'Follow-up');
+        if (!added) {
+          window.alert('Already in queue');
+          return;
+        }
+        if (typeof render === 'function') render();
       };
     }
   },
