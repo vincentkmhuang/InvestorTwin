@@ -471,14 +471,19 @@ while ($listener.IsListening) {
         $methodName = if ($body.methodInput.method) { [string]$body.methodInput.method } else { '' }
         $fieldName = if ($body.methodInput.field) { [string]$body.methodInput.field } else { '' }
         $rawValue = $body.methodInput.value
+        $isBlank = $null -eq $rawValue -or $rawValue -eq ''
         $parsedValue = $null
-        try { $parsedValue = [double]$rawValue } catch { $parsedValue = $null }
+        $parseFailed = $false
+        if (-not $isBlank) {
+          try { $parsedValue = [double]$rawValue } catch { $parseFailed = $true }
+          if ($null -eq $parsedValue) { $parseFailed = $true }
+        }
         if ($target.Count -eq 0) {
           Send-Json $response @{ error = 'not_found'; message = 'Investment Case not found' } 404
         } elseif (-not (Get-MethodInputFields).Contains($methodName) -or @((Get-MethodInputFields)[$methodName]) -notcontains $fieldName) {
           Send-Json $response @{ error = 'invalid_payload'; message = 'Unsupported method or field' } 400
-        } elseif ($null -eq $parsedValue) {
-          Send-Json $response @{ error = 'invalid_payload'; message = 'methodInput value must be a number' } 400
+        } elseif ($parseFailed) {
+          Send-Json $response @{ error = 'invalid_payload'; message = 'methodInput value must be a number or empty' } 400
         } else {
           $caseObj = $target[0]
           if (-not $caseObj.valuation) {
@@ -498,12 +503,22 @@ while ($listener.IsListening) {
             $methodObj = [PSCustomObject]@{}
             $caseObj.valuation.methodInputs | Add-Member -NotePropertyName $methodName -NotePropertyValue $methodObj -Force
           }
-          $leaf = [PSCustomObject]@{
-            value = $parsedValue
-            sourceType = 'user'
-            researchId = $null
-            period = $null
-            asOf = $today
+          $leaf = if ($isBlank) {
+            [PSCustomObject]@{
+              value = $null
+              sourceType = $null
+              researchId = $null
+              period = $null
+              asOf = $null
+            }
+          } else {
+            [PSCustomObject]@{
+              value = $parsedValue
+              sourceType = 'user'
+              researchId = $null
+              period = $null
+              asOf = $today
+            }
           }
           if ($methodObj.PSObject.Properties[$fieldName]) {
             $methodObj.$fieldName = $leaf

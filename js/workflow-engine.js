@@ -417,21 +417,21 @@ const WorkflowEngine = {
       { key: 'reasonablePB', required: true, source: 'user', unit: '倍', inputKind: 'number', purpose: '使用者認為合理的股價淨值比' }
     ],
     'DCF': [
-      { key: 'freeCashFlow', required: true, source: 'system', unit: '金額', inputKind: 'number', purpose: '自由現金流起點，尚未折現' },
+      { key: 'freeCashFlow', required: true, source: 'system', unit: '億元', inputKind: 'number', purpose: '自由現金流起點，尚未折現' },
       { key: 'growthRate', required: true, source: 'user', unit: '%', inputKind: 'percent', purpose: '明確成長期的現金流成長率' },
       { key: 'discountRate', required: true, source: 'user', unit: '%', inputKind: 'percent', purpose: '把未來現金流折回現值的折現率' },
       { key: 'terminalGrowthRate', required: true, source: 'user', unit: '%', inputKind: 'percent', purpose: '終值階段的長期成長率' }
     ],
     'EV/EBITDA': [
-      { key: 'EBITDA', required: true, source: 'system', unit: '金額', inputKind: 'number', purpose: '企業價值對 EBITDA 的營運獲利基準' },
+      { key: 'EBITDA', required: true, source: 'system', unit: '億元', inputKind: 'number', purpose: '企業價值對 EBITDA 的營運獲利基準' },
       { key: 'reasonableEVEBITDA', required: true, source: 'user', unit: '倍', inputKind: 'number', purpose: '使用者認為合理的 EV/EBITDA 倍數' },
-      { key: 'netDebt', required: true, source: 'system', unit: '金額', inputKind: 'number', purpose: '把企業價值轉成股權價值時扣除的淨負債' },
+      { key: 'netDebt', required: true, source: 'system', unit: '億元', inputKind: 'number', purpose: '把企業價值轉成股權價值時扣除的淨負債' },
       { key: 'sharesOutstanding', required: true, source: 'system', unit: '股', inputKind: 'number', purpose: '把股權價值換成每股價值' }
     ],
     'EV/Sales': [
-      { key: 'revenue', required: true, source: 'system', unit: '金額', inputKind: 'number', purpose: '企業價值對營收的銷售基準' },
+      { key: 'revenue', required: true, source: 'system', unit: '億元', inputKind: 'number', purpose: '企業價值對營收的銷售基準' },
       { key: 'reasonableEVSales', required: true, source: 'user', unit: '倍', inputKind: 'number', purpose: '使用者認為合理的 EV/Sales 倍數' },
-      { key: 'netDebt', required: true, source: 'system', unit: '金額', inputKind: 'number', purpose: '把企業價值轉成股權價值時扣除的淨負債' },
+      { key: 'netDebt', required: true, source: 'system', unit: '億元', inputKind: 'number', purpose: '把企業價值轉成股權價值時扣除的淨負債' },
       { key: 'sharesOutstanding', required: true, source: 'system', unit: '股', inputKind: 'number', purpose: '把股權價值換成每股價值' }
     ],
     'Dividend Discount': [
@@ -440,8 +440,8 @@ const WorkflowEngine = {
       { key: 'requiredReturn', required: true, source: 'user', unit: '%', inputKind: 'percent', purpose: '投資人要求報酬率' }
     ],
     'NAV': [
-      { key: 'assetValue', required: true, source: 'user', unit: '金額', inputKind: 'number', purpose: '資產價值，作為淨資產估值的分子' },
-      { key: 'liabilities', required: true, source: 'system', unit: '金額', inputKind: 'number', purpose: '負債，用來從資產得到淨資產' },
+      { key: 'assetValue', required: true, source: 'user', unit: '億元', inputKind: 'number', purpose: '資產價值，作為淨資產估值的分子' },
+      { key: 'liabilities', required: true, source: 'system', unit: '億元', inputKind: 'number', purpose: '負債，用來從資產得到淨資產' },
       { key: 'sharesOutstanding', required: true, source: 'system', unit: '股', inputKind: 'number', purpose: '把淨資產換成每股 NAV' }
     ]
   },
@@ -571,6 +571,7 @@ const WorkflowEngine = {
     let html = '<p><b>估值輸入</b></p>';
     html += '<p>本階段只列出所需輸入與資料來源，不計算公平價值。</p>';
     html += '<p>researchId 是此數值或判斷的依據，不是原始提供者。</p>';
+    html += '<p>空白會存成 null。無效文字不會寫入。合理性 warning 仍可保存假設。</p>';
 
     const roleByMethod = {};
     selected.forEach(item => { roleByMethod[item.method] = item.role; });
@@ -598,6 +599,9 @@ const WorkflowEngine = {
         html += `<br>researchId：${this.escapeHtml(this.formatResearchBasis(leaf))}`;
         html += `<br>period：${this.escapeHtml(this.formatInputValue(leaf.period))}`;
         html += `<br>asOf：${this.escapeHtml(this.formatInputValue(leaf.asOf))}`;
+        this.getMethodInputWarnings(method, field.key, leaf.value).forEach(warning => {
+          html += `<br><span style="color:#b45309">Warning：${this.escapeHtml(warning)}。仍可保存此假設。</span>`;
+        });
         html += '</li>';
       });
       html += '</ul>';
@@ -909,12 +913,53 @@ const WorkflowEngine = {
   },
 
   fromUiInputValue(method, field, rawValue) {
-    const n = Number(rawValue);
-    if (!Number.isFinite(n)) return { ok: false, message: `${field} must be a number` };
+    const raw = String(rawValue ?? '').trim();
+    if (raw === '') return { ok: true, value: null };
+    const n = Number(raw);
+    if (!Number.isFinite(n)) {
+      return { ok: false, message: `${field} 必須是有效數字，未寫入 Case` };
+    }
     return {
       ok: true,
       value: this.isPercentField(method, field) ? n / 100 : n
     };
+  },
+
+  getMethodInputWarnings(method, field, storedValue) {
+    if (storedValue == null || storedValue === '') return [];
+    const n = Number(storedValue);
+    if (!Number.isFinite(n)) return [];
+
+    const warnings = [];
+    const peFields = ['reasonablePE', 'historicalPEBear', 'historicalPEBase', 'historicalPEBull'];
+    const extremePercents = [
+      'ROE', 'growthRate', 'discountRate', 'terminalGrowthRate',
+      'dividendGrowthRate', 'requiredReturn'
+    ];
+
+    if (field === 'requiredReturn' && n < 0) {
+      warnings.push('requiredReturn 為負值');
+    }
+    if (field === 'discountRate' && n < 0) {
+      warnings.push('discountRate 為負值');
+    }
+    if (peFields.includes(field) && n < 0) {
+      warnings.push('PE 為負值');
+    }
+    if (field === 'reasonablePB' && n < 0) {
+      warnings.push('PB 為負值');
+    }
+    if ((field === 'reasonableEVEBITDA' || field === 'reasonableEVSales') && n < 0) {
+      warnings.push('估值倍數為負值');
+    }
+    if (extremePercents.includes(field) && Math.abs(n) > 1) {
+      warnings.push('百分比絕對值超過 100%，屬極端假設');
+    }
+    if (field === 'sharesOutstanding' && n < 0) {
+      warnings.push('股數為負值');
+    }
+
+    return warnings;
   },
 
   async saveMethodInputValue(caseId, method, field, rawValue) {
@@ -928,13 +973,15 @@ const WorkflowEngine = {
     const current = DataEngine.getCase(caseId);
     if (!current) return { ok: false, message: 'Investment Case not found' };
 
-    const leaf = {
-      value: n,
-      sourceType: 'user',
-      researchId: null,
-      period: null,
-      asOf: this.today()
-    };
+    const leaf = n == null
+      ? this.emptyMethodInput()
+      : {
+          value: n,
+          sourceType: 'user',
+          researchId: null,
+          period: null,
+          asOf: this.today()
+        };
 
     try {
       const res = await fetch('/api/cases', {
