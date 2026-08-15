@@ -1,18 +1,95 @@
 {
-  "date": "2026-08-08",
+  "date": "2026-08-10",
   "executiveSummary": "市場焦點仍集中在 AI 基礎設施與供應鏈驗證。Glass Bridge 量產進度與相關光通訊標的，是今日觀察重點。",
+  "topThings": [
+    "Glass Bridge 量產驗證，是否已形成台灣光通訊供應鏈的近期待投資機會。",
+    "美股 AI 基建支出延續，SOX 與大型科技走勢仍是台股科技族群的先行指標。",
+    "台股光通訊與 PCB 相關標的關注度高於整體電子，需對照供應鏈驗證進度。"
+  ],
+  "marketTemperature": {
+    "Nasdaq": { "value": "21750.12", "asOf": "2026-08-07 16:00 ET" },
+    "S&P 500": { "value": "5620.44", "asOf": "2026-08-07 16:00 ET" },
+    "Dow": { "value": "40880.15", "asOf": "2026-08-07 16:00 ET" },
+    "SOX": { "value": "5480.30", "asOf": "2026-08-07 16:00 ET" }
+  },
+  "globalMarket": "美股隔夜表現分歧。AI 基礎設施支出仍是主軸，利率與美元相對穩定。",
+  "globalNews": [
+    {
+      "title": "大型雲端資本支出維持高檔，AI 伺服器與光通訊需求敘事延續",
+      "source": "Global",
+      "researchId": null
+    },
+    {
+      "title": "半導體設備與記憶體供應鏈持續被點名為 AI 受惠族群",
+      "source": "Global",
+      "researchId": "hbm"
+    }
+  ],
+  "taiwanMarket": "台股科技族群持續跟隨 AI 硬體敘事。光通訊與 PCB 相關標的較整體電子族群更受關注。",
+  "taiwanNews": [
+    {
+      "title": "光通訊供應鏈關注 Glass Bridge 量產驗證進度",
+      "source": "工商時報",
+      "researchId": "glass-bridge"
+    },
+    {
+      "title": "AI 伺服器相關台廠訂單能見度仍是盤面焦點",
+      "source": "經濟日報",
+      "researchId": null
+    },
+    {
+      "title": "台股開盤觀察電子權值與光通訊族群",
+      "source": "鉅亨網台股新聞",
+      "researchId": null
+    },
+    {
+      "title": "上市買賣觀察需對照證交所與櫃買中心公告",
+      "source": "證交所",
+      "researchId": null
+    },
+    {
+      "title": "上櫃科技股訊息請核對櫃買中心與公開資訊觀測站",
+      "source": "櫃買中心",
+      "researchId": null
+    }
+  ],
+  "aiHighlights": [
+    {
+      "title": "HBM 供給仍緊，記憶體週期與 AI 伺服器綁定",
+      "researchId": "hbm"
+    },
+    {
+      "title": "CPO / 光互連時程需對照資料中心採用進度",
+      "researchId": "cpo"
+    },
+    {
+      "title": "FAU 與台灣光通訊供應鏈驗證名單",
+      "researchId": "fau"
+    }
+  ],
+  "upcomingEvents": [
+    { "title": "美國 CPI", "when": "2026-08-12" },
+    { "title": "台股期貨結算觀察", "when": "2026-08-19" }
+  ],
+  "todaysThreeThings": [
+    {
+      "text": "核對 Glass Bridge 量產驗證是否有新的供應鏈點名",
+      "researchId": "glass-bridge"
+    },
+    {
+      "text": "檢視 FAU 研究卡待驗證問題",
+      "researchId": "fau"
+    },
+    {
+      "text": "追蹤 SOX 與台股科技族群是否同步",
+      "researchId": null
+    }
+  ],
   "opportunityRadar": [
     "glass-bridge",
     "fau",
     "cpo",
     "hbm"
   ],
-  "todayQuestion": "Glass Bridge 量產驗證，是否已形成台灣光通訊供應鏈的近期待投資機會？",
-  "globalMarket": "美股隔夜表現分歧。AI 基礎設施支出仍是主軸，利率與美元相對穩定。",
-  "taiwanMarket": "台股科技族群持續跟隨 AI 硬體敘事。光通訊與 PCB 相關標的較整體電子族群更受關注。",
-  "newResearch": [
-    "glass-bridge",
-    "fau",
-    "cpo"
-  ]
+  "opportunityRadarException": false
 }

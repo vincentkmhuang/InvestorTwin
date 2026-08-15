@@ -1,7 +1,7 @@
 <!doctype html><html lang="zh-Hant"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Investor Twin v0.5</title>
-<link rel="stylesheet" href="style.css"></head>
+<link rel="stylesheet" href="style.css?v=007"></head>
 <body>
 <aside>
 <h2>投資雙胞胎</h2>
@@ -26,31 +26,44 @@
 <section class="box">
 <h2>執行摘要</h2>
 <p id="morningExecutiveSummary"></p>
+<ol id="morningTopThings"></ol>
 </section>
 
 <section class="box">
-<h2>機會雷達</h2>
-<ul id="morningOpportunityRadar"></ul>
+<h2>市場溫度</h2>
+<div id="morningMarketTemperature"></div>
 </section>
 
 <section class="box">
-<h2>今日問題</h2>
-<p id="morningTodayQuestion"></p>
-</section>
-
-<section class="box">
-<h2>外部世界</h2>
+<h2>全球市場與新聞</h2>
 <p id="morningGlobalMarket"></p>
+<ul id="morningGlobalNews"></ul>
 </section>
 
 <section class="box">
-<h2>台灣市場</h2>
+<h2>台灣市場與新聞</h2>
 <p id="morningTaiwanMarket"></p>
+<ul id="morningTaiwanNews"></ul>
 </section>
 
 <section class="box">
-<h2>今日新增研究</h2>
-<ul id="morningNewResearch"></ul>
+<h2>AI / 台灣 AI Highlights</h2>
+<ul id="morningAiHighlights"></ul>
+</section>
+
+<section class="box">
+<h2>即將事件</h2>
+<ul id="morningUpcomingEvents"></ul>
+</section>
+
+<section class="box">
+<h2>今日三件事</h2>
+<ul id="morningTodaysThreeThings"></ul>
+</section>
+
+<section class="box" id="morningRadarSection" style="display:none">
+<h2 id="morningRadarTitle">Opportunity Radar｜上週機會變化</h2>
+<ul id="morningOpportunityRadar"></ul>
 </section>
 </div>
 
@@ -119,7 +132,7 @@
 <div id="portfolio" class="page" style="display:none">
 <section class="box"><h2>投資組合（預留）</h2></section></div>
 
-<script src="js/data-engine.js?v=005c5"></script>
+<script src="js/data-engine.js?v=007"></script>
 <script src="js/workflow-engine.js?v=005c6"></script>
 <script src="js/knowledge-engine.js?v=005c5"></script>
 <script src="app.js?v=005nav"></script>

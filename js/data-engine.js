@@ -87,6 +87,29 @@ const DataEngine = {
     return this.researchCards[id] ?? this.investmentThesis?.cards?.[id] ?? null;
   },
 
+  weekdayFromBriefDate(dateStr) {
+    if (!dateStr || typeof dateStr !== 'string') return null;
+    const matched = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
+    if (!matched) return null;
+    const year = Number(matched[1]);
+    const month = Number(matched[2]);
+    const day = Number(matched[3]);
+    const utc = new Date(Date.UTC(year, month - 1, day));
+    if (
+      utc.getUTCFullYear() !== year
+      || utc.getUTCMonth() !== month - 1
+      || utc.getUTCDate() !== day
+    ) return null;
+    return utc.getUTCDay();
+  },
+
+  shouldShowOpportunityRadar(data) {
+    const weekday = this.weekdayFromBriefDate(data?.date);
+    if (weekday === 1) return true;
+    if (data?.opportunityRadarException === true && weekday >= 2 && weekday <= 5) return true;
+    return false;
+  },
+
   async renderMorningBrief(onItemClick) {
     const data = this.morningBriefHome;
     if (!data) return;
@@ -96,12 +119,118 @@ const DataEngine = {
       if (el) el.textContent = value || '--';
     };
 
-    setText('morningExecutiveSummary', data.executiveSummary);
-    setText('morningTodayQuestion', data.todayQuestion);
-    setText('morningGlobalMarket', data.globalMarket);
-    setText('morningTaiwanMarket', data.taiwanMarket);
+    const bindResearchClick = (el, researchId) => {
+      if (!researchId || typeof onItemClick !== 'function') {
+        el.classList.add('morning-brief-static');
+        return;
+      }
+      el.dataset.researchId = researchId;
+      el.onclick = () => onItemClick(researchId);
+    };
 
-    const renderList = async (listId, ids) => {
+    const renderEmpty = (listEl) => {
+      const li = document.createElement('li');
+      li.className = 'morning-brief-static';
+      li.textContent = '--';
+      listEl.appendChild(li);
+    };
+
+    const renderTextList = (listId, values) => {
+      const listEl = document.getElementById(listId);
+      if (!listEl) return;
+      listEl.innerHTML = '';
+      (values || []).forEach(value => {
+        const text = (value || '').trim();
+        if (!text) return;
+        const li = document.createElement('li');
+        li.className = 'morning-brief-static';
+        li.textContent = text;
+        listEl.appendChild(li);
+      });
+      if (!listEl.children.length) renderEmpty(listEl);
+    };
+
+    const renderNews = (listId, items) => {
+      const listEl = document.getElementById(listId);
+      if (!listEl) return;
+      listEl.innerHTML = '';
+      (items || []).forEach(item => {
+        const title = (item?.title || '').trim();
+        if (!title) return;
+        const li = document.createElement('li');
+        const titleEl = document.createElement('div');
+        titleEl.className = 'morning-brief-title';
+        titleEl.textContent = title;
+        li.appendChild(titleEl);
+        const source = (item?.source || '').trim();
+        if (source) {
+          const sourceEl = document.createElement('div');
+          sourceEl.className = 'morning-brief-summary';
+          sourceEl.textContent = source;
+          li.appendChild(sourceEl);
+        }
+        bindResearchClick(li, item?.researchId);
+        listEl.appendChild(li);
+      });
+      if (!listEl.children.length) renderEmpty(listEl);
+    };
+
+    const renderHighlights = (listId, items) => {
+      const listEl = document.getElementById(listId);
+      if (!listEl) return;
+      listEl.innerHTML = '';
+      (items || []).forEach(item => {
+        const title = (item?.title || '').trim();
+        if (!title) return;
+        const li = document.createElement('li');
+        li.textContent = title;
+        bindResearchClick(li, item?.researchId);
+        listEl.appendChild(li);
+      });
+      if (!listEl.children.length) renderEmpty(listEl);
+    };
+
+    const renderEvents = (listId, items) => {
+      const listEl = document.getElementById(listId);
+      if (!listEl) return;
+      listEl.innerHTML = '';
+      (items || []).forEach(item => {
+        const title = (item?.title || '').trim();
+        if (!title) return;
+        const li = document.createElement('li');
+        const titleEl = document.createElement('div');
+        titleEl.className = 'morning-brief-title';
+        titleEl.textContent = title;
+        li.appendChild(titleEl);
+        const when = (item?.when || '').trim();
+        if (when) {
+          const whenEl = document.createElement('div');
+          whenEl.className = 'morning-brief-summary';
+          whenEl.textContent = when;
+          li.appendChild(whenEl);
+        }
+        bindResearchClick(li, item?.researchId);
+        listEl.appendChild(li);
+      });
+      if (!listEl.children.length) renderEmpty(listEl);
+    };
+
+    const renderThreeThings = (listId, items) => {
+      const listEl = document.getElementById(listId);
+      if (!listEl) return;
+      listEl.innerHTML = '';
+      (items || []).forEach(item => {
+        const text = (typeof item === 'string' ? item : item?.text || '').trim();
+        if (!text) return;
+        const li = document.createElement('li');
+        li.textContent = text;
+        bindResearchClick(li, typeof item === 'object' ? item?.researchId : null);
+        listEl.appendChild(li);
+      });
+      if (!listEl.children.length) renderEmpty(listEl);
+    };
+
+    const renderResearchIds = async (listId, ids) => {
       const listEl = document.getElementById(listId);
       if (!listEl) return;
       listEl.innerHTML = '';
@@ -118,8 +247,6 @@ const DataEngine = {
         }
 
         const li = document.createElement('li');
-        li.dataset.researchId = id;
-
         const titleEl = document.createElement('div');
         titleEl.className = 'morning-brief-title';
         titleEl.textContent = title;
@@ -132,15 +259,62 @@ const DataEngine = {
           li.appendChild(summaryEl);
         }
 
-        if (typeof onItemClick === 'function') {
-          li.onclick = () => onItemClick(id);
-        }
+        bindResearchClick(li, id);
         listEl.appendChild(li);
       }
+      if (!listEl.children.length) renderEmpty(listEl);
     };
 
-    await renderList('morningOpportunityRadar', data.opportunityRadar);
-    await renderList('morningNewResearch', data.newResearch);
+    const renderMarketTemperature = () => {
+      const el = document.getElementById('morningMarketTemperature');
+      if (!el) return;
+      el.innerHTML = '';
+      el.className = 'morning-market';
+      const table = data.marketTemperature || {};
+      ['Nasdaq', 'S&P 500', 'Dow', 'SOX'].forEach(name => {
+        const row = table[name] || {};
+        const item = document.createElement('div');
+        item.className = 'morning-market-item';
+        const nameEl = document.createElement('div');
+        nameEl.className = 'morning-market-name';
+        nameEl.textContent = name;
+        const valueEl = document.createElement('div');
+        valueEl.className = 'morning-market-value';
+        valueEl.textContent = row.value || '--';
+        const asOfEl = document.createElement('div');
+        asOfEl.className = 'morning-market-asof';
+        asOfEl.textContent = row.asOf || '--';
+        item.appendChild(nameEl);
+        item.appendChild(valueEl);
+        item.appendChild(asOfEl);
+        el.appendChild(item);
+      });
+    };
+
+    setText('morningExecutiveSummary', data.executiveSummary);
+    setText('morningGlobalMarket', data.globalMarket);
+    setText('morningTaiwanMarket', data.taiwanMarket);
+    renderTextList('morningTopThings', data.topThings);
+    renderMarketTemperature();
+    renderNews('morningGlobalNews', data.globalNews);
+    renderNews('morningTaiwanNews', data.taiwanNews);
+    renderHighlights('morningAiHighlights', data.aiHighlights);
+    renderEvents('morningUpcomingEvents', data.upcomingEvents);
+    renderThreeThings('morningTodaysThreeThings', data.todaysThreeThings);
+
+    const radarSection = document.getElementById('morningRadarSection');
+    const radarTitle = document.getElementById('morningRadarTitle');
+    const showRadar = this.shouldShowOpportunityRadar(data);
+    if (radarSection) radarSection.style.display = showRadar ? '' : 'none';
+    if (showRadar) {
+      const weekday = this.weekdayFromBriefDate(data.date);
+      if (radarTitle) {
+        radarTitle.textContent = weekday === 1
+          ? 'Opportunity Radar｜上週機會變化'
+          : 'Opportunity Radar';
+      }
+      await renderResearchIds('morningOpportunityRadar', data.opportunityRadar);
+    }
   },
 
   renderOpportunityRadar(container, onItemClick) {
