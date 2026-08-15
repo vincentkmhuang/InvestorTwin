@@ -267,6 +267,13 @@ const WorkflowEngine = {
         }).join('')}</ul>`
       : '<p>--</p>';
     html += `<p><b>Investment Thesis</b></p><p>${card.investmentThesis || '--'}</p>`;
+    const researchConclusion = card.researchConclusion;
+    if (researchConclusion && typeof researchConclusion === 'object') {
+      html += '<p><b>Research Conclusion</b></p>';
+      html += `<p>${this.escapeHtml(researchConclusion.conclusion || '--')}</p>`;
+      html += `<p>Status: ${this.escapeHtml(researchConclusion.status || '--')}</p>`;
+      html += `<p>As of: ${this.escapeHtml(researchConclusion.asOf || '--')}</p>`;
+    }
     html += '<p><b>Questions</b></p>';
     html += questions.length
       ? `<ul>${questions.map(q => `<li>${q}</li>`).join('')}</ul>`

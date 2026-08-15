@@ -12,5 +12,10 @@
   "tags": ["光通訊", "康寧", "Glass Bridge"],
   "related": ["fau", "cpo"],
   "status": "研究中",
-  "updated": "2026-08-06"
+  "updated": "2026-08-06",
+  "researchConclusion": {
+    "conclusion": "Glass Bridge 已由技術驗證逐步進入量產驗證階段；若後續量產驗證成立，AI 光通訊需求可能帶動 FAU 用量增加，上詮有機會受惠於供應鏈需求擴張。",
+    "status": "uncertain",
+    "asOf": "2026-08-15"
+  }
 }
