@@ -624,10 +624,51 @@ const WorkflowEngine = {
     return values;
   },
 
-  applyMethodFairValues(valuation, userConfirmed) {
+  applyMethodFairValues(valuation, profile) {
     const current = valuation || this.emptyValuation();
-    current.methodFairValues = this.computeMethodFairValues(current, userConfirmed === true);
+    current.methodFairValues = this.computeMethodFairValues(current, profile?.userConfirmed === true);
+    this.applyCaseLevelValuation(current, profile);
     return current;
+  },
+
+  fairValueNumber(value) {
+    if (value == null || value === '') return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  },
+
+  applyCaseLevelValuation(valuation, profile) {
+    const current = valuation || this.emptyValuation();
+    const primary = profile?.primaryMethod || null;
+    if (profile?.userConfirmed !== true || !primary) {
+      current.bear = null;
+      current.base = null;
+      current.bull = null;
+      current.buyUnder = null;
+      return current;
+    }
+    const fv = current.methodFairValues?.[primary];
+    current.base = this.fairValueNumber(fv?.base);
+    current.bear = this.fairValueNumber(fv?.bear);
+    current.bull = this.fairValueNumber(fv?.bull);
+    current.buyUnder = this.computeBuyUnder(current.base, current.marginOfSafety);
+    return current;
+  },
+
+  caseLevelMissingNote(profile, valuation) {
+    if (!profile?.userConfirmed) return '尚未確認 valuationProfile';
+    if (!profile.primaryMethod) return '尚未判定 Primary Method';
+    if (!this.fairValueMethods.includes(profile.primaryMethod)) {
+      return `Primary Method ${profile.primaryMethod} 本階段不計算`;
+    }
+    const missing = this.missingFairValueInputs(profile.primaryMethod, valuation?.methodInputs);
+    if (missing.length) return `缺少 ${missing.join('、')}`;
+    return '';
+  },
+
+  formatCaseLevelValue(value) {
+    if (value == null || value === '') return '尚未計算';
+    return `${this.formatNumber(value)} 元/股`;
   },
 
   ensureMethodFairValues(valuation) {
@@ -1009,7 +1050,7 @@ const WorkflowEngine = {
     persisted.current.valuationProfile = profile;
     persisted.current.valuation = this.applyMethodFairValues(
       persisted.current.valuation || this.emptyValuation(),
-      false
+      profile
     );
     persisted.current.origin = persisted.current.origin || {};
     persisted.current.origin.updatedAt = this.today();
@@ -1035,7 +1076,7 @@ const WorkflowEngine = {
     persisted.current.valuationProfile.userConfirmed = true;
     persisted.current.valuation = this.applyMethodFairValues(
       persisted.current.valuation || this.emptyValuation(),
-      true
+      persisted.current.valuationProfile
     );
     persisted.current.origin = persisted.current.origin || {};
     persisted.current.origin.updatedAt = this.today();
@@ -1177,7 +1218,7 @@ const WorkflowEngine = {
       valuation.methodInputs[method][field] = leaf;
       current.valuation = this.applyMethodFairValues(
         valuation,
-        current.valuationProfile?.userConfirmed === true
+        current.valuationProfile
       );
       current.origin = current.origin || {};
       current.origin.updatedAt = this.today();
@@ -1208,7 +1249,7 @@ const WorkflowEngine = {
     } catch (_) {
       if (!current.valuation) current.valuation = this.emptyValuation();
       current.valuation.marginOfSafety = parsed.value;
-      current.valuation.buyUnder = this.computeBuyUnder(current.valuation.base, parsed.value);
+      this.applyCaseLevelValuation(current.valuation, current.valuationProfile);
       current.valuation.currentPrice = null;
       current.valuation.currentDiscount = null;
       current.origin = current.origin || {};
@@ -1245,6 +1286,7 @@ const WorkflowEngine = {
     const company = caseObj.company || {};
     const thesis = caseObj.thesis || {};
     const valuation = caseObj.valuation || this.emptyValuation();
+    this.applyMethodFairValues(valuation, caseObj.valuationProfile);
     const researchIds = Array.isArray(caseObj.researchIds) ? caseObj.researchIds : [];
     const companyLine = [company.name, company.ticker && `(${company.ticker})`, company.exchange, company.currency]
       .filter(Boolean)
@@ -1281,16 +1323,19 @@ const WorkflowEngine = {
     html += `<p><b>Thesis Status</b></p><p>${this.escapeHtml(thesis.status || '--')}</p>`;
     html += this.renderValuationProfile(caseObj.valuationProfile);
     html += this.renderValuationInputs(caseObj.valuationProfile, valuation, caseObj.researchIds);
-    html += '<p><b>Valuation</b></p>';
-    html += '<p>上方是各方法 Fair Value；Case 層級 Bear / Base / Bull 尚未指定。</p>';
-    html += `<p>Bear: ${this.escapeHtml(this.formatNumber(valuation.bear))}</p>`;
-    html += `<p>Base: ${this.escapeHtml(this.formatNumber(valuation.base))}</p>`;
-    html += `<p>Bull: ${this.escapeHtml(this.formatNumber(valuation.bull))}</p>`;
+    html += '<p><b>Fair Value</b></p>';
+    const caseNote = this.caseLevelMissingNote(caseObj.valuationProfile, valuation);
+    if (caseNote && valuation.base == null && valuation.bear == null && valuation.bull == null) {
+      html += `<p>尚未計算：${this.escapeHtml(caseNote)}</p>`;
+    }
+    html += `<p>Bear: ${this.escapeHtml(this.formatCaseLevelValue(valuation.bear))}</p>`;
+    html += `<p>Base: ${this.escapeHtml(this.formatCaseLevelValue(valuation.base))}</p>`;
+    html += `<p>Bull: ${this.escapeHtml(this.formatCaseLevelValue(valuation.bull))}</p>`;
     html += '<p>Margin of Safety: ';
     html += `<input data-case-mos type="number" min="0" max="100" step="0.01" placeholder="0.20" `;
     html += `value="${valuation.marginOfSafety == null ? '' : this.escapeHtml(valuation.marginOfSafety)}" `;
     html += 'style="width:6em"> <button type="button" data-case-mos-save>Save</button></p>';
-    html += `<p>Buy Under: ${this.escapeHtml(this.formatNumber(valuation.buyUnder))}</p>`;
+    html += `<p>Buy Under: ${this.escapeHtml(this.formatCaseLevelValue(valuation.buyUnder))}</p>`;
     html += `<p>Current Price: ${this.escapeHtml(this.formatNumber(valuation.currentPrice))}</p>`;
     html += `<p>Current Discount: ${this.escapeHtml(this.formatPercent(valuation.currentDiscount))}</p>`;
 

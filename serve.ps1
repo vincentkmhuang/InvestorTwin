@@ -371,6 +371,43 @@ function Set-CaseMethodFairValues($caseObj, $today) {
   } else {
     $caseObj.valuation | Add-Member -NotePropertyName methodFairValues -NotePropertyValue $computed -Force
   }
+  Set-CaseLevelValuation $caseObj
+}
+
+function Get-FiniteNumber($raw) {
+  if ($null -eq $raw -or $raw -eq '') { return $null }
+  try {
+    $n = [double]$raw
+    if ([double]::IsNaN($n) -or [double]::IsInfinity($n)) { return $null }
+    return $n
+  } catch {
+    return $null
+  }
+}
+
+function Set-CaseLevelValuation($caseObj) {
+  if (-not $caseObj.valuation) { return }
+  $confirmed = $false
+  $primary = $null
+  if ($caseObj.valuationProfile) {
+    if ($caseObj.valuationProfile.userConfirmed) { $confirmed = [bool]$caseObj.valuationProfile.userConfirmed }
+    if ($caseObj.valuationProfile.primaryMethod) { $primary = [string]$caseObj.valuationProfile.primaryMethod }
+  }
+  $bear = $null
+  $base = $null
+  $bull = $null
+  if ($confirmed -and $primary) {
+    $fv = Get-MethodInputObject $caseObj.valuation.methodFairValues $primary
+    if ($fv) {
+      if ($fv.PSObject.Properties['bear']) { $bear = Get-FiniteNumber $fv.bear }
+      if ($fv.PSObject.Properties['base']) { $base = Get-FiniteNumber $fv.base }
+      if ($fv.PSObject.Properties['bull']) { $bull = Get-FiniteNumber $fv.bull }
+    }
+  }
+  $caseObj.valuation.bear = $bear
+  $caseObj.valuation.base = $base
+  $caseObj.valuation.bull = $bull
+  $caseObj.valuation.buyUnder = Get-BuyUnder $base $caseObj.valuation.marginOfSafety
 }
 
 function ConvertTo-InvestmentCaseJson($caseObj) {
@@ -683,7 +720,7 @@ while ($listener.IsListening) {
                 }) -Force
               }
               $caseObj.valuation.marginOfSafety = $mos
-              $caseObj.valuation.buyUnder = Get-BuyUnder $caseObj.valuation.base $mos
+              Set-CaseLevelValuation $caseObj
               $caseObj.valuation.currentPrice = $null
               $caseObj.valuation.currentDiscount = $null
               if ($caseObj.origin) { $caseObj.origin.updatedAt = $today }
