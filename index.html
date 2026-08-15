@@ -8,6 +8,7 @@
 <div class="nav active" onclick="showPage('today')">🏠 今日工作台</div>
 <div class="nav" onclick="showPage('queue')">📥 研究佇列</div>
 <div class="nav" onclick="showPage('cards')">📄 研究卡</div>
+<div class="nav" onclick="showPage('cases')">📋 投資個案</div>
 <div class="nav" onclick="showPage('knowledge')">🔍 Knowledge Explorer</div>
 <div class="nav" onclick="showPage('sources')">📚 資料來源</div>
 <div class="nav" onclick="showPage('portfolio')">💼 投資組合</div>
@@ -70,6 +71,14 @@
 </section>
 </div>
 
+<div id="cases" class="page" style="display:none">
+<section class="box"><h2>Investment Cases</h2><ul id="caseList"></ul></section>
+<section class="box">
+<h2>Investment Case</h2>
+<div id="caseView">請選擇 Investment Case</div>
+</section>
+</div>
+
 <div id="knowledge" class="page" style="display:none">
 <div class="explorer-grid">
 <section class="box">
@@ -110,8 +119,8 @@
 <div id="portfolio" class="page" style="display:none">
 <section class="box"><h2>投資組合（預留）</h2></section></div>
 
-<script src="js/data-engine.js"></script>
-<script src="js/workflow-engine.js"></script>
-<script src="js/knowledge-engine.js"></script>
-<script src="app.js"></script>
+<script src="js/data-engine.js?v=005c3"></script>
+<script src="js/workflow-engine.js?v=005c3"></script>
+<script src="js/knowledge-engine.js?v=005c3"></script>
+<script src="app.js?v=005c3"></script>
 </main></body></html>

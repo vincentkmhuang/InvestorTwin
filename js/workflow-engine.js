@@ -289,6 +289,17 @@ const WorkflowEngine = {
     html += '<p><button type="button" data-append-save>Save</button></p>';
     html += '<p><button type="button" data-queue-follow-up>Queue for follow-up</button></p>';
 
+    const linkedCases = DataEngine.findCasesByResearchId(card.id);
+    html += '<p><b>Investment Case</b></p>';
+    html += linkedCases.length
+      ? `<ul>${linkedCases.map(item =>
+          `<li data-open-case-id="${this.escapeHtml(item.id)}">${this.escapeHtml(item.title || item.id)}</li>`
+        ).join('')}</ul>`
+      : '<p>--</p>';
+    html += '<p><input data-case-company placeholder="Company" style="width:40%;box-sizing:border-box;margin-right:8px">';
+    html += '<input data-case-ticker placeholder="Ticker" style="width:25%;box-sizing:border-box;margin-right:8px">';
+    html += '<button type="button" data-case-create>建立 Investment Case</button></p>';
+
     container.innerHTML = html;
 
     container.querySelectorAll('[data-related-id]').forEach(li => {
@@ -331,6 +342,799 @@ const WorkflowEngine = {
           return;
         }
         if (typeof render === 'function') render();
+      };
+    }
+
+    container.querySelectorAll('[data-open-case-id]').forEach(li => {
+      li.onclick = () => {
+        if (typeof openInvestmentCase === 'function') {
+          openInvestmentCase(li.dataset.openCaseId);
+        }
+      };
+    });
+
+    const createCaseBtn = container.querySelector('[data-case-create]');
+    const companyInput = container.querySelector('[data-case-company]');
+    const tickerInput = container.querySelector('[data-case-ticker]');
+    if (createCaseBtn) {
+      createCaseBtn.onclick = async () => {
+        const result = await this.createCaseFromResearch(
+          card.id,
+          companyInput?.value,
+          tickerInput?.value
+        );
+        if (!result.ok) {
+          window.alert(result.message || 'Failed to create Investment Case');
+          return;
+        }
+        if (typeof render === 'function') render();
+        if (typeof openInvestmentCase === 'function') {
+          await openInvestmentCase(result.id);
+        }
+      };
+    }
+  },
+
+  escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  },
+
+  today() {
+    return new Date().toISOString().slice(0, 10);
+  },
+
+  emptyValuation() {
+    return {
+      bear: null,
+      base: null,
+      bull: null,
+      marginOfSafety: null,
+      buyUnder: null,
+      currentPrice: null,
+      currentDiscount: null,
+      methodInputs: this.emptyMethodInputs()
+    };
+  },
+
+  methodInputModels: {
+    'Forward PE': [
+      { key: 'forwardEPS', required: true, source: 'system', unit: '元/股', inputKind: 'number', purpose: '前瞻 EPS，作為 Forward PE 的盈餘基準' },
+      { key: 'reasonablePE', required: true, source: 'user', unit: '倍', inputKind: 'number', purpose: '使用者認為合理的本益比' }
+    ],
+    'Historical PE': [
+      { key: 'referenceEPS', required: true, source: 'system', unit: '元/股', inputKind: 'number', purpose: '用來回推歷史本益比帶的參考 EPS' },
+      { key: 'historicalPEBear', required: true, source: 'user', unit: '倍', inputKind: 'number', purpose: '歷史本益比空頭倍數' },
+      { key: 'historicalPEBase', required: true, source: 'user', unit: '倍', inputKind: 'number', purpose: '歷史本益比基準倍數' },
+      { key: 'historicalPEBull', required: true, source: 'user', unit: '倍', inputKind: 'number', purpose: '歷史本益比多頭倍數' }
+    ],
+    'PB / ROE': [
+      { key: 'BVPS', required: true, source: 'system', unit: '元/股', inputKind: 'number', purpose: '每股淨值，作為 PB 估值的帳面基準' },
+      { key: 'ROE', required: true, source: 'system', unit: '%', inputKind: 'percent', purpose: '用來判斷合理 PB 是否與獲利能力相符' },
+      { key: 'reasonablePB', required: true, source: 'user', unit: '倍', inputKind: 'number', purpose: '使用者認為合理的股價淨值比' }
+    ],
+    'DCF': [
+      { key: 'freeCashFlow', required: true, source: 'system', unit: '金額', inputKind: 'number', purpose: '自由現金流起點，尚未折現' },
+      { key: 'growthRate', required: true, source: 'user', unit: '%', inputKind: 'percent', purpose: '明確成長期的現金流成長率' },
+      { key: 'discountRate', required: true, source: 'user', unit: '%', inputKind: 'percent', purpose: '把未來現金流折回現值的折現率' },
+      { key: 'terminalGrowthRate', required: true, source: 'user', unit: '%', inputKind: 'percent', purpose: '終值階段的長期成長率' }
+    ],
+    'EV/EBITDA': [
+      { key: 'EBITDA', required: true, source: 'system', unit: '金額', inputKind: 'number', purpose: '企業價值對 EBITDA 的營運獲利基準' },
+      { key: 'reasonableEVEBITDA', required: true, source: 'user', unit: '倍', inputKind: 'number', purpose: '使用者認為合理的 EV/EBITDA 倍數' },
+      { key: 'netDebt', required: true, source: 'system', unit: '金額', inputKind: 'number', purpose: '把企業價值轉成股權價值時扣除的淨負債' },
+      { key: 'sharesOutstanding', required: true, source: 'system', unit: '股', inputKind: 'number', purpose: '把股權價值換成每股價值' }
+    ],
+    'EV/Sales': [
+      { key: 'revenue', required: true, source: 'system', unit: '金額', inputKind: 'number', purpose: '企業價值對營收的銷售基準' },
+      { key: 'reasonableEVSales', required: true, source: 'user', unit: '倍', inputKind: 'number', purpose: '使用者認為合理的 EV/Sales 倍數' },
+      { key: 'netDebt', required: true, source: 'system', unit: '金額', inputKind: 'number', purpose: '把企業價值轉成股權價值時扣除的淨負債' },
+      { key: 'sharesOutstanding', required: true, source: 'system', unit: '股', inputKind: 'number', purpose: '把股權價值換成每股價值' }
+    ],
+    'Dividend Discount': [
+      { key: 'DPS', required: true, source: 'system', unit: '元/股', inputKind: 'number', purpose: '每股股利，作為股利折現的起點' },
+      { key: 'dividendGrowthRate', required: true, source: 'user', unit: '%', inputKind: 'percent', purpose: '股利成長率' },
+      { key: 'requiredReturn', required: true, source: 'user', unit: '%', inputKind: 'percent', purpose: '投資人要求報酬率' }
+    ],
+    'NAV': [
+      { key: 'assetValue', required: true, source: 'user', unit: '金額', inputKind: 'number', purpose: '資產價值，作為淨資產估值的分子' },
+      { key: 'liabilities', required: true, source: 'system', unit: '金額', inputKind: 'number', purpose: '負債，用來從資產得到淨資產' },
+      { key: 'sharesOutstanding', required: true, source: 'system', unit: '股', inputKind: 'number', purpose: '把淨資產換成每股 NAV' }
+    ]
+  },
+
+  emptyMethodInput() {
+    return {
+      value: null,
+      sourceType: null,
+      researchId: null,
+      period: null,
+      asOf: null
+    };
+  },
+
+  methodInputSourceTypes: ['user', 'research', 'external', 'system'],
+
+  normalizeMethodInput(raw) {
+    const leaf = this.emptyMethodInput();
+    if (raw == null || raw === '') return leaf;
+    if (typeof raw === 'number') {
+      leaf.value = Number.isFinite(raw) ? raw : null;
+      return leaf;
+    }
+    if (typeof raw !== 'object') return leaf;
+
+    if (raw.value != null && raw.value !== '') {
+      const n = Number(raw.value);
+      leaf.value = Number.isFinite(n) ? n : null;
+    }
+    if (this.methodInputSourceTypes.includes(raw.sourceType)) {
+      leaf.sourceType = raw.sourceType;
+    }
+    const researchId = (raw.researchId || '').trim();
+    leaf.researchId = researchId || null;
+    const period = (raw.period || '').trim();
+    leaf.period = period || null;
+    const asOf = (raw.asOf || '').trim();
+    leaf.asOf = asOf || null;
+    return leaf;
+  },
+
+  validateMethodInput(input, researchIds) {
+    const leaf = this.normalizeMethodInput(input);
+    const linked = Array.isArray(researchIds) ? researchIds : [];
+    const errors = [];
+
+    if (leaf.sourceType != null && !this.methodInputSourceTypes.includes(leaf.sourceType)) {
+      errors.push('invalid_sourceType');
+    }
+    if (leaf.researchId && !linked.includes(leaf.researchId)) {
+      errors.push('researchId_not_linked');
+    }
+    if (leaf.sourceType === 'research' && !leaf.researchId) {
+      errors.push('research_requires_researchId');
+    }
+
+    return { ok: errors.length === 0, errors, input: leaf };
+  },
+
+  emptyMethodInputs() {
+    const inputs = {};
+    Object.keys(this.methodInputModels).forEach(method => {
+      inputs[method] = {};
+      this.methodInputModels[method].forEach(field => {
+        inputs[method][field.key] = this.emptyMethodInput();
+      });
+    });
+    return inputs;
+  },
+
+  ensureMethodInputs(valuation) {
+    const current = valuation || this.emptyValuation();
+    const reserved = this.emptyMethodInputs();
+    const existing = current.methodInputs && typeof current.methodInputs === 'object'
+      ? current.methodInputs
+      : {};
+
+    Object.keys(reserved).forEach(method => {
+      const src = existing[method] && typeof existing[method] === 'object' ? existing[method] : {};
+      Object.keys(reserved[method]).forEach(key => {
+        reserved[method][key] = this.normalizeMethodInput(src[key]);
+      });
+    });
+
+    current.methodInputs = reserved;
+    return current;
+  },
+
+  formatInputValue(value) {
+    return value == null || value === '' ? '尚未提供' : String(value);
+  },
+
+  formatSourceType(sourceType) {
+    if (sourceType === 'user') return '使用者輸入';
+    if (sourceType === 'research') return '直接引用研究卡';
+    if (sourceType === 'external') return '外部資料';
+    if (sourceType === 'system') return '系統';
+    return '尚未提供';
+  },
+
+  formatResearchBasis(leaf) {
+    if (!leaf?.researchId) return '尚未提供';
+    if (leaf.sourceType === 'research') {
+      return `直接引用：${leaf.researchId}`;
+    }
+    if (leaf.sourceType === 'user') {
+      return `研究依據：${leaf.researchId}`;
+    }
+    return leaf.researchId;
+  },
+
+  selectedValuationMethods(profile) {
+    const current = profile || this.emptyValuationProfile();
+    return [
+      { role: 'Primary Method', method: current.primaryMethod },
+      { role: 'Secondary Method', method: current.secondaryMethod },
+      { role: 'Cross-check Method', method: current.crossCheckMethod }
+    ].filter(item => item.method);
+  },
+
+  renderValuationInputs(profile, valuation, researchIds) {
+    if (!profile?.userConfirmed) return '';
+
+    const ensured = this.ensureMethodInputs(valuation);
+    const selected = this.selectedValuationMethods(profile);
+    const linkedIds = Array.isArray(researchIds) ? researchIds : [];
+    let html = '<p><b>估值輸入</b></p>';
+    html += '<p>本階段只列出所需輸入與資料來源，不計算公平價值。</p>';
+    html += '<p>researchId 是此數值或判斷的依據，不是原始提供者。</p>';
+
+    const roleByMethod = {};
+    selected.forEach(item => { roleByMethod[item.method] = item.role; });
+
+    Object.keys(this.methodInputModels).forEach(method => {
+      const fields = this.methodInputModels[method] || [];
+      const values = ensured.methodInputs[method] || {};
+      const role = roleByMethod[method];
+      const title = role ? `${role}：${method}` : method;
+      html += `<p><b>${this.escapeHtml(title)}</b></p>`;
+      html += '<ul>';
+      fields.forEach(field => {
+        const checked = this.validateMethodInput(values[field.key], linkedIds);
+        const leaf = checked.input;
+        const status = field.required ? '必要' : '可選';
+        const currentValue = this.toUiInputValue(method, field.key, leaf.value);
+        const token = `${method}::${field.key}`;
+        const unit = field.unit || '';
+        html += `<li>${this.escapeHtml(field.key)}（${status}，${this.escapeHtml(unit)}）：`;
+        html += `<input data-method-value="${this.escapeHtml(token)}" type="number" step="0.01" value="${currentValue === '' ? '' : this.escapeHtml(currentValue)}" style="width:6em"> `;
+        html += `${this.escapeHtml(unit)} `;
+        html += `<button type="button" data-method-save="${this.escapeHtml(token)}">Save</button>`;
+        html += ` — ${this.escapeHtml(field.purpose)}`;
+        html += `<br>sourceType：${this.escapeHtml(this.formatSourceType(leaf.sourceType))}`;
+        html += `<br>researchId：${this.escapeHtml(this.formatResearchBasis(leaf))}`;
+        html += `<br>period：${this.escapeHtml(this.formatInputValue(leaf.period))}`;
+        html += `<br>asOf：${this.escapeHtml(this.formatInputValue(leaf.asOf))}`;
+        html += '</li>';
+      });
+      html += '</ul>';
+    });
+
+    return html;
+  },
+
+  valuationMethods: [
+    'Forward PE',
+    'Historical PE',
+    'PB / ROE',
+    'DCF',
+    'EV/EBITDA',
+    'EV/Sales',
+    'Dividend Discount',
+    'NAV'
+  ],
+
+  companyTypes: [
+    'Growth',
+    'Financial / Bank',
+    'Mature / Value',
+    'Asset-heavy'
+  ],
+
+  valuationRecommendations: {
+    'Growth': {
+      primaryMethod: 'Forward PE',
+      secondaryMethod: 'Historical PE',
+      crossCheckMethod: 'DCF'
+    },
+    'Financial / Bank': {
+      primaryMethod: 'PB / ROE',
+      secondaryMethod: 'Historical PE',
+      crossCheckMethod: 'Dividend Discount'
+    },
+    'Mature / Value': {
+      primaryMethod: 'Historical PE',
+      secondaryMethod: 'Forward PE',
+      crossCheckMethod: 'DCF'
+    },
+    'Asset-heavy': {
+      primaryMethod: 'NAV',
+      secondaryMethod: 'PB / ROE',
+      crossCheckMethod: 'DCF'
+    }
+  },
+
+  emptyValuationProfile() {
+    return {
+      companyType: null,
+      primaryMethod: null,
+      secondaryMethod: null,
+      crossCheckMethod: null,
+      userConfirmed: false
+    };
+  },
+
+  recommendValuationMethods(companyType) {
+    if (!companyType) return null;
+    return this.valuationRecommendations[companyType] || null;
+  },
+
+  profileFromCompanyType(companyType) {
+    const type = (companyType || '').trim();
+    if (!type) return this.emptyValuationProfile();
+    const rec = this.recommendValuationMethods(type);
+    if (!rec) return null;
+    return {
+      companyType: type,
+      primaryMethod: rec.primaryMethod,
+      secondaryMethod: rec.secondaryMethod,
+      crossCheckMethod: rec.crossCheckMethod,
+      userConfirmed: false
+    };
+  },
+
+  formatProfileValue(value) {
+    return value ? value : '尚未判定';
+  },
+
+  parseMarginOfSafety(raw) {
+    if (raw == null || String(raw).trim() === '') {
+      return { ok: false, message: 'marginOfSafety is required' };
+    }
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) {
+      return { ok: false, message: 'Invalid marginOfSafety' };
+    }
+    const mos = n > 1 && n <= 100 ? n / 100 : n;
+    if (mos > 1) {
+      return { ok: false, message: 'marginOfSafety must be between 0 and 1' };
+    }
+    return { ok: true, value: mos };
+  },
+
+  computeBuyUnder(base, marginOfSafety) {
+    if (base == null || marginOfSafety == null) return null;
+    const b = Number(base);
+    const m = Number(marginOfSafety);
+    if (!Number.isFinite(b) || !Number.isFinite(m)) return null;
+    return b * (1 - m);
+  },
+
+  formatNumber(value) {
+    return value == null || value === '' ? '--' : String(value);
+  },
+
+  formatPercent(value) {
+    if (value == null || value === '') return '--';
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '--';
+    return `${Math.round(n * 10000) / 100}%`;
+  },
+
+  async researchTitle(id) {
+    const card = await DataEngine.getCard(id);
+    return card?.title ?? this.cardTitle(id);
+  },
+
+  async createCaseFromResearch(researchId, companyName, ticker) {
+    const name = (companyName || '').trim();
+    const code = (ticker || '').trim();
+    if (!name || !code) {
+      return { ok: false, message: 'Company and ticker are required' };
+    }
+    if (/[\\/]/.test(code) || /[\\/]/.test(researchId)) {
+      return { ok: false, message: 'Invalid company or research id' };
+    }
+
+    const id = `${code}-${researchId}`;
+    const existing = DataEngine.getCase(id);
+    if (existing) return { ok: true, created: false, id };
+
+    const bundle = await this.loadResearch(researchId);
+    const card = bundle?.card;
+    const related = await KnowledgeEngine.getResolvedRelated(researchId);
+    const researchIds = [researchId, ...related.filter(item => item !== researchId)];
+    const today = this.today();
+    const questions = Array.isArray(card?.questions) ? card.questions : [];
+    const summary = (card?.summary || '').trim();
+
+    const caseObj = {
+      id,
+      title: `${name} — ${card?.title || researchId}`,
+      status: 'draft',
+      company: {
+        name,
+        ticker: code,
+        exchange: null,
+        currency: null
+      },
+      origin: {
+        source: 'Research Card',
+        createdAt: today,
+        updatedAt: today
+      },
+      researchIds,
+      thesis: {
+        thesis: card?.investmentThesis || '',
+        growthDrivers: [],
+        competitiveAdvantage: '',
+        earningsTranslation: '',
+        duration: '',
+        supportingEvidence: summary
+          ? [{ text: summary, researchId }]
+          : [],
+        counterEvidence: [],
+        toBeVerified: questions.map(text => ({ text, researchId })),
+        killCriteria: [],
+        status: 'forming'
+      },
+      valuationProfile: this.emptyValuationProfile(),
+      valuation: this.emptyValuation(),
+      decision: null,
+      positionPlaybook: null,
+      monitoring: null
+    };
+
+    const persisted = await this.persistCaseCreate(caseObj);
+    if (!persisted.ok) return persisted;
+    return { ok: true, created: persisted.created !== false, id };
+  },
+
+  async persistCaseCreate(caseObj) {
+    try {
+      const res = await fetch('/api/cases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ case: caseObj })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        await DataEngine.loadInvestmentCases();
+        if (!DataEngine.getCase(caseObj.id)) DataEngine.upsertCase(caseObj);
+        return { ok: true, created: data.created === true, id: caseObj.id };
+      }
+      return { ok: false, message: data.message || 'Failed to save Investment Case' };
+    } catch (_) {
+      DataEngine.upsertCase(caseObj);
+      return { ok: true, created: true, id: caseObj.id, fallback: true };
+    }
+  },
+
+  async persistValuationProfile(caseId, payload) {
+    const current = DataEngine.getCase(caseId);
+    if (!current) return { ok: false, message: 'Investment Case not found' };
+
+    try {
+      const res = await fetch('/api/cases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: caseId, ...payload })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        await DataEngine.loadInvestmentCases();
+        return { ok: true, id: caseId };
+      }
+      return { ok: false, message: data.message || 'Failed to save valuationProfile' };
+    } catch (_) {
+      return { ok: false, fallback: true, current };
+    }
+  },
+
+  async saveCaseCompanyType(caseId, companyType) {
+    const profile = this.profileFromCompanyType(companyType);
+    if (companyType && !profile) {
+      return { ok: false, message: 'Unsupported companyType' };
+    }
+
+    const persisted = await this.persistValuationProfile(caseId, {
+      companyType: profile.companyType
+    });
+    if (persisted.ok) return persisted;
+    if (!persisted.fallback) return persisted;
+
+    persisted.current.valuationProfile = profile;
+    persisted.current.origin = persisted.current.origin || {};
+    persisted.current.origin.updatedAt = this.today();
+    DataEngine.upsertCase(persisted.current);
+    return { ok: true, id: caseId, fallback: true };
+  },
+
+  async confirmCaseValuationProfile(caseId) {
+    const current = DataEngine.getCase(caseId);
+    if (!current) return { ok: false, message: 'Investment Case not found' };
+    const profile = current.valuationProfile || this.emptyValuationProfile();
+    if (!profile.companyType || !profile.primaryMethod) {
+      return { ok: false, message: 'companyType 尚未判定，無法確認' };
+    }
+
+    const persisted = await this.persistValuationProfile(caseId, {
+      confirmValuationProfile: true
+    });
+    if (persisted.ok) return persisted;
+    if (!persisted.fallback) return persisted;
+
+    persisted.current.valuationProfile = persisted.current.valuationProfile || this.emptyValuationProfile();
+    persisted.current.valuationProfile.userConfirmed = true;
+    persisted.current.origin = persisted.current.origin || {};
+    persisted.current.origin.updatedAt = this.today();
+    DataEngine.upsertCase(persisted.current);
+    return { ok: true, id: caseId, fallback: true };
+  },
+
+  renderValuationProfile(profile) {
+    const current = profile || this.emptyValuationProfile();
+    const selected = current.companyType || '';
+    const options = ['<option value="">尚未判定</option>']
+      .concat(this.companyTypes.map(type => {
+        const mark = type === selected ? ' selected' : '';
+        return `<option value="${this.escapeHtml(type)}"${mark}>${this.escapeHtml(type)}</option>`;
+      }));
+
+    let html = '<p><b>Valuation Profile</b></p>';
+    html += `<p>公司類型 <select data-case-company-type>${options.join('')}</select></p>`;
+    html += `<p>Investor Twin 建議的 Primary Method：${this.escapeHtml(this.formatProfileValue(current.primaryMethod))}</p>`;
+    html += `<p>Secondary Method：${this.escapeHtml(this.formatProfileValue(current.secondaryMethod))}</p>`;
+    html += `<p>Cross-check Method：${this.escapeHtml(this.formatProfileValue(current.crossCheckMethod))}</p>`;
+    html += `<p>userConfirmed：${current.userConfirmed ? '已確認' : '尚未確認'}</p>`;
+    if (current.companyType && !current.userConfirmed) {
+      html += '<p><button type="button" data-case-confirm-profile>確認這組方法</button></p>';
+    } else if (!current.companyType) {
+      html += '<p>公司類型尚未判定，不自動填入估值方法。</p>';
+    }
+    return html;
+  },
+
+  getMethodField(method, field) {
+    const fields = this.methodInputModels[method];
+    return Array.isArray(fields) ? fields.find(item => item.key === field) : null;
+  },
+
+  isAllowedMethodField(method, field) {
+    return !!this.getMethodField(method, field);
+  },
+
+  isPercentField(method, field) {
+    return this.getMethodField(method, field)?.inputKind === 'percent';
+  },
+
+  toUiInputValue(method, field, storedValue) {
+    if (storedValue == null || storedValue === '') return '';
+    const n = Number(storedValue);
+    if (!Number.isFinite(n)) return '';
+    return this.isPercentField(method, field) ? n * 100 : n;
+  },
+
+  fromUiInputValue(method, field, rawValue) {
+    const n = Number(rawValue);
+    if (!Number.isFinite(n)) return { ok: false, message: `${field} must be a number` };
+    return {
+      ok: true,
+      value: this.isPercentField(method, field) ? n / 100 : n
+    };
+  },
+
+  async saveMethodInputValue(caseId, method, field, rawValue) {
+    if (!this.isAllowedMethodField(method, field)) {
+      return { ok: false, message: 'Unsupported method or field' };
+    }
+    const parsed = this.fromUiInputValue(method, field, rawValue);
+    if (!parsed.ok) return parsed;
+    const n = parsed.value;
+
+    const current = DataEngine.getCase(caseId);
+    if (!current) return { ok: false, message: 'Investment Case not found' };
+
+    const leaf = {
+      value: n,
+      sourceType: 'user',
+      researchId: null,
+      period: null,
+      asOf: this.today()
+    };
+
+    try {
+      const res = await fetch('/api/cases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: caseId,
+          methodInput: { method, field, value: n }
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        await DataEngine.loadInvestmentCases();
+        return { ok: true, id: caseId };
+      }
+      return { ok: false, message: data.message || `Failed to save ${field}` };
+    } catch (_) {
+      const valuation = this.ensureMethodInputs(current.valuation || this.emptyValuation());
+      valuation.methodInputs[method][field] = leaf;
+      current.valuation = valuation;
+      current.origin = current.origin || {};
+      current.origin.updatedAt = this.today();
+      DataEngine.upsertCase(current);
+      return { ok: true, id: caseId, fallback: true };
+    }
+  },
+
+  async saveCaseMarginOfSafety(caseId, rawMos) {
+    const parsed = this.parseMarginOfSafety(rawMos);
+    if (!parsed.ok) return parsed;
+
+    const current = DataEngine.getCase(caseId);
+    if (!current) return { ok: false, message: 'Investment Case not found' };
+
+    try {
+      const res = await fetch('/api/cases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: caseId, marginOfSafety: parsed.value })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        await DataEngine.loadInvestmentCases();
+        return { ok: true, id: caseId };
+      }
+      return { ok: false, message: data.message || 'Failed to save marginOfSafety' };
+    } catch (_) {
+      if (!current.valuation) current.valuation = this.emptyValuation();
+      current.valuation.marginOfSafety = parsed.value;
+      current.valuation.buyUnder = this.computeBuyUnder(current.valuation.base, parsed.value);
+      current.valuation.currentPrice = null;
+      current.valuation.currentDiscount = null;
+      current.origin = current.origin || {};
+      current.origin.updatedAt = this.today();
+      DataEngine.upsertCase(current);
+      return { ok: true, id: caseId, fallback: true };
+    }
+  },
+
+  renderEvidenceList(items) {
+    const list = Array.isArray(items) ? items : [];
+    if (!list.length) return '<p>--</p>';
+    return `<ul>${list.map(item => {
+      const text = this.escapeHtml(item?.text || '--');
+      const researchId = item?.researchId;
+      if (!researchId) return `<li>${text}</li>`;
+      return `<li>${text} <span data-case-research-id="${this.escapeHtml(researchId)}">[${this.escapeHtml(researchId)}]</span></li>`;
+    }).join('')}</ul>`;
+  },
+
+  renderStringList(items) {
+    const list = Array.isArray(items) ? items : [];
+    if (!list.length) return '<p>--</p>';
+    return `<ul>${list.map(item => `<li>${this.escapeHtml(item)}</li>`).join('')}</ul>`;
+  },
+
+  async renderInvestmentCase(caseObj, container) {
+    if (!container) return;
+    if (!caseObj) {
+      container.innerHTML = '找不到 Investment Case';
+      return;
+    }
+
+    const company = caseObj.company || {};
+    const thesis = caseObj.thesis || {};
+    const valuation = caseObj.valuation || this.emptyValuation();
+    const researchIds = Array.isArray(caseObj.researchIds) ? caseObj.researchIds : [];
+    const companyLine = [company.name, company.ticker && `(${company.ticker})`, company.exchange, company.currency]
+      .filter(Boolean)
+      .join(' ');
+
+    const researchItems = [];
+    for (const researchId of researchIds) {
+      const title = await this.researchTitle(researchId);
+      researchItems.push(
+        `<li data-case-research-id="${this.escapeHtml(researchId)}">${this.escapeHtml(title)}</li>`
+      );
+    }
+
+    let html = `<h3>${this.escapeHtml(caseObj.title || caseObj.id)}</h3>`;
+    html += `<p><b>Company</b></p><p>${this.escapeHtml(companyLine || '--')}</p>`;
+    html += '<p><b>Research Cards</b></p>';
+    html += researchItems.length ? `<ul>${researchItems.join('')}</ul>` : '<p>--</p>';
+    html += `<p><b>Investment Thesis</b></p><p>${this.escapeHtml(thesis.thesis || '--')}</p>`;
+    html += '<p><b>Growth Drivers</b></p>';
+    html += this.renderStringList(thesis.growthDrivers);
+    html += '<p><b>Competitive Advantage</b></p>';
+    html += `<p>${this.escapeHtml(thesis.competitiveAdvantage || '--')}</p>`;
+    html += '<p><b>Earnings Translation</b></p>';
+    html += `<p>${this.escapeHtml(thesis.earningsTranslation || '--')}</p>`;
+    html += `<p><b>Duration</b></p><p>${this.escapeHtml(thesis.duration || '--')}</p>`;
+    html += '<p><b>Supporting Evidence</b></p>';
+    html += this.renderEvidenceList(thesis.supportingEvidence);
+    html += '<p><b>Counter Evidence</b></p>';
+    html += this.renderEvidenceList(thesis.counterEvidence);
+    html += '<p><b>To Be Verified</b></p>';
+    html += this.renderEvidenceList(thesis.toBeVerified);
+    html += '<p><b>Kill Criteria</b></p>';
+    html += this.renderStringList(thesis.killCriteria);
+    html += `<p><b>Thesis Status</b></p><p>${this.escapeHtml(thesis.status || '--')}</p>`;
+    html += this.renderValuationProfile(caseObj.valuationProfile);
+    html += this.renderValuationInputs(caseObj.valuationProfile, valuation, caseObj.researchIds);
+    html += '<p><b>Valuation</b></p>';
+    html += `<p>Bear: ${this.escapeHtml(this.formatNumber(valuation.bear))}</p>`;
+    html += `<p>Base: ${this.escapeHtml(this.formatNumber(valuation.base))}</p>`;
+    html += `<p>Bull: ${this.escapeHtml(this.formatNumber(valuation.bull))}</p>`;
+    html += '<p>Margin of Safety: ';
+    html += `<input data-case-mos type="number" min="0" max="100" step="0.01" placeholder="0.20" `;
+    html += `value="${valuation.marginOfSafety == null ? '' : this.escapeHtml(valuation.marginOfSafety)}" `;
+    html += 'style="width:6em"> <button type="button" data-case-mos-save>Save</button></p>';
+    html += `<p>Buy Under: ${this.escapeHtml(this.formatNumber(valuation.buyUnder))}</p>`;
+    html += `<p>Current Price: ${this.escapeHtml(this.formatNumber(valuation.currentPrice))}</p>`;
+    html += `<p>Current Discount: ${this.escapeHtml(this.formatPercent(valuation.currentDiscount))}</p>`;
+
+    container.innerHTML = html;
+
+    container.querySelectorAll('[data-case-research-id]').forEach(el => {
+      el.style.cursor = 'pointer';
+      el.onclick = () => {
+        if (typeof openResearchCard === 'function') {
+          showPage('cards');
+          openResearchCard(el.dataset.caseResearchId, document.getElementById('card'), {
+            resetPath: true,
+            fromPage: 'cases'
+          });
+        }
+      };
+    });
+
+    const typeSelect = container.querySelector('[data-case-company-type]');
+    if (typeSelect) {
+      typeSelect.onchange = async () => {
+        const result = await this.saveCaseCompanyType(caseObj.id, typeSelect.value);
+        if (!result.ok) {
+          window.alert(result.message || 'Failed to save companyType');
+          return;
+        }
+        await this.renderInvestmentCase(DataEngine.getCase(caseObj.id), container);
+      };
+    }
+
+    const confirmBtn = container.querySelector('[data-case-confirm-profile]');
+    if (confirmBtn) {
+      confirmBtn.onclick = async () => {
+        const result = await this.confirmCaseValuationProfile(caseObj.id);
+        if (!result.ok) {
+          window.alert(result.message || 'Failed to confirm valuationProfile');
+          return;
+        }
+        await this.renderInvestmentCase(DataEngine.getCase(caseObj.id), container);
+      };
+    }
+
+    container.querySelectorAll('[data-method-save]').forEach(btn => {
+      btn.onclick = async () => {
+        const token = btn.dataset.methodSave || '';
+        const sep = token.indexOf('::');
+        if (sep < 0) return;
+        const method = token.slice(0, sep);
+        const field = token.slice(sep + 2);
+        const input = container.querySelector(`[data-method-value="${token}"]`);
+        const result = await this.saveMethodInputValue(caseObj.id, method, field, input?.value);
+        if (!result.ok) {
+          window.alert(result.message || `Failed to save ${field}`);
+          return;
+        }
+        await this.renderInvestmentCase(DataEngine.getCase(caseObj.id), container);
+      };
+    });
+
+    const saveMosBtn = container.querySelector('[data-case-mos-save]');
+    const mosInput = container.querySelector('[data-case-mos]');
+    if (saveMosBtn && mosInput) {
+      saveMosBtn.onclick = async () => {
+        const result = await this.saveCaseMarginOfSafety(caseObj.id, mosInput.value);
+        if (!result.ok) {
+          window.alert(result.message || 'Failed to save marginOfSafety');
+          return;
+        }
+        await this.renderInvestmentCase(DataEngine.getCase(caseObj.id), container);
       };
     }
   },

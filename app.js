@@ -22,6 +22,7 @@ async function init() {
   renderKnowledgeExplorer();
   renderRecentResearch();
   render();
+  renderCaseList();
 }
 
 async function loadVersionInfo() {
@@ -336,6 +337,25 @@ function render() {
     li2.onclick = () => openResearchCard(q, undefined, { resetPath: true });
     cardList.appendChild(li2);
   });
+  renderCaseList();
+}
+
+function renderCaseList() {
+  const listEl = document.getElementById('caseList');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+  DataEngine.getCases().forEach(item => {
+    const li = document.createElement('li');
+    li.textContent = item.title || item.id;
+    li.onclick = () => openInvestmentCase(item.id);
+    listEl.appendChild(li);
+  });
+}
+
+async function openInvestmentCase(id) {
+  showPage('cases');
+  const container = document.getElementById('caseView');
+  await WorkflowEngine.renderInvestmentCase(DataEngine.getCase(id), container);
 }
 
 async function add() {
