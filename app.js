@@ -23,6 +23,7 @@ async function init() {
   renderRecentResearch();
   render();
   renderCaseList();
+  await restoreViewFromHash();
 }
 
 async function loadVersionInfo() {
@@ -53,6 +54,84 @@ function showPage(id) {
   document.getElementById('title').textContent = id === 'today'
     ? '🌅 Morning Brief'
     : document.querySelector('[onclick="showPage(\'' + id + '\')"]').textContent.trim();
+  setViewHash(id);
+}
+
+function hashPath() {
+  return (window.location.hash || '').replace(/^#/, '');
+}
+
+function decodeHashSegment(value) {
+  try {
+    return decodeURIComponent(value || '').trim();
+  } catch (_) {
+    return (value || '').trim();
+  }
+}
+
+function setViewHash(page, contentId) {
+  const currentPage = (page || '').trim();
+  if (!currentPage) return;
+  const content = (contentId || '').trim();
+  let next = '#' + currentPage;
+  if (currentPage === 'cases' && content) {
+    next = '#case/' + encodeURIComponent(content);
+  } else if (content) {
+    next = '#' + currentPage + '/' + encodeURIComponent(content);
+  }
+  if (window.location.hash !== next) {
+    history.replaceState(null, '', next);
+  }
+}
+
+function parseViewHash() {
+  const raw = hashPath();
+  if (!raw || raw === 'today') return { page: 'today' };
+
+  if (raw.startsWith('case/')) {
+    return { page: 'cases', caseId: decodeHashSegment(raw.slice('case/'.length)) };
+  }
+  if (raw.startsWith('cards/')) {
+    return { page: 'cards', researchId: decodeHashSegment(raw.slice('cards/'.length)) };
+  }
+  if (raw.startsWith('knowledge/')) {
+    return { page: 'knowledge', knowledgeKey: decodeHashSegment(raw.slice('knowledge/'.length)) };
+  }
+
+  const pages = ['today', 'queue', 'cards', 'cases', 'knowledge', 'sources', 'portfolio'];
+  if (pages.includes(raw)) return { page: raw };
+  return { page: 'today' };
+}
+
+async function restoreViewFromHash() {
+  const view = parseViewHash();
+  if (view.caseId) {
+    if (DataEngine.getCase(view.caseId)) {
+      await openInvestmentCase(view.caseId);
+      return;
+    }
+    showPage('cases');
+    return;
+  }
+  if (view.page === 'cards' && view.researchId) {
+    showPage('cards');
+    await openResearchCard(view.researchId, document.getElementById('card'), { resetPath: true });
+    return;
+  }
+  if (view.page === 'knowledge' && view.knowledgeKey) {
+    showPage('knowledge');
+    if (isKnowledgeTag(view.knowledgeKey)) {
+      await selectKnowledgeTag(view.knowledgeKey);
+      return;
+    }
+    await openResearchCard(view.knowledgeKey, document.getElementById('knowledgeExplorerCard'), { resetPath: true });
+    return;
+  }
+  showPage(view.page || 'today');
+}
+
+function isKnowledgeTag(value) {
+  return KnowledgeEngine.getTags().includes(value);
 }
 
 async function openMorningBriefResearch(id) {
@@ -109,6 +188,9 @@ async function openResearchCard(id, container, options) {
     const graph = await KnowledgeEngine.getGraph(researchId);
     renderKnowledgeConnections(graph);
     renderKnowledgeMap(graph);
+    setViewHash('knowledge', researchId);
+  } else {
+    setViewHash('cards', researchId);
   }
 }
 
@@ -290,6 +372,7 @@ function renderKnowledgeExplorer() {
 }
 
 async function selectKnowledgeTag(tag) {
+  setViewHash('knowledge', tag);
   document.getElementById('knowledgeResultsTitle').textContent = `Research Cards — ${tag}`;
 
   const resultsEl = document.getElementById('knowledgeResults');
@@ -354,6 +437,7 @@ function renderCaseList() {
 
 async function openInvestmentCase(id) {
   showPage('cases');
+  setViewHash('cases', id);
   const container = document.getElementById('caseView');
   await WorkflowEngine.renderInvestmentCase(DataEngine.getCase(id), container);
 }

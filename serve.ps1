@@ -255,6 +255,124 @@ function Get-BuyUnder($base, $mos) {
   }
 }
 
+function New-EmptyMethodFairValue {
+  return [PSCustomObject]@{
+    bear = $null
+    base = $null
+    bull = $null
+    asOf = $null
+  }
+}
+
+function Get-MethodInputNumericValue($methodInputs, $method, $field) {
+  $methodObj = Get-MethodInputObject $methodInputs $method
+  if (-not $methodObj) { return $null }
+  $prop = $methodObj.PSObject.Properties[$field]
+  if (-not $prop) { return $null }
+  $raw = $prop.Value
+  if ($null -eq $raw -or $raw -eq '') { return $null }
+  $value = $null
+  if ($raw -is [System.Management.Automation.PSObject] -or $raw -is [System.Collections.IDictionary]) {
+    if ($raw.PSObject.Properties['value']) { $value = $raw.value }
+  } else {
+    $value = $raw
+  }
+  if ($null -eq $value -or $value -eq '') { return $null }
+  try {
+    $n = [double]$value
+    if ([double]::IsNaN($n) -or [double]::IsInfinity($n)) { return $null }
+    return $n
+  } catch {
+    return $null
+  }
+}
+
+function Get-ProductOrNull($left, $right) {
+  if ($null -eq $left -or $null -eq $right) { return $null }
+  try {
+    $n = [double]$left * [double]$right
+    if ([double]::IsNaN($n) -or [double]::IsInfinity($n)) { return $null }
+    return $n
+  } catch {
+    return $null
+  }
+}
+
+function New-MethodFairValue($bear, $base, $bull, $today) {
+  $hasValue = $null -ne $bear -or $null -ne $base -or $null -ne $bull
+  return [PSCustomObject]@{
+    bear = $bear
+    base = $base
+    bull = $bull
+    asOf = if ($hasValue) { $today } else { $null }
+  }
+}
+
+function Get-ComputedMethodFairValues($methodInputs, $userConfirmed, $today) {
+  if (-not $userConfirmed) {
+    return [PSCustomObject]@{
+      'Forward PE' = (New-EmptyMethodFairValue)
+      'Historical PE' = (New-EmptyMethodFairValue)
+      'PB / ROE' = (New-EmptyMethodFairValue)
+    }
+  }
+
+  $fwdBase = Get-ProductOrNull `
+    (Get-MethodInputNumericValue $methodInputs 'Forward PE' 'forwardEPS') `
+    (Get-MethodInputNumericValue $methodInputs 'Forward PE' 'reasonablePE')
+  $refEps = Get-MethodInputNumericValue $methodInputs 'Historical PE' 'referenceEPS'
+  $pbBase = Get-ProductOrNull `
+    (Get-MethodInputNumericValue $methodInputs 'PB / ROE' 'BVPS') `
+    (Get-MethodInputNumericValue $methodInputs 'PB / ROE' 'reasonablePB')
+
+  return [PSCustomObject]@{
+    'Forward PE' = (New-MethodFairValue $null $fwdBase $null $today)
+    'Historical PE' = (New-MethodFairValue `
+      (Get-ProductOrNull $refEps (Get-MethodInputNumericValue $methodInputs 'Historical PE' 'historicalPEBear')) `
+      (Get-ProductOrNull $refEps (Get-MethodInputNumericValue $methodInputs 'Historical PE' 'historicalPEBase')) `
+      (Get-ProductOrNull $refEps (Get-MethodInputNumericValue $methodInputs 'Historical PE' 'historicalPEBull')) `
+      $today)
+    'PB / ROE' = (New-MethodFairValue $null $pbBase $null $today)
+  }
+}
+
+function ConvertTo-MethodFairValuesJson($methodFairValues) {
+  $methods = @('Forward PE', 'Historical PE', 'PB / ROE')
+  $parts = foreach ($method in $methods) {
+    $src = $null
+    if ($methodFairValues) {
+      $prop = $methodFairValues.PSObject.Properties[$method]
+      if ($prop) { $src = $prop.Value }
+    }
+    $bear = $null
+    $base = $null
+    $bull = $null
+    $asOf = $null
+    if ($src) {
+      if ($src.PSObject.Properties['bear']) { $bear = $src.bear }
+      if ($src.PSObject.Properties['base']) { $base = $src.base }
+      if ($src.PSObject.Properties['bull']) { $bull = $src.bull }
+      if ($src.PSObject.Properties['asOf'] -and $src.asOf) { $asOf = [string]$src.asOf }
+    }
+    ('"' + $method + '":{"bear":' + (Get-JsonNullOrNumber $bear) + ',"base":' + (Get-JsonNullOrNumber $base) + ',"bull":' + (Get-JsonNullOrNumber $bull) + ',"asOf":' + (Get-JsonNullOrString $asOf) + '}')
+  }
+  return '{' + ($parts -join ',') + '}'
+}
+
+function Set-CaseMethodFairValues($caseObj, $today) {
+  if (-not $caseObj.valuation) { return }
+  $confirmed = $false
+  if ($caseObj.valuationProfile -and $caseObj.valuationProfile.userConfirmed) {
+    $confirmed = [bool]$caseObj.valuationProfile.userConfirmed
+  }
+  $computed = Get-ComputedMethodFairValues $caseObj.valuation.methodInputs $confirmed $today
+  if ($caseObj.valuation.PSObject.Properties['methodFairValues']) {
+    $caseObj.valuation.methodFairValues = $computed
+  } else {
+    $caseObj.valuation | Add-Member -NotePropertyName methodFairValues -NotePropertyValue $computed -Force
+  }
+}
+
 function ConvertTo-InvestmentCaseJson($caseObj) {
   $company = $caseObj.company
   if (-not $company) { $company = [PSCustomObject]@{ name = ''; ticker = ''; exchange = $null; currency = $null } }
@@ -293,7 +411,7 @@ function ConvertTo-InvestmentCaseJson($caseObj) {
     '"researchIds":' + (ConvertTo-JsonArrayText (Get-AsArray $caseObj.researchIds))
     '"thesis":{"thesis":' + (Get-JsonString $thesis.thesis) + ',"growthDrivers":' + (ConvertTo-JsonArrayText (Get-AsArray $thesis.growthDrivers)) + ',"competitiveAdvantage":' + (Get-JsonString $thesis.competitiveAdvantage) + ',"earningsTranslation":' + (Get-JsonString $thesis.earningsTranslation) + ',"duration":' + (Get-JsonString $thesis.duration) + ',"supportingEvidence":' + (ConvertTo-EvidenceJson $thesis.supportingEvidence) + ',"counterEvidence":' + (ConvertTo-EvidenceJson $thesis.counterEvidence) + ',"toBeVerified":' + (ConvertTo-EvidenceJson $thesis.toBeVerified) + ',"killCriteria":' + (ConvertTo-JsonArrayText (Get-AsArray $thesis.killCriteria)) + ',"status":' + (Get-JsonString $thesis.status) + '}'
     '"valuationProfile":{"companyType":' + (Get-JsonNullOrString $profile.companyType) + ',"primaryMethod":' + (Get-JsonNullOrString $profile.primaryMethod) + ',"secondaryMethod":' + (Get-JsonNullOrString $profile.secondaryMethod) + ',"crossCheckMethod":' + (Get-JsonNullOrString $profile.crossCheckMethod) + ',"userConfirmed":' + $(if ($confirmed) { 'true' } else { 'false' }) + '}'
-    '"valuation":{"bear":' + (Get-JsonNullOrNumber $val.bear) + ',"base":' + (Get-JsonNullOrNumber $val.base) + ',"bull":' + (Get-JsonNullOrNumber $val.bull) + ',"marginOfSafety":' + (Get-JsonNullOrNumber $val.marginOfSafety) + ',"buyUnder":' + (Get-JsonNullOrNumber $val.buyUnder) + ',"currentPrice":null,"currentDiscount":null,"methodInputs":' + (ConvertTo-MethodInputsJson $val.methodInputs) + '}'
+    '"valuation":{"bear":' + (Get-JsonNullOrNumber $val.bear) + ',"base":' + (Get-JsonNullOrNumber $val.base) + ',"bull":' + (Get-JsonNullOrNumber $val.bull) + ',"marginOfSafety":' + (Get-JsonNullOrNumber $val.marginOfSafety) + ',"buyUnder":' + (Get-JsonNullOrNumber $val.buyUnder) + ',"currentPrice":null,"currentDiscount":null,"methodInputs":' + (ConvertTo-MethodInputsJson $val.methodInputs) + ',"methodFairValues":' + (ConvertTo-MethodFairValuesJson $val.methodFairValues) + '}'
     '"decision":null'
     '"positionPlaybook":null'
     '"monitoring":null'
@@ -413,6 +531,7 @@ while ($listener.IsListening) {
           $type = if ($null -eq $body.companyType) { '' } else { ([string]$body.companyType).Trim() }
           if ([string]::IsNullOrWhiteSpace($type)) {
             $caseObj.valuationProfile = New-EmptyValuationProfile
+            Set-CaseMethodFairValues $caseObj $today
             if ($caseObj.origin) { $caseObj.origin.updatedAt = $today }
             $store.updated = $today
             Write-InvestmentCasesFile $casesPath $store
@@ -432,6 +551,7 @@ while ($listener.IsListening) {
               $profile.secondaryMethod = $rec.secondaryMethod
               $profile.crossCheckMethod = $rec.crossCheckMethod
               $profile.userConfirmed = $false
+              Set-CaseMethodFairValues $caseObj $today
               if ($caseObj.origin) { $caseObj.origin.updatedAt = $today }
               $store.updated = $today
               Write-InvestmentCasesFile $casesPath $store
@@ -455,6 +575,7 @@ while ($listener.IsListening) {
             Send-Json $response @{ error = 'invalid_payload'; message = 'companyType is not set' } 400
           } else {
             $profile.userConfirmed = $true
+            Set-CaseMethodFairValues $caseObj $today
             if ($caseObj.origin) { $caseObj.origin.updatedAt = $today }
             $store.updated = $today
             Write-InvestmentCasesFile $casesPath $store
@@ -525,6 +646,7 @@ while ($listener.IsListening) {
           } else {
             $methodObj | Add-Member -NotePropertyName $fieldName -NotePropertyValue $leaf -Force
           }
+          Set-CaseMethodFairValues $caseObj $today
           if ($caseObj.origin) { $caseObj.origin.updatedAt = $today }
           $store.updated = $today
           Write-InvestmentCasesFile $casesPath $store

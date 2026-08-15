@@ -396,8 +396,17 @@ const WorkflowEngine = {
       buyUnder: null,
       currentPrice: null,
       currentDiscount: null,
-      methodInputs: this.emptyMethodInputs()
+      methodInputs: this.emptyMethodInputs(),
+      methodFairValues: this.emptyMethodFairValues()
     };
+  },
+
+  fairValueMethods: ['Forward PE', 'Historical PE', 'PB / ROE'],
+
+  fairValueFormulas: {
+    'Forward PE': 'forwardEPS × reasonablePE',
+    'Historical PE': 'referenceEPS × historicalPEBear / historicalPEBase / historicalPEBull',
+    'PB / ROE': 'BVPS × reasonablePB'
   },
 
   methodInputModels: {
@@ -530,6 +539,162 @@ const WorkflowEngine = {
     return current;
   },
 
+  emptyMethodFairValue() {
+    return {
+      bear: null,
+      base: null,
+      bull: null,
+      asOf: null
+    };
+  },
+
+  emptyMethodFairValues() {
+    const values = {};
+    this.fairValueMethods.forEach(method => {
+      values[method] = this.emptyMethodFairValue();
+    });
+    return values;
+  },
+
+  methodInputNumber(methodInputs, method, field) {
+    const raw = methodInputs?.[method]?.[field]?.value;
+    if (raw == null || raw === '') return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  },
+
+  productOrNull(left, right) {
+    if (left == null || right == null) return null;
+    const n = Number(left) * Number(right);
+    return Number.isFinite(n) ? n : null;
+  },
+
+  withFairValueAsOf(result) {
+    const leaf = {
+      bear: result?.bear ?? null,
+      base: result?.base ?? null,
+      bull: result?.bull ?? null,
+      asOf: null
+    };
+    if (leaf.bear != null || leaf.base != null || leaf.bull != null) {
+      leaf.asOf = this.today();
+    }
+    return leaf;
+  },
+
+  computeOneMethodFairValue(method, methodInputs) {
+    if (method === 'Forward PE') {
+      return this.withFairValueAsOf({
+        bear: null,
+        base: this.productOrNull(
+          this.methodInputNumber(methodInputs, method, 'forwardEPS'),
+          this.methodInputNumber(methodInputs, method, 'reasonablePE')
+        ),
+        bull: null
+      });
+    }
+    if (method === 'Historical PE') {
+      const eps = this.methodInputNumber(methodInputs, method, 'referenceEPS');
+      return this.withFairValueAsOf({
+        bear: this.productOrNull(eps, this.methodInputNumber(methodInputs, method, 'historicalPEBear')),
+        base: this.productOrNull(eps, this.methodInputNumber(methodInputs, method, 'historicalPEBase')),
+        bull: this.productOrNull(eps, this.methodInputNumber(methodInputs, method, 'historicalPEBull'))
+      });
+    }
+    if (method === 'PB / ROE') {
+      return this.withFairValueAsOf({
+        bear: null,
+        base: this.productOrNull(
+          this.methodInputNumber(methodInputs, method, 'BVPS'),
+          this.methodInputNumber(methodInputs, method, 'reasonablePB')
+        ),
+        bull: null
+      });
+    }
+    return this.emptyMethodFairValue();
+  },
+
+  computeMethodFairValues(valuation, userConfirmed) {
+    const ensured = this.ensureMethodInputs(valuation || this.emptyValuation());
+    if (!userConfirmed) return this.emptyMethodFairValues();
+    const values = {};
+    this.fairValueMethods.forEach(method => {
+      values[method] = this.computeOneMethodFairValue(method, ensured.methodInputs);
+    });
+    return values;
+  },
+
+  applyMethodFairValues(valuation, userConfirmed) {
+    const current = valuation || this.emptyValuation();
+    current.methodFairValues = this.computeMethodFairValues(current, userConfirmed === true);
+    return current;
+  },
+
+  ensureMethodFairValues(valuation) {
+    const current = valuation || this.emptyValuation();
+    const reserved = this.emptyMethodFairValues();
+    const existing = current.methodFairValues && typeof current.methodFairValues === 'object'
+      ? current.methodFairValues
+      : {};
+    this.fairValueMethods.forEach(method => {
+      const src = existing[method] && typeof existing[method] === 'object' ? existing[method] : {};
+      const leaf = this.emptyMethodFairValue();
+      ['bear', 'base', 'bull'].forEach(key => {
+        if (src[key] != null && src[key] !== '') {
+          const n = Number(src[key]);
+          leaf[key] = Number.isFinite(n) ? n : null;
+        }
+      });
+      const asOf = (src.asOf || '').trim();
+      leaf.asOf = (leaf.bear != null || leaf.base != null || leaf.bull != null)
+        ? (asOf || null)
+        : null;
+      reserved[method] = leaf;
+    });
+    current.methodFairValues = reserved;
+    return current;
+  },
+
+  missingFairValueInputs(method, methodInputs) {
+    const missing = [];
+    const addIfMissing = field => {
+      if (this.methodInputNumber(methodInputs, method, field) == null) missing.push(field);
+    };
+    if (method === 'Forward PE') {
+      addIfMissing('forwardEPS');
+      addIfMissing('reasonablePE');
+    } else if (method === 'Historical PE') {
+      addIfMissing('referenceEPS');
+      addIfMissing('historicalPEBear');
+      addIfMissing('historicalPEBase');
+      addIfMissing('historicalPEBull');
+    } else if (method === 'PB / ROE') {
+      addIfMissing('BVPS');
+      addIfMissing('reasonablePB');
+    }
+    return missing;
+  },
+
+  formatFairValue(value) {
+    return value == null || value === '' ? '--' : `${this.formatNumber(value)} 元/股`;
+  },
+
+  renderMethodFairValue(method, methodInputs, role) {
+    if (!this.fairValueMethods.includes(method)) return '';
+    const title = role ? `Fair Value（${role}：${method}）` : `Fair Value（${method}）`;
+    const result = this.computeOneMethodFairValue(method, methodInputs);
+    const missing = this.missingFairValueInputs(method, methodInputs);
+    let html = `<p><b>${this.escapeHtml(title)}</b></p>`;
+    html += `<p>公式：${this.escapeHtml(this.fairValueFormulas[method] || '')}</p>`;
+    html += `<p>Bear：${this.escapeHtml(this.formatFairValue(result.bear))}</p>`;
+    html += `<p>Base：${this.escapeHtml(this.formatFairValue(result.base))}</p>`;
+    html += `<p>Bull：${this.escapeHtml(this.formatFairValue(result.bull))}</p>`;
+    if (missing.length) {
+      html += `<p>尚未計算：缺少 ${this.escapeHtml(missing.join('、'))}</p>`;
+    }
+    return html;
+  },
+
   formatInputValue(value) {
     return value == null || value === '' ? '尚未提供' : String(value);
   },
@@ -569,7 +734,7 @@ const WorkflowEngine = {
     const selected = this.selectedValuationMethods(profile);
     const linkedIds = Array.isArray(researchIds) ? researchIds : [];
     let html = '<p><b>估值輸入</b></p>';
-    html += '<p>本階段只列出所需輸入與資料來源，不計算公平價值。</p>';
+    html += '<p>本階段只計算 Forward PE、Historical PE、PB / ROE 的 Fair Value。Case 層級 Bear / Base / Bull 尚未指定。</p>';
     html += '<p>researchId 是此數值或判斷的依據，不是原始提供者。</p>';
     html += '<p>空白會存成 null。無效文字不會寫入。合理性 warning 仍可保存假設。</p>';
 
@@ -605,6 +770,7 @@ const WorkflowEngine = {
         html += '</li>';
       });
       html += '</ul>';
+      html += this.renderMethodFairValue(method, ensured.methodInputs, role);
     });
 
     return html;
@@ -841,6 +1007,10 @@ const WorkflowEngine = {
     if (!persisted.fallback) return persisted;
 
     persisted.current.valuationProfile = profile;
+    persisted.current.valuation = this.applyMethodFairValues(
+      persisted.current.valuation || this.emptyValuation(),
+      false
+    );
     persisted.current.origin = persisted.current.origin || {};
     persisted.current.origin.updatedAt = this.today();
     DataEngine.upsertCase(persisted.current);
@@ -863,6 +1033,10 @@ const WorkflowEngine = {
 
     persisted.current.valuationProfile = persisted.current.valuationProfile || this.emptyValuationProfile();
     persisted.current.valuationProfile.userConfirmed = true;
+    persisted.current.valuation = this.applyMethodFairValues(
+      persisted.current.valuation || this.emptyValuation(),
+      true
+    );
     persisted.current.origin = persisted.current.origin || {};
     persisted.current.origin.updatedAt = this.today();
     DataEngine.upsertCase(persisted.current);
@@ -1001,7 +1175,10 @@ const WorkflowEngine = {
     } catch (_) {
       const valuation = this.ensureMethodInputs(current.valuation || this.emptyValuation());
       valuation.methodInputs[method][field] = leaf;
-      current.valuation = valuation;
+      current.valuation = this.applyMethodFairValues(
+        valuation,
+        current.valuationProfile?.userConfirmed === true
+      );
       current.origin = current.origin || {};
       current.origin.updatedAt = this.today();
       DataEngine.upsertCase(current);
@@ -1105,6 +1282,7 @@ const WorkflowEngine = {
     html += this.renderValuationProfile(caseObj.valuationProfile);
     html += this.renderValuationInputs(caseObj.valuationProfile, valuation, caseObj.researchIds);
     html += '<p><b>Valuation</b></p>';
+    html += '<p>上方是各方法 Fair Value；Case 層級 Bear / Base / Bull 尚未指定。</p>';
     html += `<p>Bear: ${this.escapeHtml(this.formatNumber(valuation.bear))}</p>`;
     html += `<p>Base: ${this.escapeHtml(this.formatNumber(valuation.base))}</p>`;
     html += `<p>Bull: ${this.escapeHtml(this.formatNumber(valuation.bull))}</p>`;
