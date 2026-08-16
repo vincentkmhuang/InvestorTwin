@@ -30,7 +30,7 @@ function Send-Json($response, $obj, $statusCode = 200) {
 
 function Read-Body($request) {
   if (-not $request.HasEntityBody) { return $null }
-  $reader = New-Object System.IO.StreamReader($request.InputStream, $request.ContentEncoding)
+  $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
   $text = $reader.ReadToEnd()
   if ([string]::IsNullOrWhiteSpace($text)) { return $null }
   return $text | ConvertFrom-Json
@@ -119,6 +119,15 @@ function ConvertTo-EvidenceJson($items) {
     ('{"text":' + $text + ',"researchId":' + $rid + '}')
   }
   return '[' + ($parts -join ',') + ']'
+}
+
+function Test-EvidenceDuplicate($items, $text, $researchId) {
+  foreach ($item in (Get-AsArray $items)) {
+    if (([string]$item.text) -eq $text -and ([string]$item.researchId) -eq $researchId) {
+      return $true
+    }
+  }
+  return $false
 }
 
 function New-EmptyValuationProfile {
@@ -735,8 +744,54 @@ while ($listener.IsListening) {
             }
           }
         }
+      } elseif ($body -and $body.id -and $body.thesisEvidence) {
+        $id = [string]$body.id
+        $target = @($store.cases | Where-Object { $_.id -eq $id } | Select-Object -First 1)
+        $ev = $body.thesisEvidence
+        $side = if ($ev.side) { ([string]$ev.side).Trim() } else { '' }
+        $text = if ($null -eq $ev.text) { '' } else { ([string]$ev.text).Trim() }
+        $researchId = if ($null -eq $ev.researchId) { '' } else { ([string]$ev.researchId).Trim() }
+        if ($target.Count -eq 0) {
+          Send-Json $response @{ error = 'not_found'; message = 'Investment Case not found' } 404
+        } elseif ($side -ne 'supporting' -and $side -ne 'counter') {
+          Send-Json $response @{ error = 'invalid_payload'; message = 'thesisEvidence.side must be supporting or counter' } 400
+        } elseif ([string]::IsNullOrWhiteSpace($text) -or [string]::IsNullOrWhiteSpace($researchId)) {
+          Send-Json $response @{ error = 'invalid_payload'; message = 'thesisEvidence text and researchId are required' } 400
+        } else {
+          $caseObj = $target[0]
+          $linked = @(Get-AsArray $caseObj.researchIds)
+          if ($linked -notcontains $researchId) {
+            Send-Json $response @{ error = 'invalid_payload'; message = 'Research Card is not linked to this Investment Case' } 400
+          } elseif (-not $caseObj.thesis) {
+            Send-Json $response @{ error = 'invalid_payload'; message = 'Investment Case thesis is missing' } 400
+          } else {
+            $thesis = $caseObj.thesis
+            $supporting = @(Get-AsArray $thesis.supportingEvidence)
+            $counter = @(Get-AsArray $thesis.counterEvidence)
+            $isDup = (Test-EvidenceDuplicate $supporting $text $researchId) -or (Test-EvidenceDuplicate $counter $text $researchId)
+            if ($isDup) {
+              Send-Json $response @{ updated = $false; duplicate = $true; id = $id }
+            } else {
+              $entry = [PSCustomObject]@{ text = $text; researchId = $researchId }
+              if ($side -eq 'supporting') {
+                $thesis.supportingEvidence = @($supporting + $entry)
+              } else {
+                $thesis.counterEvidence = @($counter + $entry)
+              }
+              if ($caseObj.origin) { $caseObj.origin.updatedAt = $today }
+              $store.updated = $today
+              Write-InvestmentCasesFile $casesPath $store
+              Send-Json $response @{
+                updated = $true
+                duplicate = $false
+                id = $id
+                side = $side
+              }
+            }
+          }
+        }
       } else {
-        Send-Json $response @{ error = 'invalid_payload'; message = 'case, companyType, confirmValuationProfile, methodInput, or marginOfSafety is required' } 400
+        Send-Json $response @{ error = 'invalid_payload'; message = 'case, companyType, confirmValuationProfile, methodInput, marginOfSafety, or thesisEvidence is required' } 400
       }
     }
     elseif ($localPath -match '^/api/research/(.+)$' -and $method -eq 'POST') {
