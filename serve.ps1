@@ -871,8 +871,46 @@ while ($listener.IsListening) {
             }
           }
         }
+      } elseif ($body -and $body.id -and ($body.PSObject.Properties.Name -contains 'decision')) {
+        $id = [string]$body.id
+        $target = @($store.cases | Where-Object { $_.id -eq $id } | Select-Object -First 1)
+        $incoming = $body.decision
+        $stance = if ((Test-IsJsonObject $incoming) -and $incoming.stance) { [string]$incoming.stance } else { '' }
+        $reason = if ((Test-IsJsonObject $incoming) -and $null -ne $incoming.reason) { ([string]$incoming.reason).Trim() } else { '' }
+        if ($target.Count -eq 0) {
+          Send-Json $response @{ error = 'not_found'; message = 'Investment Case not found' } 404
+        } elseif ((Get-AllowedDecisionStances) -notcontains $stance) {
+          Send-Json $response @{ error = 'invalid_payload'; message = 'decision.stance is invalid' } 400
+        } elseif ([string]::IsNullOrWhiteSpace($reason)) {
+          Send-Json $response @{ error = 'invalid_payload'; message = 'decision.reason is required' } 400
+        } else {
+          $caseObj = $target[0]
+          if ($incoming.reason -ne $reason) { $incoming.reason = $reason }
+          if (-not $incoming.asOf) { $incoming | Add-Member -NotePropertyName asOf -NotePropertyValue $today -Force }
+          $normalized = Get-PersistedDecision $incoming
+          if ($null -eq $normalized) {
+            Send-Json $response @{ error = 'invalid_payload'; message = 'decision is invalid' } 400
+          } else {
+            $old = Get-PersistedDecision $caseObj.decision
+            if ($old) {
+              $history = @(Get-AsArray $caseObj.decisionHistory)
+              $caseObj | Add-Member -NotePropertyName decisionHistory -NotePropertyValue (@($history + $old)) -Force
+            } elseif (-not $caseObj.PSObject.Properties['decisionHistory']) {
+              $caseObj | Add-Member -NotePropertyName decisionHistory -NotePropertyValue @() -Force
+            }
+            $caseObj | Add-Member -NotePropertyName decision -NotePropertyValue $normalized -Force
+            if ($caseObj.origin) { $caseObj.origin.updatedAt = $today }
+            $store.updated = $today
+            Write-InvestmentCasesFile $casesPath $store
+            Send-Json $response @{
+              updated = $true
+              id = $id
+              stance = $normalized.stance
+            }
+          }
+        }
       } else {
-        Send-Json $response @{ error = 'invalid_payload'; message = 'case, companyType, confirmValuationProfile, methodInput, marginOfSafety, or thesisEvidence is required' } 400
+        Send-Json $response @{ error = 'invalid_payload'; message = 'case, companyType, confirmValuationProfile, methodInput, marginOfSafety, thesisEvidence, or decision is required' } 400
       }
     }
     elseif ($localPath -match '^/api/research/(.+)$' -and $method -eq 'POST') {

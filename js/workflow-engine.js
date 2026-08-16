@@ -1267,6 +1267,127 @@ const WorkflowEngine = {
     }
   },
 
+  allowedDecisionStances() {
+    return ['watch', 'pass', 'initiate', 'hold', 'reduce', 'exit', 'review'];
+  },
+
+  isPersistedDecision(decision) {
+    return !!decision
+      && typeof decision === 'object'
+      && this.allowedDecisionStances().includes(String(decision.stance || ''));
+  },
+
+  decisionBasedOnSnapshot(caseObj) {
+    const thesis = caseObj?.thesis || {};
+    const supporting = Array.isArray(thesis.supportingEvidence) ? thesis.supportingEvidence : [];
+    const counter = Array.isArray(thesis.counterEvidence) ? thesis.counterEvidence : [];
+    const researchIds = Array.isArray(caseObj?.researchIds) ? caseObj.researchIds.slice() : [];
+    return {
+      researchIds,
+      supportingCount: supporting.length,
+      counterCount: counter.length,
+      thesisStatus: thesis.status || null
+    };
+  },
+
+  buildDecision(caseObj, stance, reason) {
+    return {
+      stance,
+      asOf: this.today(),
+      reason: String(reason || '').trim(),
+      basedOn: this.decisionBasedOnSnapshot(caseObj)
+    };
+  },
+
+  applyDecisionLocally(caseObj, next) {
+    if (this.isPersistedDecision(caseObj.decision)) {
+      const history = Array.isArray(caseObj.decisionHistory) ? caseObj.decisionHistory : [];
+      history.push(caseObj.decision);
+      caseObj.decisionHistory = history;
+    } else if (!Array.isArray(caseObj.decisionHistory)) {
+      caseObj.decisionHistory = [];
+    }
+    caseObj.decision = next;
+    caseObj.origin = caseObj.origin || {};
+    caseObj.origin.updatedAt = this.today();
+    return caseObj;
+  },
+
+  formatDecisionBasedOn(basedOn) {
+    const src = basedOn || {};
+    const ids = Array.isArray(src.researchIds) && src.researchIds.length
+      ? src.researchIds.join(', ')
+      : '--';
+    const supporting = src.supportingCount == null ? '--' : src.supportingCount;
+    const counter = src.counterCount == null ? '--' : src.counterCount;
+    return `researchIds: ${ids}; supporting: ${supporting}; counter: ${counter}; thesisStatus: ${src.thesisStatus || '--'}`;
+  },
+
+  renderDecisionRecord(decision) {
+    if (!this.isPersistedDecision(decision)) return '';
+    let html = `<p>Stance: ${this.escapeHtml(decision.stance)}</p>`;
+    html += `<p>As of: ${this.escapeHtml(decision.asOf || '--')}</p>`;
+    html += `<p>Reason: ${this.escapeHtml(decision.reason || '--')}</p>`;
+    html += `<p>Based on: ${this.escapeHtml(this.formatDecisionBasedOn(decision.basedOn))}</p>`;
+    return html;
+  },
+
+  renderDecisionHistory(items) {
+    const list = Array.isArray(items) ? items.filter(item => this.isPersistedDecision(item)) : [];
+    if (!list.length) return '<p>--</p>';
+    return `<ul>${list.map(item => {
+      const basedOn = this.formatDecisionBasedOn(item.basedOn);
+      return `<li>${this.escapeHtml(item.stance)} · ${this.escapeHtml(item.asOf || '--')} · ${this.escapeHtml(item.reason || '--')} · ${this.escapeHtml(basedOn)}</li>`;
+    }).join('')}</ul>`;
+  },
+
+  renderDecisionSection(caseObj) {
+    const hasDecision = this.isPersistedDecision(caseObj?.decision);
+    const actionLabel = hasDecision ? '更新 Decision' : '建立 Decision';
+    const options = ['<option value="">選擇 stance</option>']
+      .concat(this.allowedDecisionStances().map(stance => (
+        `<option value="${this.escapeHtml(stance)}">${this.escapeHtml(stance)}</option>`
+      )));
+
+    let html = '<p><b>Decision</b></p>';
+    html += hasDecision ? this.renderDecisionRecord(caseObj.decision) : '<p>尚無 Decision</p>';
+    html += `<p>Stance <select data-case-decision-stance>${options.join('')}</select></p>`;
+    html += '<p>Reason<br><textarea data-case-decision-reason rows="3" style="width:100%;max-width:36em"></textarea></p>';
+    html += `<p><button type="button" data-case-decision-save>${actionLabel}</button></p>`;
+    html += '<p><b>Decision History</b></p>';
+    html += this.renderDecisionHistory(caseObj?.decisionHistory);
+    return html;
+  },
+
+  async saveCaseDecision(caseId, stance, reason) {
+    const current = DataEngine.getCase(caseId);
+    if (!current) return { ok: false, message: 'Investment Case not found' };
+    if (!this.allowedDecisionStances().includes(stance)) {
+      return { ok: false, message: 'Invalid stance' };
+    }
+    const trimmed = String(reason || '').trim();
+    if (!trimmed) return { ok: false, message: 'Reason is required' };
+
+    const next = this.buildDecision(current, stance, trimmed);
+    try {
+      const res = await fetch('/api/cases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: caseId, decision: next })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        await DataEngine.loadInvestmentCases();
+        return { ok: true, id: caseId };
+      }
+      return { ok: false, message: data.message || 'Failed to save Decision' };
+    } catch (_) {
+      this.applyDecisionLocally(current, next);
+      DataEngine.upsertCase(current);
+      return { ok: true, id: caseId, fallback: true };
+    }
+  },
+
   renderEvidenceList(items) {
     const list = Array.isArray(items) ? items : [];
     if (!list.length) return '<p>--</p>';
@@ -1346,6 +1467,8 @@ const WorkflowEngine = {
     html += `<p>Buy Under: ${this.escapeHtml(this.formatCaseLevelValue(valuation.buyUnder))}</p>`;
     html += `<p>Current Price: ${this.escapeHtml(this.formatNumber(valuation.currentPrice))}</p>`;
     html += `<p>Current Discount: ${this.escapeHtml(this.formatPercent(valuation.currentDiscount))}</p>`;
+    html += this.renderDecisionSection(caseObj);
+    html += '<p data-case-decision-error style="display:none"></p>';
 
     container.innerHTML = html;
 
@@ -1410,6 +1533,46 @@ const WorkflowEngine = {
         const result = await this.saveCaseMarginOfSafety(caseObj.id, mosInput.value);
         if (!result.ok) {
           window.alert(result.message || 'Failed to save marginOfSafety');
+          return;
+        }
+        await this.renderInvestmentCase(DataEngine.getCase(caseObj.id), container);
+      };
+    }
+
+    const saveDecisionBtn = container.querySelector('[data-case-decision-save]');
+    const stanceSelect = container.querySelector('[data-case-decision-stance]');
+    const reasonInput = container.querySelector('[data-case-decision-reason]');
+    const decisionError = container.querySelector('[data-case-decision-error]');
+    if (saveDecisionBtn && stanceSelect && reasonInput) {
+      saveDecisionBtn.onclick = async () => {
+        const stance = stanceSelect.value;
+        const reason = reasonInput.value;
+        if (decisionError) {
+          decisionError.style.display = 'none';
+          decisionError.textContent = '';
+        }
+        if (!this.allowedDecisionStances().includes(stance)) {
+          window.alert('請選擇 stance');
+          return;
+        }
+        if (!String(reason || '').trim()) {
+          if (decisionError) {
+            decisionError.textContent = 'Reason 必填';
+            decisionError.style.display = '';
+          }
+          return;
+        }
+        const actionLabel = this.isPersistedDecision(caseObj.decision) ? '更新' : '建立';
+        const confirmed = window.confirm(
+          `確定${actionLabel} Decision 為 ${stance}？\n按「確定」後才會寫入 Investment Case。\n按「取消」則不會寫入。`
+        );
+        if (!confirmed) {
+          window.alert('已取消，未寫入 Decision');
+          return;
+        }
+        const result = await this.saveCaseDecision(caseObj.id, stance, reason);
+        if (!result.ok) {
+          window.alert(result.message || 'Failed to save Decision');
           return;
         }
         await this.renderInvestmentCase(DataEngine.getCase(caseObj.id), container);
