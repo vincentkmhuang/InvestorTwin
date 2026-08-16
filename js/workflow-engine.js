@@ -992,6 +992,7 @@ const WorkflowEngine = {
       valuationProfile: this.emptyValuationProfile(),
       valuation: this.emptyValuation(),
       decision: null,
+      decisionHistory: [],
       positionPlaybook: null,
       monitoring: null
     };

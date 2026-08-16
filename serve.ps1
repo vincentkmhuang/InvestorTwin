@@ -121,6 +121,85 @@ function ConvertTo-EvidenceJson($items) {
   return '[' + ($parts -join ',') + ']'
 }
 
+function Get-AllowedDecisionStances {
+  return @('watch', 'pass', 'initiate', 'hold', 'reduce', 'exit', 'review')
+}
+
+function Test-IsJsonObject($value) {
+  if ($null -eq $value) { return $false }
+  return ($value -is [System.Management.Automation.PSObject] -or $value -is [System.Collections.IDictionary])
+}
+
+function Get-PersistedDecision($raw) {
+  if (-not (Test-IsJsonObject $raw)) { return $null }
+  $stance = ''
+  if ($raw.PSObject.Properties['stance'] -and $raw.stance) { $stance = [string]$raw.stance }
+  if ((Get-AllowedDecisionStances) -notcontains $stance) { return $null }
+
+  $asOf = ''
+  if ($raw.PSObject.Properties['asOf'] -and $null -ne $raw.asOf) { $asOf = [string]$raw.asOf }
+  $reason = ''
+  if ($raw.PSObject.Properties['reason'] -and $null -ne $raw.reason) { $reason = [string]$raw.reason }
+
+  $researchIds = @()
+  $supportingCount = $null
+  $counterCount = $null
+  $thesisStatus = $null
+  $basedOnRaw = $null
+  if ($raw.PSObject.Properties['basedOn']) { $basedOnRaw = $raw.basedOn }
+  if (Test-IsJsonObject $basedOnRaw) {
+    if ($basedOnRaw.PSObject.Properties['researchIds']) {
+      $researchIds = @(Get-AsArray $basedOnRaw.researchIds)
+    }
+    if ($basedOnRaw.PSObject.Properties['supportingCount'] -and $null -ne $basedOnRaw.supportingCount -and $basedOnRaw.supportingCount -ne '') {
+      try { $supportingCount = [int]$basedOnRaw.supportingCount } catch { $supportingCount = $null }
+    }
+    if ($basedOnRaw.PSObject.Properties['counterCount'] -and $null -ne $basedOnRaw.counterCount -and $basedOnRaw.counterCount -ne '') {
+      try { $counterCount = [int]$basedOnRaw.counterCount } catch { $counterCount = $null }
+    }
+    if ($basedOnRaw.PSObject.Properties['thesisStatus'] -and $basedOnRaw.thesisStatus) {
+      $thesisStatus = [string]$basedOnRaw.thesisStatus
+    }
+  }
+
+  return [PSCustomObject]@{
+    stance = $stance
+    asOf = $asOf
+    reason = $reason
+    basedOn = [PSCustomObject]@{
+      researchIds = $researchIds
+      supportingCount = $supportingCount
+      counterCount = $counterCount
+      thesisStatus = $thesisStatus
+    }
+  }
+}
+
+function ConvertTo-DecisionJson($raw) {
+  $decision = Get-PersistedDecision $raw
+  if ($null -eq $decision) { return 'null' }
+  $basedOn = $decision.basedOn
+  return ('{"stance":' + (Get-JsonString $decision.stance) +
+    ',"asOf":' + (Get-JsonString $decision.asOf) +
+    ',"reason":' + (Get-JsonString $decision.reason) +
+    ',"basedOn":{"researchIds":' + (ConvertTo-JsonArrayText (Get-AsArray $basedOn.researchIds)) +
+    ',"supportingCount":' + (Get-JsonNullOrNumber $basedOn.supportingCount) +
+    ',"counterCount":' + (Get-JsonNullOrNumber $basedOn.counterCount) +
+    ',"thesisStatus":' + (Get-JsonNullOrString $basedOn.thesisStatus) + '}}')
+}
+
+function ConvertTo-DecisionHistoryJson($raw) {
+  $list = Get-AsArray $raw
+  if ($list.Count -eq 0) { return '[]' }
+  $parts = foreach ($item in $list) {
+    $json = ConvertTo-DecisionJson $item
+    if ($json -ne 'null') { $json }
+  }
+  $kept = @($parts)
+  if ($kept.Count -eq 0) { return '[]' }
+  return '[' + ($kept -join ',') + ']'
+}
+
 function Test-EvidenceDuplicate($items, $text, $researchId) {
   foreach ($item in (Get-AsArray $items)) {
     if (([string]$item.text) -eq $text -and ([string]$item.researchId) -eq $researchId) {
@@ -458,7 +537,8 @@ function ConvertTo-InvestmentCaseJson($caseObj) {
     '"thesis":{"thesis":' + (Get-JsonString $thesis.thesis) + ',"growthDrivers":' + (ConvertTo-JsonArrayText (Get-AsArray $thesis.growthDrivers)) + ',"competitiveAdvantage":' + (Get-JsonString $thesis.competitiveAdvantage) + ',"earningsTranslation":' + (Get-JsonString $thesis.earningsTranslation) + ',"duration":' + (Get-JsonString $thesis.duration) + ',"supportingEvidence":' + (ConvertTo-EvidenceJson $thesis.supportingEvidence) + ',"counterEvidence":' + (ConvertTo-EvidenceJson $thesis.counterEvidence) + ',"toBeVerified":' + (ConvertTo-EvidenceJson $thesis.toBeVerified) + ',"killCriteria":' + (ConvertTo-JsonArrayText (Get-AsArray $thesis.killCriteria)) + ',"status":' + (Get-JsonString $thesis.status) + '}'
     '"valuationProfile":{"companyType":' + (Get-JsonNullOrString $profile.companyType) + ',"primaryMethod":' + (Get-JsonNullOrString $profile.primaryMethod) + ',"secondaryMethod":' + (Get-JsonNullOrString $profile.secondaryMethod) + ',"crossCheckMethod":' + (Get-JsonNullOrString $profile.crossCheckMethod) + ',"userConfirmed":' + $(if ($confirmed) { 'true' } else { 'false' }) + '}'
     '"valuation":{"bear":' + (Get-JsonNullOrNumber $val.bear) + ',"base":' + (Get-JsonNullOrNumber $val.base) + ',"bull":' + (Get-JsonNullOrNumber $val.bull) + ',"marginOfSafety":' + (Get-JsonNullOrNumber $val.marginOfSafety) + ',"buyUnder":' + (Get-JsonNullOrNumber $val.buyUnder) + ',"currentPrice":null,"currentDiscount":null,"methodInputs":' + (ConvertTo-MethodInputsJson $val.methodInputs) + ',"methodFairValues":' + (ConvertTo-MethodFairValuesJson $val.methodFairValues) + '}'
-    '"decision":null'
+    '"decision":' + (ConvertTo-DecisionJson $caseObj.decision)
+    '"decisionHistory":' + (ConvertTo-DecisionHistoryJson $caseObj.decisionHistory)
     '"positionPlaybook":null'
     '"monitoring":null'
   )
@@ -547,7 +627,8 @@ while ($listener.IsListening) {
           if ($existing.Count -gt 0) {
             Send-Json $response @{ created = $false; existing = $true; id = $id }
           } else {
-            $caseObj.decision = $null
+            $caseObj | Add-Member -NotePropertyName decision -NotePropertyValue $null -Force
+            $caseObj | Add-Member -NotePropertyName decisionHistory -NotePropertyValue @() -Force
             $caseObj.positionPlaybook = $null
             $caseObj.monitoring = $null
             if (-not $caseObj.valuation) {
