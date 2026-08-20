@@ -251,6 +251,7 @@ const WorkflowEngine = {
     const questions = Array.isArray(card.questions) ? card.questions : [];
     const tags = Array.isArray(card.tags) ? card.tags : [];
     const related = await KnowledgeEngine.getResolvedRelated(card.id);
+    const linkedCases = DataEngine.findCasesByResearchId(card.id);
 
     let html = `<h3>${card.title}</h3>`;
     html += `<p><b>Summary</b></p><p>${card.summary || '--'}</p>`;
@@ -273,6 +274,12 @@ const WorkflowEngine = {
       html += `<p>${this.escapeHtml(researchConclusion.conclusion || '--')}</p>`;
       html += `<p>Status: ${this.escapeHtml(researchConclusion.status || '--')}</p>`;
       html += `<p>As of: ${this.escapeHtml(researchConclusion.asOf || '--')}</p>`;
+      if (linkedCases.length) {
+        html += '<p><b>加入 Investment Case 證據</b></p>';
+        html += `<p>${linkedCases.map(item => this.escapeHtml(item.title || item.id)).join('、')}</p>`;
+        html += '<p><button type="button" data-case-evidence="supporting">支持投資假設</button> ';
+        html += '<button type="button" data-case-evidence="counter">反對投資假設</button></p>';
+      }
     }
     html += '<p><b>Questions</b></p>';
     html += questions.length
@@ -296,7 +303,6 @@ const WorkflowEngine = {
     html += '<p><button type="button" data-append-save>Save</button></p>';
     html += '<p><button type="button" data-queue-follow-up>Queue for follow-up</button></p>';
 
-    const linkedCases = DataEngine.findCasesByResearchId(card.id);
     html += '<p><b>Investment Case</b></p>';
     html += linkedCases.length
       ? `<ul>${linkedCases.map(item =>
@@ -380,6 +386,40 @@ const WorkflowEngine = {
         }
       };
     }
+
+    container.querySelectorAll('[data-case-evidence]').forEach(btn => {
+      btn.onclick = async () => {
+        const side = btn.dataset.caseEvidence === 'counter' ? 'counter' : 'supporting';
+        const evidenceLabel = side === 'counter' ? 'Counter Evidence' : 'Supporting Evidence';
+        const confirmed = window.confirm(
+          `確定將此研究結論加入 ${evidenceLabel}？\n按「確定」後才會寫入 Investment Case。\n按「取消」則不會寫入。`
+        );
+        if (!confirmed) {
+          window.alert('已取消，未寫入 Investment Case');
+          return;
+        }
+
+        const result = await this.addResearchConclusionToCase(card, side);
+        if (!result.ok) {
+          window.alert(result.message || '寫入 Investment Case 失敗');
+          return;
+        }
+        if (result.duplicate) {
+          const existing = result.duplicateSide === 'counter' ? 'Counter Evidence' : 'Supporting Evidence';
+          window.alert(`此結論已存在於 ${existing}`);
+          return;
+        }
+
+        window.alert(`已加入 ${evidenceLabel}`);
+        await DataEngine.loadInvestmentCases();
+        const caseContainer = document.getElementById('caseView');
+        if (typeof openInvestmentCase === 'function' && result.id) {
+          await openInvestmentCase(result.id);
+        } else if (caseContainer) {
+          await this.renderInvestmentCase(DataEngine.getCase(result.id), caseContainer);
+        }
+      };
+    });
   },
 
   escapeHtml(value) {
@@ -1019,6 +1059,118 @@ const WorkflowEngine = {
     } catch (_) {
       DataEngine.upsertCase(caseObj);
       return { ok: true, created: true, id: caseObj.id, fallback: true };
+    }
+  },
+
+  sameCaseEvidence(item, researchId, text) {
+    return !!item
+      && String(item.researchId || '') === String(researchId || '')
+      && String(item.text || '').trim() === String(text || '').trim();
+  },
+
+  conclusionEvidenceLocation(caseObj, researchId, text) {
+    const thesis = caseObj?.thesis || {};
+    const supporting = Array.isArray(thesis.supportingEvidence) ? thesis.supportingEvidence : [];
+    const counter = Array.isArray(thesis.counterEvidence) ? thesis.counterEvidence : [];
+    if (supporting.some(item => this.sameCaseEvidence(item, researchId, text))) return 'supporting';
+    if (counter.some(item => this.sameCaseEvidence(item, researchId, text))) return 'counter';
+    return null;
+  },
+
+  caseHasConclusionEvidence(caseObj, researchId, text) {
+    return this.conclusionEvidenceLocation(caseObj, researchId, text) != null;
+  },
+
+  async addResearchConclusionToCase(card, side) {
+    const conclusion = (card?.researchConclusion?.conclusion || '').trim();
+    if (!conclusion) return { ok: false, message: 'Research Conclusion is empty' };
+    if (side !== 'supporting' && side !== 'counter') {
+      return { ok: false, message: 'Choose supporting or counter evidence' };
+    }
+
+    const researchId = card.id;
+    const linkedCases = DataEngine.findCasesByResearchId(researchId).filter(item =>
+      Array.isArray(item.researchIds) && item.researchIds.includes(researchId)
+    );
+    if (!linkedCases.length) {
+      return { ok: false, message: 'No linked Investment Case' };
+    }
+
+    const evidence = { text: conclusion, researchId };
+    let lastId = null;
+    let lastDuplicateSide = null;
+    let wrote = false;
+    let duplicateOnly = true;
+
+    for (const caseObj of linkedCases) {
+      const result = await this.persistCaseThesisEvidence(caseObj.id, side, evidence);
+      if (!result.ok) return result;
+      lastId = caseObj.id;
+      if (result.duplicate) {
+        lastDuplicateSide = result.duplicateSide || lastDuplicateSide;
+        continue;
+      }
+      duplicateOnly = false;
+      wrote = true;
+    }
+
+    if (!wrote && duplicateOnly) {
+      return { ok: true, duplicate: true, duplicateSide: lastDuplicateSide, id: lastId };
+    }
+    return { ok: true, id: lastId };
+  },
+
+  async persistCaseThesisEvidence(caseId, side, evidence) {
+    const current = DataEngine.getCase(caseId);
+    if (!current) return { ok: false, message: 'Investment Case not found' };
+    const researchIds = Array.isArray(current.researchIds) ? current.researchIds : [];
+    if (!researchIds.includes(evidence.researchId)) {
+      return { ok: false, message: 'Research Card is not linked to this Investment Case' };
+    }
+    const existingSide = this.conclusionEvidenceLocation(current, evidence.researchId, evidence.text);
+    if (existingSide) {
+      return { ok: true, duplicate: true, duplicateSide: existingSide, id: caseId };
+    }
+
+    try {
+      const res = await fetch('/api/cases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: caseId,
+          thesisEvidence: {
+            side,
+            text: evidence.text,
+            researchId: evidence.researchId
+          }
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        await DataEngine.loadInvestmentCases();
+        if (data.duplicate === true) {
+          const fresh = DataEngine.getCase(caseId);
+          return {
+            ok: true,
+            duplicate: true,
+            duplicateSide: this.conclusionEvidenceLocation(fresh, evidence.researchId, evidence.text),
+            id: caseId
+          };
+        }
+        return { ok: true, id: caseId };
+      }
+      return { ok: false, message: data.message || '寫入 Investment Case 失敗' };
+    } catch (_) {
+      const thesis = current.thesis || {};
+      const key = side === 'counter' ? 'counterEvidence' : 'supportingEvidence';
+      const list = Array.isArray(thesis[key]) ? thesis[key] : [];
+      list.push({ text: evidence.text, researchId: evidence.researchId });
+      thesis[key] = list;
+      current.thesis = thesis;
+      current.origin = current.origin || {};
+      current.origin.updatedAt = this.today();
+      DataEngine.upsertCase(current);
+      return { ok: true, id: caseId, fallback: true };
     }
   },
 
