@@ -1,0 +1,22 @@
+{
+  "sprint": "011-B-1",
+  "caseId": "3363-glass-bridge",
+  "monitoringItem": {
+    "text": "Glass Bridge 量產驗證是否確認",
+    "researchId": "glass-bridge"
+  },
+  "expectedInterface": {
+    "method": "POST",
+    "path": "/api/cases",
+    "description": "Trigger uses the monitoring item researchId and the existing Research Queue. Do not create a second queue store. Do not change decision, decisionHistory, thesis.status, evidence, valuation, or MOS.",
+    "body": {
+      "id": "3363-glass-bridge",
+      "monitoringTrigger": {
+        "text": "Glass Bridge 量產驗證是否確認",
+        "researchId": "glass-bridge"
+      }
+    }
+  },
+  "expectedQueueSource": "Monitoring",
+  "reResearchMarker": "needs re-research"
+}
