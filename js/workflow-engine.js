@@ -1542,6 +1542,38 @@ const WorkflowEngine = {
     return String(value);
   },
 
+  formatPlaybookInput(value) {
+    if (value == null) return '';
+    return String(value);
+  },
+
+  formatPlaybookLines(items) {
+    return Array.isArray(items) ? items.join('\n') : '';
+  },
+
+  parsePlaybookLines(text) {
+    return String(text || '')
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
+  },
+
+  normalizePlaybookText(value) {
+    const text = String(value == null ? '' : value).trim();
+    return text ? text : null;
+  },
+
+  applyPositionPlaybookLocally(caseObj, patch) {
+    const next = this.positionPlaybookView(caseObj.positionPlaybook);
+    next.targetPosition = this.normalizePlaybookText(patch?.targetPosition);
+    next.initialPosition = this.normalizePlaybookText(patch?.initialPosition);
+    next.entryTriggers = Array.isArray(patch?.entryTriggers) ? patch.entryTriggers.slice() : [];
+    caseObj.positionPlaybook = next;
+    caseObj.origin = caseObj.origin || {};
+    caseObj.origin.updatedAt = this.today();
+    return caseObj;
+  },
+
   renderPositionPlaybook(playbook) {
     const view = this.positionPlaybookView(playbook);
     let html = '<p><b>Position Playbook</b></p>';
@@ -1556,7 +1588,42 @@ const WorkflowEngine = {
     html += this.renderStringList(view.exitConditions);
     html += '<p><b>Monitoring Items</b></p>';
     html += this.renderStringList(view.monitoringItems);
+    html += '<p>Target Position<br>';
+    html += `<input data-case-playbook-target type="text" style="width:100%;max-width:36em" value="${this.escapeHtml(this.formatPlaybookInput(view.targetPosition))}"></p>`;
+    html += '<p>Initial Position<br>';
+    html += `<input data-case-playbook-initial type="text" style="width:100%;max-width:36em" value="${this.escapeHtml(this.formatPlaybookInput(view.initialPosition))}"></p>`;
+    html += '<p>Entry Triggers<br>';
+    html += `<textarea data-case-playbook-entry-triggers rows="4" style="width:100%;max-width:36em">${this.escapeHtml(this.formatPlaybookLines(view.entryTriggers))}</textarea></p>`;
+    html += '<p><button type="button" data-case-playbook-save>Save Position Playbook</button></p>';
+    html += '<p data-case-playbook-error style="display:none"></p>';
     return html;
+  },
+
+  async saveCasePositionPlaybook(caseId, targetPosition, initialPosition, entryTriggers) {
+    const current = DataEngine.getCase(caseId);
+    if (!current) return { ok: false, message: 'Investment Case not found' };
+    const payload = {
+      targetPosition: this.normalizePlaybookText(targetPosition),
+      initialPosition: this.normalizePlaybookText(initialPosition),
+      entryTriggers: Array.isArray(entryTriggers) ? entryTriggers : []
+    };
+    try {
+      const res = await fetch('/api/cases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: caseId, positionPlaybook: payload })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        await DataEngine.loadInvestmentCases();
+        return { ok: true, id: caseId };
+      }
+      return { ok: false, message: data.message || 'Failed to save Position Playbook' };
+    } catch (_) {
+      this.applyPositionPlaybookLocally(current, payload);
+      DataEngine.upsertCase(current);
+      return { ok: true, id: caseId, fallback: true };
+    }
   },
 
   async saveCaseDecision(caseId, stance, reason) {
@@ -1774,6 +1841,34 @@ const WorkflowEngine = {
         const result = await this.saveCaseDecision(caseObj.id, stance, reason);
         if (!result.ok) {
           window.alert(result.message || 'Failed to save Decision');
+          return;
+        }
+        await this.renderInvestmentCase(DataEngine.getCase(caseObj.id), container);
+      };
+    }
+
+    const savePlaybookBtn = container.querySelector('[data-case-playbook-save]');
+    const targetInput = container.querySelector('[data-case-playbook-target]');
+    const initialInput = container.querySelector('[data-case-playbook-initial]');
+    const entryInput = container.querySelector('[data-case-playbook-entry-triggers]');
+    const playbookError = container.querySelector('[data-case-playbook-error]');
+    if (savePlaybookBtn && targetInput && initialInput && entryInput) {
+      savePlaybookBtn.onclick = async () => {
+        if (playbookError) {
+          playbookError.style.display = 'none';
+          playbookError.textContent = '';
+        }
+        const result = await this.saveCasePositionPlaybook(
+          caseObj.id,
+          targetInput.value,
+          initialInput.value,
+          this.parsePlaybookLines(entryInput.value)
+        );
+        if (!result.ok) {
+          if (playbookError) {
+            playbookError.textContent = result.message || 'Failed to save Position Playbook';
+            playbookError.style.display = '';
+          }
           return;
         }
         await this.renderInvestmentCase(DataEngine.getCase(caseObj.id), container);

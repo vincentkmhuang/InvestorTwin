@@ -231,6 +231,63 @@ function ConvertTo-PositionPlaybookJson($raw) {
     ',"monitoringItems":' + (ConvertTo-JsonArrayText $monitoringItems) + '}')
 }
 
+function New-EmptyPositionPlaybook {
+  return [PSCustomObject]@{
+    targetPosition = $null
+    initialPosition = $null
+    addPosition = $null
+    entryTriggers = @()
+    addConditions = @()
+    exitConditions = @()
+    monitoringItems = @()
+  }
+}
+
+function Get-PlaybookTextOrNull($value) {
+  if ($null -eq $value -or $value -eq '') { return $null }
+  $text = ([string]$value).Trim()
+  if ([string]::IsNullOrWhiteSpace($text)) { return $null }
+  return $text
+}
+
+function Get-PlaybookStringList($raw) {
+  $result = @()
+  foreach ($item in (Get-AsArray $raw)) {
+    if ($null -eq $item -or $item -eq '') { continue }
+    $text = ([string]$item).Trim()
+    if (-not [string]::IsNullOrWhiteSpace($text)) {
+      $result += $text
+    }
+  }
+  return $result
+}
+
+function Merge-PositionPlaybookFromEditor($existing, $incoming) {
+  if (-not (Test-IsJsonObject $incoming)) { return $null }
+  $base = if (Test-IsJsonObject $existing) { $existing } else { New-EmptyPositionPlaybook }
+
+  $addPosition = $null
+  if ($base.PSObject.Properties['addPosition'] -and $null -ne $base.addPosition -and $base.addPosition -ne '') {
+    $addPosition = $base.addPosition
+  }
+  $addConditions = @()
+  $exitConditions = @()
+  $monitoringItems = @()
+  if ($base.PSObject.Properties['addConditions']) { $addConditions = @(Get-AsArray $base.addConditions) }
+  if ($base.PSObject.Properties['exitConditions']) { $exitConditions = @(Get-AsArray $base.exitConditions) }
+  if ($base.PSObject.Properties['monitoringItems']) { $monitoringItems = @(Get-AsArray $base.monitoringItems) }
+
+  return [PSCustomObject]@{
+    targetPosition = Get-PlaybookTextOrNull $incoming.targetPosition
+    initialPosition = Get-PlaybookTextOrNull $incoming.initialPosition
+    addPosition = $addPosition
+    entryTriggers = @(Get-PlaybookStringList $incoming.entryTriggers)
+    addConditions = $addConditions
+    exitConditions = $exitConditions
+    monitoringItems = $monitoringItems
+  }
+}
+
 function Test-EvidenceDuplicate($items, $text, $researchId) {
   foreach ($item in (Get-AsArray $items)) {
     if (([string]$item.text) -eq $text -and ([string]$item.researchId) -eq $researchId) {
@@ -942,8 +999,28 @@ while ($listener.IsListening) {
             }
           }
         }
+      } elseif ($body -and $body.id -and ($body.PSObject.Properties.Name -contains 'positionPlaybook')) {
+        $id = [string]$body.id
+        $target = @($store.cases | Where-Object { $_.id -eq $id } | Select-Object -First 1)
+        $incoming = $body.positionPlaybook
+        if ($target.Count -eq 0) {
+          Send-Json $response @{ error = 'not_found'; message = 'Investment Case not found' } 404
+        } elseif (-not (Test-IsJsonObject $incoming)) {
+          Send-Json $response @{ error = 'invalid_payload'; message = 'positionPlaybook must be an object' } 400
+        } else {
+          $caseObj = $target[0]
+          $merged = Merge-PositionPlaybookFromEditor $caseObj.positionPlaybook $incoming
+          $caseObj | Add-Member -NotePropertyName positionPlaybook -NotePropertyValue $merged -Force
+          if ($caseObj.origin) { $caseObj.origin.updatedAt = $today }
+          $store.updated = $today
+          Write-InvestmentCasesFile $casesPath $store
+          Send-Json $response @{
+            updated = $true
+            id = $id
+          }
+        }
       } else {
-        Send-Json $response @{ error = 'invalid_payload'; message = 'case, companyType, confirmValuationProfile, methodInput, marginOfSafety, thesisEvidence, or decision is required' } 400
+        Send-Json $response @{ error = 'invalid_payload'; message = 'case, companyType, confirmValuationProfile, methodInput, marginOfSafety, thesisEvidence, decision, or positionPlaybook is required' } 400
       }
     }
     elseif ($localPath -match '^/api/research/(.+)$' -and $method -eq 'POST') {
