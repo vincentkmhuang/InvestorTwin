@@ -1,0 +1,660 @@
+{
+  "schemaVersion": "1.0",
+  "sprint": "010-C-1",
+  "id": "3363-glass-bridge",
+  "source": "working-tree data/investment-cases.json (read-only copy; not a production write)",
+  "evidence": {
+    "supportingEvidence": [
+      {
+        "text": "Glass Bridge 已進入量產驗證，供應鏈點名正崴、上詮。",
+        "researchId": "glass-bridge"
+      },
+      {
+        "text": "FAU 研究卡將上詮列為主要追蹤標的。",
+        "researchId": "fau"
+      },
+      {
+        "text": "Glass Bridge 已由技術驗證逐步進入量產驗證階段；若後續量產驗證成立，AI 光通訊需求可能帶動 FAU 用量增加，上詮有機會受惠於供應鏈需求擴張。",
+        "researchId": "glass-bridge"
+      }
+    ],
+    "counterEvidence": [
+      {
+        "text": "量產時程與台廠實際訂單仍未確認，可能只是題材。",
+        "researchId": "glass-bridge"
+      }
+    ]
+  },
+  "thesisStatus": "forming",
+  "valuation": {
+    "bear": null,
+    "base": 30,
+    "bull": null,
+    "marginOfSafety": 0.3,
+    "buyUnder": 21,
+    "currentPrice": null,
+    "currentDiscount": null,
+    "methodInputs": {
+      "Forward PE": {
+        "forwardEPS": {
+          "value": 10,
+          "sourceType": "user",
+          "researchId": null,
+          "period": null,
+          "asOf": "2026-08-15"
+        },
+        "reasonablePE": {
+          "value": -2,
+          "sourceType": "user",
+          "researchId": null,
+          "period": null,
+          "asOf": "2026-08-15"
+        }
+      },
+      "Historical PE": {
+        "referenceEPS": {
+          "value": 10,
+          "sourceType": "user",
+          "researchId": null,
+          "period": null,
+          "asOf": "2026-08-15"
+        },
+        "historicalPEBear": {
+          "value": null,
+          "sourceType": null,
+          "researchId": null,
+          "period": null,
+          "asOf": null
+        },
+        "historicalPEBase": {
+          "value": 12,
+          "sourceType": "user",
+          "researchId": null,
+          "period": null,
+          "asOf": "2026-08-15"
+        },
+        "historicalPEBull": {
+          "value": null,
+          "sourceType": null,
+          "researchId": null,
+          "period": null,
+          "asOf": null
+        }
+      },
+      "PB / ROE": {
+        "BVPS": {
+          "value": 20,
+          "sourceType": "user",
+          "researchId": null,
+          "period": null,
+          "asOf": "2026-08-15"
+        },
+        "ROE": {
+          "value": 0.2,
+          "sourceType": "user",
+          "researchId": null,
+          "period": null,
+          "asOf": "2026-08-15"
+        },
+        "reasonablePB": {
+          "value": 1.5,
+          "sourceType": "user",
+          "researchId": null,
+          "period": null,
+          "asOf": "2026-08-15"
+        }
+      },
+      "DCF": {
+        "freeCashFlow": {
+          "value": null,
+          "sourceType": null,
+          "researchId": null,
+          "period": null,
+          "asOf": null
+        },
+        "growthRate": {
+          "value": null,
+          "sourceType": null,
+          "researchId": null,
+          "period": null,
+          "asOf": null
+        },
+        "discountRate": {
+          "value": null,
+          "sourceType": null,
+          "researchId": null,
+          "period": null,
+          "asOf": null
+        },
+        "terminalGrowthRate": {
+          "value": null,
+          "sourceType": null,
+          "researchId": null,
+          "period": null,
+          "asOf": null
+        }
+      },
+      "EV/EBITDA": {
+        "EBITDA": {
+          "value": null,
+          "sourceType": null,
+          "researchId": null,
+          "period": null,
+          "asOf": null
+        },
+        "reasonableEVEBITDA": {
+          "value": null,
+          "sourceType": null,
+          "researchId": null,
+          "period": null,
+          "asOf": null
+        },
+        "netDebt": {
+          "value": null,
+          "sourceType": null,
+          "researchId": null,
+          "period": null,
+          "asOf": null
+        },
+        "sharesOutstanding": {
+          "value": null,
+          "sourceType": null,
+          "researchId": null,
+          "period": null,
+          "asOf": null
+        }
+      },
+      "EV/Sales": {
+        "revenue": {
+          "value": null,
+          "sourceType": null,
+          "researchId": null,
+          "period": null,
+          "asOf": null
+        },
+        "reasonableEVSales": {
+          "value": null,
+          "sourceType": null,
+          "researchId": null,
+          "period": null,
+          "asOf": null
+        },
+        "netDebt": {
+          "value": null,
+          "sourceType": null,
+          "researchId": null,
+          "period": null,
+          "asOf": null
+        },
+        "sharesOutstanding": {
+          "value": null,
+          "sourceType": null,
+          "researchId": null,
+          "period": null,
+          "asOf": null
+        }
+      },
+      "Dividend Discount": {
+        "DPS": {
+          "value": null,
+          "sourceType": null,
+          "researchId": null,
+          "period": null,
+          "asOf": null
+        },
+        "dividendGrowthRate": {
+          "value": null,
+          "sourceType": null,
+          "researchId": null,
+          "period": null,
+          "asOf": null
+        },
+        "requiredReturn": {
+          "value": null,
+          "sourceType": null,
+          "researchId": null,
+          "period": null,
+          "asOf": null
+        }
+      },
+      "NAV": {
+        "assetValue": {
+          "value": null,
+          "sourceType": null,
+          "researchId": null,
+          "period": null,
+          "asOf": null
+        },
+        "liabilities": {
+          "value": null,
+          "sourceType": null,
+          "researchId": null,
+          "period": null,
+          "asOf": null
+        },
+        "sharesOutstanding": {
+          "value": null,
+          "sourceType": null,
+          "researchId": null,
+          "period": null,
+          "asOf": null
+        }
+      }
+    },
+    "methodFairValues": {
+      "Forward PE": {
+        "bear": null,
+        "base": -20,
+        "bull": null,
+        "asOf": "2026-08-15"
+      },
+      "Historical PE": {
+        "bear": null,
+        "base": 120,
+        "bull": null,
+        "asOf": "2026-08-15"
+      },
+      "PB / ROE": {
+        "bear": null,
+        "base": 30,
+        "bull": null,
+        "asOf": "2026-08-15"
+      }
+    }
+  },
+  "decision": {
+    "stance": "pass",
+    "asOf": "2026-08-20",
+    "reason": "目前證據仍不足以建立部位。",
+    "basedOn": {
+      "researchIds": [
+        "glass-bridge",
+        "fau"
+      ],
+      "supportingCount": 3,
+      "counterCount": 1,
+      "thesisStatus": "forming"
+    }
+  },
+  "decisionHistory": [
+    {
+      "stance": "watch",
+      "asOf": "2026-08-20",
+      "reason": "Glass Bridge 量產證據仍需確認，暫不建立部位。",
+      "basedOn": {
+        "researchIds": [
+          "glass-bridge",
+          "fau"
+        ],
+        "supportingCount": 3,
+        "counterCount": 1,
+        "thesisStatus": "forming"
+      }
+    }
+  ],
+  "positionPlaybook": {
+    "targetPosition": "核心持股候選",
+    "initialPosition": "觀察倉 20%",
+    "addPosition": null,
+    "entryTriggers": [
+      "Glass Bridge 量產驗證確認",
+      "FAU 客戶驗證名單確認",
+      "AI 光通訊需求持續成長"
+    ],
+    "addConditions": [],
+    "exitConditions": [],
+    "monitoringItems": []
+  },
+  "case": {
+    "id": "3363-glass-bridge",
+    "title": "上詮 — Glass Bridge / FAU",
+    "status": "draft",
+    "company": {
+      "name": "上詮",
+      "ticker": "3363",
+      "exchange": "TPEx",
+      "currency": "TWD"
+    },
+    "origin": {
+      "source": "Research Card",
+      "createdAt": "2026-08-15",
+      "updatedAt": "2026-08-20"
+    },
+    "researchIds": [
+      "glass-bridge",
+      "fau"
+    ],
+    "thesis": {
+      "thesis": "若康寧 Glass Bridge 量產驗證成立，上詮作為 FAU 相關台廠，有機會承接光通訊供應鏈的近中期需求。",
+      "growthDrivers": [
+        "Glass Bridge 由驗證進入量產",
+        "AI 光通訊需求帶動 FAU 用量"
+      ],
+      "competitiveAdvantage": "上詮在 FAU 與光通訊供應鏈的既有位置，使其比一般電子組裝更直接暴露在 Glass Bridge 放量。",
+      "earningsTranslation": "量產訂單若轉成 FAU 出貨，應反映在營收與毛利，而不只是題材 duration。",
+      "duration": "12-24 months",
+      "supportingEvidence": [
+        {
+          "text": "Glass Bridge 已進入量產驗證，供應鏈點名正崴、上詮。",
+          "researchId": "glass-bridge"
+        },
+        {
+          "text": "FAU 研究卡將上詮列為主要追蹤標的。",
+          "researchId": "fau"
+        },
+        {
+          "text": "Glass Bridge 已由技術驗證逐步進入量產驗證階段；若後續量產驗證成立，AI 光通訊需求可能帶動 FAU 用量增加，上詮有機會受惠於供應鏈需求擴張。",
+          "researchId": "glass-bridge"
+        }
+      ],
+      "counterEvidence": [
+        {
+          "text": "量產時程與台廠實際訂單仍未確認，可能只是題材。",
+          "researchId": "glass-bridge"
+        }
+      ],
+      "toBeVerified": [
+        {
+          "text": "Glass Bridge 量產驗證進度如何？",
+          "researchId": "glass-bridge"
+        },
+        {
+          "text": "上詮是否已在客戶驗證名單或具備可出貨產能？",
+          "researchId": "fau"
+        }
+      ],
+      "killCriteria": [
+        "Glass Bridge 量產時程明確延後或取消",
+        "上詮未被列入相關供應鏈，或 FAU 營收指引未出現對應變化"
+      ],
+      "status": "forming"
+    },
+    "valuationProfile": {
+      "companyType": "Financial / Bank",
+      "primaryMethod": "PB / ROE",
+      "secondaryMethod": "Historical PE",
+      "crossCheckMethod": "Dividend Discount",
+      "userConfirmed": true
+    },
+    "valuation": {
+      "bear": null,
+      "base": 30,
+      "bull": null,
+      "marginOfSafety": 0.3,
+      "buyUnder": 21,
+      "currentPrice": null,
+      "currentDiscount": null,
+      "methodInputs": {
+        "Forward PE": {
+          "forwardEPS": {
+            "value": 10,
+            "sourceType": "user",
+            "researchId": null,
+            "period": null,
+            "asOf": "2026-08-15"
+          },
+          "reasonablePE": {
+            "value": -2,
+            "sourceType": "user",
+            "researchId": null,
+            "period": null,
+            "asOf": "2026-08-15"
+          }
+        },
+        "Historical PE": {
+          "referenceEPS": {
+            "value": 10,
+            "sourceType": "user",
+            "researchId": null,
+            "period": null,
+            "asOf": "2026-08-15"
+          },
+          "historicalPEBear": {
+            "value": null,
+            "sourceType": null,
+            "researchId": null,
+            "period": null,
+            "asOf": null
+          },
+          "historicalPEBase": {
+            "value": 12,
+            "sourceType": "user",
+            "researchId": null,
+            "period": null,
+            "asOf": "2026-08-15"
+          },
+          "historicalPEBull": {
+            "value": null,
+            "sourceType": null,
+            "researchId": null,
+            "period": null,
+            "asOf": null
+          }
+        },
+        "PB / ROE": {
+          "BVPS": {
+            "value": 20,
+            "sourceType": "user",
+            "researchId": null,
+            "period": null,
+            "asOf": "2026-08-15"
+          },
+          "ROE": {
+            "value": 0.2,
+            "sourceType": "user",
+            "researchId": null,
+            "period": null,
+            "asOf": "2026-08-15"
+          },
+          "reasonablePB": {
+            "value": 1.5,
+            "sourceType": "user",
+            "researchId": null,
+            "period": null,
+            "asOf": "2026-08-15"
+          }
+        },
+        "DCF": {
+          "freeCashFlow": {
+            "value": null,
+            "sourceType": null,
+            "researchId": null,
+            "period": null,
+            "asOf": null
+          },
+          "growthRate": {
+            "value": null,
+            "sourceType": null,
+            "researchId": null,
+            "period": null,
+            "asOf": null
+          },
+          "discountRate": {
+            "value": null,
+            "sourceType": null,
+            "researchId": null,
+            "period": null,
+            "asOf": null
+          },
+          "terminalGrowthRate": {
+            "value": null,
+            "sourceType": null,
+            "researchId": null,
+            "period": null,
+            "asOf": null
+          }
+        },
+        "EV/EBITDA": {
+          "EBITDA": {
+            "value": null,
+            "sourceType": null,
+            "researchId": null,
+            "period": null,
+            "asOf": null
+          },
+          "reasonableEVEBITDA": {
+            "value": null,
+            "sourceType": null,
+            "researchId": null,
+            "period": null,
+            "asOf": null
+          },
+          "netDebt": {
+            "value": null,
+            "sourceType": null,
+            "researchId": null,
+            "period": null,
+            "asOf": null
+          },
+          "sharesOutstanding": {
+            "value": null,
+            "sourceType": null,
+            "researchId": null,
+            "period": null,
+            "asOf": null
+          }
+        },
+        "EV/Sales": {
+          "revenue": {
+            "value": null,
+            "sourceType": null,
+            "researchId": null,
+            "period": null,
+            "asOf": null
+          },
+          "reasonableEVSales": {
+            "value": null,
+            "sourceType": null,
+            "researchId": null,
+            "period": null,
+            "asOf": null
+          },
+          "netDebt": {
+            "value": null,
+            "sourceType": null,
+            "researchId": null,
+            "period": null,
+            "asOf": null
+          },
+          "sharesOutstanding": {
+            "value": null,
+            "sourceType": null,
+            "researchId": null,
+            "period": null,
+            "asOf": null
+          }
+        },
+        "Dividend Discount": {
+          "DPS": {
+            "value": null,
+            "sourceType": null,
+            "researchId": null,
+            "period": null,
+            "asOf": null
+          },
+          "dividendGrowthRate": {
+            "value": null,
+            "sourceType": null,
+            "researchId": null,
+            "period": null,
+            "asOf": null
+          },
+          "requiredReturn": {
+            "value": null,
+            "sourceType": null,
+            "researchId": null,
+            "period": null,
+            "asOf": null
+          }
+        },
+        "NAV": {
+          "assetValue": {
+            "value": null,
+            "sourceType": null,
+            "researchId": null,
+            "period": null,
+            "asOf": null
+          },
+          "liabilities": {
+            "value": null,
+            "sourceType": null,
+            "researchId": null,
+            "period": null,
+            "asOf": null
+          },
+          "sharesOutstanding": {
+            "value": null,
+            "sourceType": null,
+            "researchId": null,
+            "period": null,
+            "asOf": null
+          }
+        }
+      },
+      "methodFairValues": {
+        "Forward PE": {
+          "bear": null,
+          "base": -20,
+          "bull": null,
+          "asOf": "2026-08-15"
+        },
+        "Historical PE": {
+          "bear": null,
+          "base": 120,
+          "bull": null,
+          "asOf": "2026-08-15"
+        },
+        "PB / ROE": {
+          "bear": null,
+          "base": 30,
+          "bull": null,
+          "asOf": "2026-08-15"
+        }
+      }
+    },
+    "decision": {
+      "stance": "pass",
+      "asOf": "2026-08-20",
+      "reason": "目前證據仍不足以建立部位。",
+      "basedOn": {
+        "researchIds": [
+          "glass-bridge",
+          "fau"
+        ],
+        "supportingCount": 3,
+        "counterCount": 1,
+        "thesisStatus": "forming"
+      }
+    },
+    "decisionHistory": [
+      {
+        "stance": "watch",
+        "asOf": "2026-08-20",
+        "reason": "Glass Bridge 量產證據仍需確認，暫不建立部位。",
+        "basedOn": {
+          "researchIds": [
+            "glass-bridge",
+            "fau"
+          ],
+          "supportingCount": 3,
+          "counterCount": 1,
+          "thesisStatus": "forming"
+        }
+      }
+    ],
+    "positionPlaybook": {
+      "targetPosition": "核心持股候選",
+      "initialPosition": "觀察倉 20%",
+      "addPosition": null,
+      "entryTriggers": [
+        "Glass Bridge 量產驗證確認",
+        "FAU 客戶驗證名單確認",
+        "AI 光通訊需求持續成長"
+      ],
+      "addConditions": [],
+      "exitConditions": [],
+      "monitoringItems": []
+    },
+    "monitoring": null
+  }
+}
