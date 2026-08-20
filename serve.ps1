@@ -314,21 +314,31 @@ function Normalize-MonitoringItem($item) {
 }
 
 function Get-NormalizedMonitoringItems($raw) {
-  $result = @()
-  foreach ($item in (Get-AsArray $raw)) {
+  $result = New-Object System.Collections.Generic.List[object]
+  $items = @()
+  if ($null -eq $raw) {
+    return @()
+  } elseif ($raw -is [string]) {
+    $items = @($raw)
+  } elseif ((Test-IsJsonObject $raw) -and (Test-HasJsonProperty $raw 'text')) {
+    $items = @($raw)
+  } else {
+    $items = @(Get-AsArray $raw)
+  }
+  foreach ($item in $items) {
     $norm = Normalize-MonitoringItem $item
-    if ($null -ne $norm) { $result += $norm }
+    if ($null -ne $norm) { [void]$result.Add($norm) }
   }
   return $result
 }
 
 function ConvertTo-MonitoringItemsJson($items) {
-  $kept = @()
+  $kept = New-Object System.Collections.Generic.List[string]
   foreach ($item in (Get-NormalizedMonitoringItems $items)) {
     if (Test-IsJsonObject $item) {
-      $kept += ('{"text":' + (Get-JsonString $item.text) + ',"researchId":' + (Get-JsonNullOrString $item.researchId) + '}')
+      [void]$kept.Add(('{"text":' + (Get-JsonString $item.text) + ',"researchId":' + (Get-JsonNullOrString $item.researchId) + '}'))
     } else {
-      $kept += (Get-JsonString $item)
+      [void]$kept.Add((Get-JsonString $item))
     }
   }
   if ($kept.Count -eq 0) { return '[]' }

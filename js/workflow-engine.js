@@ -1533,7 +1533,7 @@ const WorkflowEngine = {
       entryTriggers: Array.isArray(playbook.entryTriggers) ? playbook.entryTriggers : [],
       addConditions: Array.isArray(playbook.addConditions) ? playbook.addConditions : [],
       exitConditions: Array.isArray(playbook.exitConditions) ? playbook.exitConditions : [],
-      monitoringItems: Array.isArray(playbook.monitoringItems) ? playbook.monitoringItems.slice() : []
+      monitoringItems: this.normalizeMonitoringItems(playbook.monitoringItems)
     };
   },
 
@@ -1600,7 +1600,7 @@ const WorkflowEngine = {
   },
 
   normalizeMonitoringItems(raw) {
-    const list = Array.isArray(raw) ? raw : [];
+    const list = raw == null ? [] : Array.isArray(raw) ? raw : [raw];
     const out = [];
     for (const item of list) {
       const view = this.monitoringItemView(item);
@@ -1694,10 +1694,10 @@ const WorkflowEngine = {
       .map(line => line.trim())
       .filter(line => line.length > 0)
       .map(line => {
-        const sep = line.lastIndexOf(' | ');
+        const sep = line.lastIndexOf('|');
         if (sep > 0) {
           const itemText = line.slice(0, sep).trim();
-          const researchId = line.slice(sep + 3).trim();
+          const researchId = line.slice(sep + 1).trim();
           if (itemText && researchId) return { text: itemText, researchId };
         }
         return line;
@@ -1743,7 +1743,7 @@ const WorkflowEngine = {
     html += `<textarea data-case-playbook-entry-triggers rows="4" style="width:100%;max-width:36em">${this.escapeHtml(this.formatPlaybookLines(view.entryTriggers))}</textarea></p>`;
     html += '<p>Monitoring Items<br>';
     html += `<textarea data-case-playbook-monitoring-items rows="4" style="width:100%;max-width:36em">${this.escapeHtml(this.formatMonitoringEditorLines(view.monitoringItems))}</textarea></p>`;
-    html += '<p>一行一個。若要綁定研究卡，使用：文字 | researchId</p>';
+    html += '<p>一行一個。舊格式純文字；綁定研究卡使用：文字|researchId 或 文字 | researchId</p>';
     html += '<p><button type="button" data-case-playbook-save>Save Position Playbook</button></p>';
     html += '<p data-case-playbook-error style="display:none"></p>';
     return html;
