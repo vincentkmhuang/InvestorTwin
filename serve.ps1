@@ -228,7 +228,7 @@ function ConvertTo-PositionPlaybookJson($raw) {
     ',"entryTriggers":' + (ConvertTo-JsonArrayText $entryTriggers) +
     ',"addConditions":' + (ConvertTo-JsonArrayText $addConditions) +
     ',"exitConditions":' + (ConvertTo-JsonArrayText $exitConditions) +
-    ',"monitoringItems":' + (ConvertTo-JsonArrayText $monitoringItems) + '}')
+    ',"monitoringItems":' + (ConvertTo-MonitoringItemsJson $monitoringItems) + '}')
 }
 
 function New-EmptyPositionPlaybook {
@@ -296,6 +296,54 @@ function Merge-PlaybookListField($base, $incoming, $name) {
   return @(Get-PlaybookStringList $raw)
 }
 
+function Normalize-MonitoringItem($item) {
+  if ($null -eq $item -or $item -eq '') { return $null }
+  if (Test-IsJsonObject $item) {
+    $text = Get-PlaybookTextOrNull $item.text
+    if ($null -eq $text) { return $null }
+    $researchId = $null
+    if (Test-HasJsonProperty $item 'researchId') {
+      $researchId = Get-PlaybookTextOrNull $item.researchId
+    }
+    return [PSCustomObject]@{
+      text = $text
+      researchId = $researchId
+    }
+  }
+  return Get-PlaybookTextOrNull $item
+}
+
+function Get-NormalizedMonitoringItems($raw) {
+  $result = @()
+  foreach ($item in (Get-AsArray $raw)) {
+    $norm = Normalize-MonitoringItem $item
+    if ($null -ne $norm) { $result += $norm }
+  }
+  return $result
+}
+
+function ConvertTo-MonitoringItemsJson($items) {
+  $kept = @()
+  foreach ($item in (Get-NormalizedMonitoringItems $items)) {
+    if (Test-IsJsonObject $item) {
+      $kept += ('{"text":' + (Get-JsonString $item.text) + ',"researchId":' + (Get-JsonNullOrString $item.researchId) + '}')
+    } else {
+      $kept += (Get-JsonString $item)
+    }
+  }
+  if ($kept.Count -eq 0) { return '[]' }
+  return '[' + ($kept -join ',') + ']'
+}
+
+function Merge-PlaybookMonitoringItemsField($base, $incoming) {
+  if (-not (Test-HasJsonProperty $incoming 'monitoringItems')) {
+    return @(Get-NormalizedMonitoringItems (Get-ExistingPlaybookList $base 'monitoringItems'))
+  }
+  $raw = $incoming.monitoringItems
+  if ($null -eq $raw) { return @() }
+  return @(Get-NormalizedMonitoringItems $raw)
+}
+
 function Merge-PositionPlaybookFromEditor($existing, $incoming) {
   if (-not (Test-IsJsonObject $incoming)) { return $null }
   $base = if (Test-IsJsonObject $existing) { $existing } else { New-EmptyPositionPlaybook }
@@ -307,7 +355,7 @@ function Merge-PositionPlaybookFromEditor($existing, $incoming) {
     entryTriggers = Merge-PlaybookListField $base $incoming 'entryTriggers'
     addConditions = Merge-PlaybookListField $base $incoming 'addConditions'
     exitConditions = Merge-PlaybookListField $base $incoming 'exitConditions'
-    monitoringItems = Merge-PlaybookListField $base $incoming 'monitoringItems'
+    monitoringItems = Merge-PlaybookMonitoringItemsField $base $incoming
   }
 }
 

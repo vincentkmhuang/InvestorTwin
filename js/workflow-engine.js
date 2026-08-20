@@ -1533,7 +1533,7 @@ const WorkflowEngine = {
       entryTriggers: Array.isArray(playbook.entryTriggers) ? playbook.entryTriggers : [],
       addConditions: Array.isArray(playbook.addConditions) ? playbook.addConditions : [],
       exitConditions: Array.isArray(playbook.exitConditions) ? playbook.exitConditions : [],
-      monitoringItems: Array.isArray(playbook.monitoringItems) ? playbook.monitoringItems : []
+      monitoringItems: Array.isArray(playbook.monitoringItems) ? playbook.monitoringItems.slice() : []
     };
   },
 
@@ -1578,8 +1578,84 @@ const WorkflowEngine = {
     }
     const raw = patch[name];
     if (raw == null) return [];
+    if (name === 'monitoringItems') return this.normalizeMonitoringItems(raw);
     if (Array.isArray(raw)) return raw.slice();
     return this.parsePlaybookLines(String(raw));
+  },
+
+  monitoringItemView(item) {
+    if (item == null || item === '') return null;
+    if (typeof item === 'string') {
+      const text = item.trim();
+      return text ? { text, researchId: null, legacy: true } : null;
+    }
+    if (typeof item === 'object') {
+      const text = String(item.text == null ? '' : item.text).trim();
+      if (!text) return null;
+      const researchId = item.researchId == null ? null : String(item.researchId).trim();
+      return { text, researchId: researchId || null, legacy: false };
+    }
+    const text = String(item).trim();
+    return text ? { text, researchId: null, legacy: true } : null;
+  },
+
+  normalizeMonitoringItems(raw) {
+    const list = Array.isArray(raw) ? raw : [];
+    const out = [];
+    for (const item of list) {
+      const view = this.monitoringItemView(item);
+      if (!view) continue;
+      if (view.legacy && !view.researchId) {
+        out.push(view.text);
+      } else {
+        out.push({ text: view.text, researchId: view.researchId });
+      }
+    }
+    return out;
+  },
+
+  renderMonitoringItems(items) {
+    const list = Array.isArray(items) ? items : [];
+    const rows = [];
+    for (const item of list) {
+      const view = this.monitoringItemView(item);
+      if (!view) continue;
+      const text = this.escapeHtml(view.text);
+      if (!view.researchId) {
+        rows.push(`<li>${text}</li>`);
+        continue;
+      }
+      rows.push(
+        `<li>${text} <span data-case-research-id="${this.escapeHtml(view.researchId)}">[${this.escapeHtml(view.researchId)}]</span></li>`
+      );
+    }
+    if (!rows.length) return '<p>--</p>';
+    return `<ul>${rows.join('')}</ul>`;
+  },
+
+  formatMonitoringEditorLines(items) {
+    const list = Array.isArray(items) ? items : [];
+    return list.map(item => {
+      const view = this.monitoringItemView(item);
+      if (!view) return '';
+      return view.researchId ? `${view.text} | ${view.researchId}` : view.text;
+    }).filter(Boolean).join('\n');
+  },
+
+  parseMonitoringEditorLines(text) {
+    return String(text || '')
+      .split(/\r?\n/)
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .map(line => {
+        const sep = line.lastIndexOf(' | ');
+        if (sep > 0) {
+          const itemText = line.slice(0, sep).trim();
+          const researchId = line.slice(sep + 3).trim();
+          if (itemText && researchId) return { text: itemText, researchId };
+        }
+        return line;
+      });
   },
 
   applyPositionPlaybookLocally(caseObj, patch) {
@@ -1611,25 +1687,29 @@ const WorkflowEngine = {
     html += '<p><b>Exit Conditions</b></p>';
     html += this.renderStringList(view.exitConditions);
     html += '<p><b>Monitoring Items</b></p>';
-    html += this.renderStringList(view.monitoringItems);
+    html += this.renderMonitoringItems(view.monitoringItems);
     html += '<p>Target Position<br>';
     html += `<input data-case-playbook-target type="text" style="width:100%;max-width:36em" value="${this.escapeHtml(this.formatPlaybookInput(view.targetPosition))}"></p>`;
     html += '<p>Initial Position<br>';
     html += `<input data-case-playbook-initial type="text" style="width:100%;max-width:36em" value="${this.escapeHtml(this.formatPlaybookInput(view.initialPosition))}"></p>`;
     html += '<p>Entry Triggers<br>';
     html += `<textarea data-case-playbook-entry-triggers rows="4" style="width:100%;max-width:36em">${this.escapeHtml(this.formatPlaybookLines(view.entryTriggers))}</textarea></p>`;
+    html += '<p>Monitoring Items<br>';
+    html += `<textarea data-case-playbook-monitoring-items rows="4" style="width:100%;max-width:36em">${this.escapeHtml(this.formatMonitoringEditorLines(view.monitoringItems))}</textarea></p>`;
+    html += '<p>一行一個。若要綁定研究卡，使用：文字 | researchId</p>';
     html += '<p><button type="button" data-case-playbook-save>Save Position Playbook</button></p>';
     html += '<p data-case-playbook-error style="display:none"></p>';
     return html;
   },
 
-  async saveCasePositionPlaybook(caseId, targetPosition, initialPosition, entryTriggers) {
+  async saveCasePositionPlaybook(caseId, targetPosition, initialPosition, entryTriggers, monitoringItems) {
     const current = DataEngine.getCase(caseId);
     if (!current) return { ok: false, message: 'Investment Case not found' };
     const payload = {
       targetPosition: this.normalizePlaybookText(targetPosition),
       initialPosition: this.normalizePlaybookText(initialPosition),
-      entryTriggers: Array.isArray(entryTriggers) ? entryTriggers : []
+      entryTriggers: Array.isArray(entryTriggers) ? entryTriggers : [],
+      monitoringItems: this.normalizeMonitoringItems(monitoringItems)
     };
     try {
       const res = await fetch('/api/cases', {
@@ -1875,8 +1955,9 @@ const WorkflowEngine = {
     const targetInput = container.querySelector('[data-case-playbook-target]');
     const initialInput = container.querySelector('[data-case-playbook-initial]');
     const entryInput = container.querySelector('[data-case-playbook-entry-triggers]');
+    const monitoringInput = container.querySelector('[data-case-playbook-monitoring-items]');
     const playbookError = container.querySelector('[data-case-playbook-error]');
-    if (savePlaybookBtn && targetInput && initialInput && entryInput) {
+    if (savePlaybookBtn && targetInput && initialInput && entryInput && monitoringInput) {
       savePlaybookBtn.onclick = async () => {
         if (playbookError) {
           playbookError.style.display = 'none';
@@ -1886,7 +1967,8 @@ const WorkflowEngine = {
           caseObj.id,
           targetInput.value,
           initialInput.value,
-          this.parsePlaybookLines(entryInput.value)
+          this.parsePlaybookLines(entryInput.value),
+          this.parseMonitoringEditorLines(monitoringInput.value)
         );
         if (!result.ok) {
           if (playbookError) {
