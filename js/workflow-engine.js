@@ -1033,7 +1033,7 @@ const WorkflowEngine = {
       valuation: this.emptyValuation(),
       decision: null,
       decisionHistory: [],
-      positionPlaybook: null,
+      positionPlaybook: this.emptyPositionPlaybook(),
       monitoring: null
     };
 
@@ -1511,6 +1511,54 @@ const WorkflowEngine = {
     return html;
   },
 
+  emptyPositionPlaybook() {
+    return {
+      targetPosition: null,
+      initialPosition: null,
+      addPosition: null,
+      entryTriggers: [],
+      addConditions: [],
+      exitConditions: [],
+      monitoringItems: []
+    };
+  },
+
+  positionPlaybookView(playbook) {
+    const empty = this.emptyPositionPlaybook();
+    if (!playbook || typeof playbook !== 'object') return empty;
+    return {
+      targetPosition: playbook.targetPosition == null ? null : playbook.targetPosition,
+      initialPosition: playbook.initialPosition == null ? null : playbook.initialPosition,
+      addPosition: playbook.addPosition == null ? null : playbook.addPosition,
+      entryTriggers: Array.isArray(playbook.entryTriggers) ? playbook.entryTriggers : [],
+      addConditions: Array.isArray(playbook.addConditions) ? playbook.addConditions : [],
+      exitConditions: Array.isArray(playbook.exitConditions) ? playbook.exitConditions : [],
+      monitoringItems: Array.isArray(playbook.monitoringItems) ? playbook.monitoringItems : []
+    };
+  },
+
+  formatPlaybookValue(value) {
+    if (value == null || value === '') return '--';
+    return String(value);
+  },
+
+  renderPositionPlaybook(playbook) {
+    const view = this.positionPlaybookView(playbook);
+    let html = '<p><b>Position Playbook</b></p>';
+    html += `<p>Target Position: ${this.escapeHtml(this.formatPlaybookValue(view.targetPosition))}</p>`;
+    html += `<p>Initial Position: ${this.escapeHtml(this.formatPlaybookValue(view.initialPosition))}</p>`;
+    html += `<p>Add Position: ${this.escapeHtml(this.formatPlaybookValue(view.addPosition))}</p>`;
+    html += '<p><b>Entry Triggers</b></p>';
+    html += this.renderStringList(view.entryTriggers);
+    html += '<p><b>Add Conditions</b></p>';
+    html += this.renderStringList(view.addConditions);
+    html += '<p><b>Exit Conditions</b></p>';
+    html += this.renderStringList(view.exitConditions);
+    html += '<p><b>Monitoring Items</b></p>';
+    html += this.renderStringList(view.monitoringItems);
+    return html;
+  },
+
   async saveCaseDecision(caseId, stance, reason) {
     const current = DataEngine.getCase(caseId);
     if (!current) return { ok: false, message: 'Investment Case not found' };
@@ -1621,6 +1669,7 @@ const WorkflowEngine = {
     html += `<p>Current Discount: ${this.escapeHtml(this.formatPercent(valuation.currentDiscount))}</p>`;
     html += this.renderDecisionSection(caseObj);
     html += '<p data-case-decision-error style="display:none"></p>';
+    html += this.renderPositionPlaybook(caseObj.positionPlaybook);
 
     container.innerHTML = html;
 

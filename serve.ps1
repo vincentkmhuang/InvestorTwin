@@ -200,6 +200,37 @@ function ConvertTo-DecisionHistoryJson($raw) {
   return '[' + ($kept -join ',') + ']'
 }
 
+function ConvertTo-PositionPlaybookJson($raw) {
+  if (-not (Test-IsJsonObject $raw)) { return 'null' }
+  $target = $null
+  $initial = $null
+  $add = $null
+  if ($raw.PSObject.Properties['targetPosition'] -and $null -ne $raw.targetPosition -and $raw.targetPosition -ne '') {
+    $target = $raw.targetPosition
+  }
+  if ($raw.PSObject.Properties['initialPosition'] -and $null -ne $raw.initialPosition -and $raw.initialPosition -ne '') {
+    $initial = $raw.initialPosition
+  }
+  if ($raw.PSObject.Properties['addPosition'] -and $null -ne $raw.addPosition -and $raw.addPosition -ne '') {
+    $add = $raw.addPosition
+  }
+  $entryTriggers = @()
+  $addConditions = @()
+  $exitConditions = @()
+  $monitoringItems = @()
+  if ($raw.PSObject.Properties['entryTriggers']) { $entryTriggers = @(Get-AsArray $raw.entryTriggers) }
+  if ($raw.PSObject.Properties['addConditions']) { $addConditions = @(Get-AsArray $raw.addConditions) }
+  if ($raw.PSObject.Properties['exitConditions']) { $exitConditions = @(Get-AsArray $raw.exitConditions) }
+  if ($raw.PSObject.Properties['monitoringItems']) { $monitoringItems = @(Get-AsArray $raw.monitoringItems) }
+  return ('{"targetPosition":' + (Get-JsonNullOrString $target) +
+    ',"initialPosition":' + (Get-JsonNullOrString $initial) +
+    ',"addPosition":' + (Get-JsonNullOrString $add) +
+    ',"entryTriggers":' + (ConvertTo-JsonArrayText $entryTriggers) +
+    ',"addConditions":' + (ConvertTo-JsonArrayText $addConditions) +
+    ',"exitConditions":' + (ConvertTo-JsonArrayText $exitConditions) +
+    ',"monitoringItems":' + (ConvertTo-JsonArrayText $monitoringItems) + '}')
+}
+
 function Test-EvidenceDuplicate($items, $text, $researchId) {
   foreach ($item in (Get-AsArray $items)) {
     if (([string]$item.text) -eq $text -and ([string]$item.researchId) -eq $researchId) {
@@ -539,7 +570,7 @@ function ConvertTo-InvestmentCaseJson($caseObj) {
     '"valuation":{"bear":' + (Get-JsonNullOrNumber $val.bear) + ',"base":' + (Get-JsonNullOrNumber $val.base) + ',"bull":' + (Get-JsonNullOrNumber $val.bull) + ',"marginOfSafety":' + (Get-JsonNullOrNumber $val.marginOfSafety) + ',"buyUnder":' + (Get-JsonNullOrNumber $val.buyUnder) + ',"currentPrice":null,"currentDiscount":null,"methodInputs":' + (ConvertTo-MethodInputsJson $val.methodInputs) + ',"methodFairValues":' + (ConvertTo-MethodFairValuesJson $val.methodFairValues) + '}'
     '"decision":' + (ConvertTo-DecisionJson $caseObj.decision)
     '"decisionHistory":' + (ConvertTo-DecisionHistoryJson $caseObj.decisionHistory)
-    '"positionPlaybook":null'
+    '"positionPlaybook":' + (ConvertTo-PositionPlaybookJson $caseObj.positionPlaybook)
     '"monitoring":null'
   )
   return '{' + ($parts -join ',') + '}'
@@ -629,7 +660,9 @@ while ($listener.IsListening) {
           } else {
             $caseObj | Add-Member -NotePropertyName decision -NotePropertyValue $null -Force
             $caseObj | Add-Member -NotePropertyName decisionHistory -NotePropertyValue @() -Force
-            $caseObj.positionPlaybook = $null
+            if (-not (Test-IsJsonObject $caseObj.positionPlaybook)) {
+              $caseObj | Add-Member -NotePropertyName positionPlaybook -NotePropertyValue $null -Force
+            }
             $caseObj.monitoring = $null
             if (-not $caseObj.valuation) {
               $caseObj | Add-Member -NotePropertyName valuation -NotePropertyValue ([PSCustomObject]@{
