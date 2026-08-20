@@ -1614,6 +1614,51 @@ const WorkflowEngine = {
     return out;
   },
 
+  canTriggerMonitoringItem(item) {
+    const view = this.monitoringItemView(item);
+    return !!(view && view.text && view.researchId);
+  },
+
+  buildMonitoringTriggerPayload(caseId, item) {
+    if (!this.canTriggerMonitoringItem(item)) return null;
+    const view = this.monitoringItemView(item);
+    return {
+      id: caseId,
+      monitoringTrigger: {
+        text: view.text,
+        researchId: view.researchId
+      }
+    };
+  },
+
+  monitoringTriggerSuccessMessage(researchId) {
+    return '已觸發重新研究：' + researchId;
+  },
+
+  async triggerMonitoringItem(caseId, item) {
+    const payload = this.buildMonitoringTriggerPayload(caseId, item);
+    if (!payload) {
+      return { ok: false, message: 'monitoring item researchId is required' };
+    }
+    try {
+      const res = await fetch('/api/cases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        return {
+          ok: true,
+          message: this.monitoringTriggerSuccessMessage(payload.monitoringTrigger.researchId)
+        };
+      }
+      return { ok: false, message: data.message || 'Failed to trigger research' };
+    } catch (_) {
+      return { ok: false, error: 'persistence_failure', message: 'Failed to trigger research' };
+    }
+  },
+
   renderMonitoringItems(items) {
     const list = Array.isArray(items) ? items : [];
     const rows = [];
@@ -1626,7 +1671,8 @@ const WorkflowEngine = {
         continue;
       }
       rows.push(
-        `<li>${text} <span data-case-research-id="${this.escapeHtml(view.researchId)}">[${this.escapeHtml(view.researchId)}]</span></li>`
+        `<li>${text} <span data-case-research-id="${this.escapeHtml(view.researchId)}">[${this.escapeHtml(view.researchId)}]</span> ` +
+        `<button type="button" data-monitoring-trigger data-monitoring-text="${this.escapeHtml(view.text)}" data-monitoring-research-id="${this.escapeHtml(view.researchId)}">Trigger Research</button></li>`
       );
     }
     if (!rows.length) return '<p>--</p>';
@@ -1688,6 +1734,7 @@ const WorkflowEngine = {
     html += this.renderStringList(view.exitConditions);
     html += '<p><b>Monitoring Items</b></p>';
     html += this.renderMonitoringItems(view.monitoringItems);
+    html += '<p data-monitoring-trigger-status style="display:none"></p>';
     html += '<p>Target Position<br>';
     html += `<input data-case-playbook-target type="text" style="width:100%;max-width:36em" value="${this.escapeHtml(this.formatPlaybookInput(view.targetPosition))}"></p>`;
     html += '<p>Initial Position<br>';
@@ -1957,6 +2004,29 @@ const WorkflowEngine = {
     const entryInput = container.querySelector('[data-case-playbook-entry-triggers]');
     const monitoringInput = container.querySelector('[data-case-playbook-monitoring-items]');
     const playbookError = container.querySelector('[data-case-playbook-error]');
+    const triggerStatus = container.querySelector('[data-monitoring-trigger-status]');
+    container.querySelectorAll('[data-monitoring-trigger]').forEach(btn => {
+      btn.onclick = async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const item = {
+          text: btn.dataset.monitoringText || '',
+          researchId: btn.dataset.monitoringResearchId || ''
+        };
+        if (!this.canTriggerMonitoringItem(item)) return;
+        if (triggerStatus) {
+          triggerStatus.style.display = 'none';
+          triggerStatus.textContent = '';
+        }
+        btn.disabled = true;
+        const result = await this.triggerMonitoringItem(caseObj.id, item);
+        btn.disabled = false;
+        if (triggerStatus) {
+          triggerStatus.textContent = result.message || (result.ok ? this.monitoringTriggerSuccessMessage(item.researchId) : 'Failed to trigger research');
+          triggerStatus.style.display = '';
+        }
+      };
+    });
     if (savePlaybookBtn && targetInput && initialInput && entryInput && monitoringInput) {
       savePlaybookBtn.onclick = async () => {
         if (playbookError) {
