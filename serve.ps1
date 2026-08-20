@@ -734,6 +734,115 @@ function Write-InvestmentCasesFile($path, $store) {
   Write-Utf8Text $path $json
 }
 
+function Get-RequiredTriggerString($obj, $name) {
+  if (-not (Test-HasJsonProperty $obj $name)) { return $null }
+  $raw = $obj.$name
+  if ($null -eq $raw) { return $null }
+  if (Test-IsJsonObject $raw) { return $null }
+  if ($raw -is [System.Collections.IEnumerable] -and $raw -isnot [string]) { return $null }
+  return Get-PlaybookTextOrNull $raw
+}
+
+function Read-ResearchQueue($rootPath) {
+  $queuePath = Join-Path $rootPath 'data\research-queue.json'
+  $queue = Get-Content $queuePath -Raw | ConvertFrom-Json
+  if (-not $queue) {
+    return [PSCustomObject]@{ items = @() }
+  }
+  if (-not (Test-HasJsonProperty $queue 'items')) {
+    $queue | Add-Member -NotePropertyName items -NotePropertyValue @() -Force
+  }
+  return $queue
+}
+
+function Write-ResearchQueue($rootPath, $queue) {
+  $queuePath = Join-Path $rootPath 'data\research-queue.json'
+  $queue | ConvertTo-Json -Depth 10 | Set-Content $queuePath -Encoding UTF8
+}
+
+function Ensure-QueueItem($rootPath, $id, $addedFrom) {
+  $queue = Read-ResearchQueue $rootPath
+  $added = $false
+  if ($id -and -not ($queue.items | Where-Object { $_.id -eq $id })) {
+    $queue.items += [PSCustomObject]@{ id = $id; addedFrom = $addedFrom }
+    Write-ResearchQueue $rootPath $queue
+    $added = $true
+  }
+  return @{ added = $added; items = $queue.items }
+}
+
+function Add-ResearchNoteAndQuestion($rootPath, $id, $noteText, $questionText) {
+  $dir = Join-Path $rootPath ("research\" + $id)
+  if (-not (Test-Path $dir)) { return $false }
+
+  $notesPath = Join-Path $dir 'notes.json'
+  $existingNotes = @()
+  if (Test-Path $notesPath) {
+    $parsedNotes = Read-Utf8Json $notesPath
+    if ($parsedNotes -is [System.Array]) {
+      $existingNotes = @($parsedNotes)
+    } elseif ($parsedNotes -and ($parsedNotes.PSObject.Properties.Name -contains 'notes')) {
+      $existingNotes = @($parsedNotes.notes)
+    }
+  }
+  $noteEntry = [PSCustomObject]@{
+    date = (Get-Date -Format 'yyyy-MM-dd')
+    text = $noteText
+  }
+  $allNotes = @($existingNotes + $noteEntry)
+  Write-Utf8Text $notesPath ('{"notes":' + (ConvertTo-JsonArrayText $allNotes) + '}')
+
+  if ($questionText) {
+    $cardPath = Join-Path $dir 'card.json'
+    if (-not (Test-Path $cardPath)) {
+      throw 'card.json missing for existing research'
+    }
+    $cardObj = Read-Utf8Json $cardPath
+    $questions = @()
+    if ($cardObj.PSObject.Properties.Name -contains 'questions' -and $cardObj.questions) {
+      $questions = @($cardObj.questions)
+    }
+    $questions += $questionText
+    $cardObj.updated = (Get-Date -Format 'yyyy-MM-dd')
+    Write-ResearchCardJson $cardPath $cardObj $questions
+  }
+  return $true
+}
+
+function Invoke-MonitoringTriggerRequest($rootPath, $response, $body) {
+  $trigger = $body.monitoringTrigger
+  if (-not (Test-IsJsonObject $trigger)) {
+    Send-Json $response @{ error = 'invalid_payload'; message = 'monitoringTrigger must be an object' } 400
+    return
+  }
+
+  $text = Get-RequiredTriggerString $trigger 'text'
+  $researchId = Get-RequiredTriggerString $trigger 'researchId'
+  if ($null -eq $text -or $null -eq $researchId) {
+    Send-Json $response @{ error = 'invalid_payload'; message = 'monitoringTrigger text and researchId are required' } 400
+    return
+  }
+  if ($researchId -match '[\\/]' -or $researchId -eq '.' -or $researchId -eq '..') {
+    Send-Json $response @{ error = 'invalid_payload'; message = 'monitoringTrigger researchId is invalid' } 400
+    return
+  }
+
+  try {
+    $queueResult = Ensure-QueueItem $rootPath $researchId 'Monitoring'
+    if (-not $queueResult.added) {
+      $noteText = 'needs re-research: ' + $text
+      Add-ResearchNoteAndQuestion $rootPath $researchId $noteText $text
+    }
+    Send-Json $response @{
+      updated = $true
+      id = $researchId
+      added = [bool]$queueResult.added
+    }
+  } catch {
+    Send-Json $response @{ error = 'persistence_failure'; message = $_.Exception.Message } 500
+  }
+}
+
 while ($listener.IsListening) {
   $context = $listener.GetContext()
   $request = $context.Request
@@ -758,18 +867,16 @@ while ($listener.IsListening) {
     }
     elseif ($localPath -eq '/api/queue' -and $method -eq 'POST') {
       $body = Read-Body $request
-      $queuePath = Join-Path $root 'data\research-queue.json'
-      $queue = Get-Content $queuePath -Raw | ConvertFrom-Json
-      $added = $false
-      if ($body -and $body.id -and -not ($queue.items | Where-Object { $_.id -eq $body.id })) {
-        $queue.items += [PSCustomObject]@{ id = $body.id; addedFrom = $body.addedFrom }
-        $queue | ConvertTo-Json -Depth 10 | Set-Content $queuePath -Encoding UTF8
-        $added = $true
-      }
-      Send-Json $response @{ added = $added; items = $queue.items }
+      $id = if ($body -and $body.id) { $body.id } else { $null }
+      $addedFrom = if ($body -and $body.addedFrom) { $body.addedFrom } else { $null }
+      $result = Ensure-QueueItem $root $id $addedFrom
+      Send-Json $response @{ added = $result.added; items = $result.items }
     }
     elseif ($localPath -eq '/api/cases' -and $method -eq 'POST') {
       $body = Read-Body $request
+      if ($body -and (Test-HasJsonProperty $body 'monitoringTrigger')) {
+        Invoke-MonitoringTriggerRequest $root $response $body
+      } else {
       $casesPath = Join-Path $root 'data\investment-cases.json'
       $store = Read-InvestmentCases $casesPath
       $today = Get-Date -Format 'yyyy-MM-dd'
@@ -1091,7 +1198,8 @@ while ($listener.IsListening) {
           }
         }
       } else {
-        Send-Json $response @{ error = 'invalid_payload'; message = 'case, companyType, confirmValuationProfile, methodInput, marginOfSafety, thesisEvidence, decision, or positionPlaybook is required' } 400
+        Send-Json $response @{ error = 'invalid_payload'; message = 'case, companyType, confirmValuationProfile, methodInput, marginOfSafety, thesisEvidence, decision, positionPlaybook, or monitoringTrigger is required' } 400
+      }
       }
     }
     elseif ($localPath -match '^/api/research/(.+)$' -and $method -eq 'POST') {
@@ -1135,38 +1243,7 @@ while ($listener.IsListening) {
             Send-Json $response @{ error = 'invalid_payload'; message = 'appendNote/note text is required for update' } 400
           } else {
             try {
-              $notesPath = Join-Path $dir 'notes.json'
-              $existingNotes = @()
-              if (Test-Path $notesPath) {
-                $parsedNotes = Read-Utf8Json $notesPath
-                if ($parsedNotes -is [System.Array]) {
-                  $existingNotes = @($parsedNotes)
-                } elseif ($parsedNotes -and ($parsedNotes.PSObject.Properties.Name -contains 'notes')) {
-                  $existingNotes = @($parsedNotes.notes)
-                }
-              }
-              $noteEntry = [PSCustomObject]@{
-                date = (Get-Date -Format 'yyyy-MM-dd')
-                text = $noteText
-              }
-              $allNotes = @($existingNotes + $noteEntry)
-              Write-Utf8Text $notesPath ('{"notes":' + (ConvertTo-JsonArrayText $allNotes) + '}')
-
-              if ($questionText) {
-                $cardPath = Join-Path $dir 'card.json'
-                if (-not (Test-Path $cardPath)) {
-                  throw 'card.json missing for existing research'
-                }
-                $cardObj = Read-Utf8Json $cardPath
-                $questions = @()
-                if ($cardObj.PSObject.Properties.Name -contains 'questions' -and $cardObj.questions) {
-                  $questions = @($cardObj.questions)
-                }
-                $questions += $questionText
-                $cardObj.updated = (Get-Date -Format 'yyyy-MM-dd')
-                Write-ResearchCardJson $cardPath $cardObj $questions
-              }
-
+              Add-ResearchNoteAndQuestion $root $id $noteText $questionText
               Send-Json $response @{ created = $false; updated = $true; id = $id }
             } catch {
               Send-Json $response @{ error = 'persistence_failure'; message = $_.Exception.Message } 500
