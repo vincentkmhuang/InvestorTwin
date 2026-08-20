@@ -262,29 +262,52 @@ function Get-PlaybookStringList($raw) {
   return $result
 }
 
+function Test-HasJsonProperty($obj, $name) {
+  if ($null -eq $obj) { return $false }
+  if ($obj -is [System.Collections.IDictionary]) {
+    return $obj.Contains($name)
+  }
+  return [bool]$obj.PSObject.Properties[$name]
+}
+
+function Get-ExistingPlaybookText($base, $name) {
+  if (-not (Test-HasJsonProperty $base $name)) { return $null }
+  return $base.$name
+}
+
+function Get-ExistingPlaybookList($base, $name) {
+  if (-not (Test-HasJsonProperty $base $name)) { return @() }
+  return @(Get-AsArray $base.$name)
+}
+
+function Merge-PlaybookTextField($base, $incoming, $name) {
+  if (-not (Test-HasJsonProperty $incoming $name)) {
+    return Get-ExistingPlaybookText $base $name
+  }
+  return Get-PlaybookTextOrNull $incoming.$name
+}
+
+function Merge-PlaybookListField($base, $incoming, $name) {
+  if (-not (Test-HasJsonProperty $incoming $name)) {
+    return @(Get-ExistingPlaybookList $base $name)
+  }
+  $raw = $incoming.$name
+  if ($null -eq $raw) { return @() }
+  return @(Get-PlaybookStringList $raw)
+}
+
 function Merge-PositionPlaybookFromEditor($existing, $incoming) {
   if (-not (Test-IsJsonObject $incoming)) { return $null }
   $base = if (Test-IsJsonObject $existing) { $existing } else { New-EmptyPositionPlaybook }
 
-  $addPosition = $null
-  if ($base.PSObject.Properties['addPosition'] -and $null -ne $base.addPosition -and $base.addPosition -ne '') {
-    $addPosition = $base.addPosition
-  }
-  $addConditions = @()
-  $exitConditions = @()
-  $monitoringItems = @()
-  if ($base.PSObject.Properties['addConditions']) { $addConditions = @(Get-AsArray $base.addConditions) }
-  if ($base.PSObject.Properties['exitConditions']) { $exitConditions = @(Get-AsArray $base.exitConditions) }
-  if ($base.PSObject.Properties['monitoringItems']) { $monitoringItems = @(Get-AsArray $base.monitoringItems) }
-
   return [PSCustomObject]@{
-    targetPosition = Get-PlaybookTextOrNull $incoming.targetPosition
-    initialPosition = Get-PlaybookTextOrNull $incoming.initialPosition
-    addPosition = $addPosition
-    entryTriggers = @(Get-PlaybookStringList $incoming.entryTriggers)
-    addConditions = $addConditions
-    exitConditions = $exitConditions
-    monitoringItems = $monitoringItems
+    targetPosition = Merge-PlaybookTextField $base $incoming 'targetPosition'
+    initialPosition = Merge-PlaybookTextField $base $incoming 'initialPosition'
+    addPosition = Merge-PlaybookTextField $base $incoming 'addPosition'
+    entryTriggers = Merge-PlaybookListField $base $incoming 'entryTriggers'
+    addConditions = Merge-PlaybookListField $base $incoming 'addConditions'
+    exitConditions = Merge-PlaybookListField $base $incoming 'exitConditions'
+    monitoringItems = Merge-PlaybookListField $base $incoming 'monitoringItems'
   }
 }
 

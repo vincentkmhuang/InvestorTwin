@@ -1563,11 +1563,35 @@ const WorkflowEngine = {
     return text ? text : null;
   },
 
+  hasOwnPlaybookField(obj, name) {
+    return !!obj && Object.prototype.hasOwnProperty.call(obj, name);
+  },
+
+  mergePlaybookTextField(current, patch, name) {
+    if (!this.hasOwnPlaybookField(patch, name)) return current;
+    return this.normalizePlaybookText(patch[name]);
+  },
+
+  mergePlaybookListField(current, patch, name) {
+    if (!this.hasOwnPlaybookField(patch, name)) {
+      return Array.isArray(current) ? current.slice() : [];
+    }
+    const raw = patch[name];
+    if (raw == null) return [];
+    if (Array.isArray(raw)) return raw.slice();
+    return this.parsePlaybookLines(String(raw));
+  },
+
   applyPositionPlaybookLocally(caseObj, patch) {
     const next = this.positionPlaybookView(caseObj.positionPlaybook);
-    next.targetPosition = this.normalizePlaybookText(patch?.targetPosition);
-    next.initialPosition = this.normalizePlaybookText(patch?.initialPosition);
-    next.entryTriggers = Array.isArray(patch?.entryTriggers) ? patch.entryTriggers.slice() : [];
+    const src = patch && typeof patch === 'object' ? patch : {};
+    next.targetPosition = this.mergePlaybookTextField(next.targetPosition, src, 'targetPosition');
+    next.initialPosition = this.mergePlaybookTextField(next.initialPosition, src, 'initialPosition');
+    next.addPosition = this.mergePlaybookTextField(next.addPosition, src, 'addPosition');
+    next.entryTriggers = this.mergePlaybookListField(next.entryTriggers, src, 'entryTriggers');
+    next.addConditions = this.mergePlaybookListField(next.addConditions, src, 'addConditions');
+    next.exitConditions = this.mergePlaybookListField(next.exitConditions, src, 'exitConditions');
+    next.monitoringItems = this.mergePlaybookListField(next.monitoringItems, src, 'monitoringItems');
     caseObj.positionPlaybook = next;
     caseObj.origin = caseObj.origin || {};
     caseObj.origin.updatedAt = this.today();
