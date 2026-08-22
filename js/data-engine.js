@@ -12,14 +12,15 @@ const DataEngine = {
 
   async init() {
     const [morningBrief, opportunityRadar, investmentThesis, investmentCases] = await Promise.all([
-      fetch('data/morning-brief/latest.json').then(r => r.json()),
+      fetch('data/morning-brief.json').then(r => r.json()),
       fetch('data/opportunity-radar.json').then(r => r.json()),
       fetch('data/investment-thesis.json').then(r => r.json()),
       fetch('data/investment-cases.json')
         .then(r => r.ok ? r.json() : this.emptyCaseStore())
         .catch(() => this.emptyCaseStore())
     ]);
-    this.morningBrief = morningBrief;
+    this.morningBrief = this.normalizeMorningBrief(morningBrief);
+    this.morningBriefHome = this.morningBrief;
     this.opportunityRadar = opportunityRadar;
     this.investmentThesis = investmentThesis;
     this.investmentCases = investmentCases && Array.isArray(investmentCases.cases)
@@ -67,12 +68,106 @@ const DataEngine = {
     try {
       const response = await fetch('data/morning-brief.json');
       this.morningBriefHome = response.ok
-        ? await response.json()
-        : null;
+        ? this.normalizeMorningBrief(await response.json())
+        : this.emptyMorningBrief();
     } catch (_) {
-      this.morningBriefHome = null;
+      this.morningBriefHome = this.emptyMorningBrief();
     }
+    this.morningBrief = this.morningBriefHome;
     return this.morningBriefHome;
+  },
+
+  emptyMorningBrief() {
+    return {
+      date: null,
+      executiveSummary: null,
+      summary: null,
+      macroDecisionLens: [],
+      marketTemperature: {},
+      globalMarketAndNews: { summary: null, items: [] },
+      taiwanMarketAndNews: { summary: null, items: [] },
+      aiIndustryHighlights: [],
+      upcomingEvents: [],
+      today3Things: [],
+      opportunityRadar: [],
+      opportunityRadarException: false
+    };
+  },
+
+  researchLinkId(item) {
+    if (item == null) return null;
+    if (typeof item === 'string') {
+      const id = item.trim();
+      return id || null;
+    }
+    if (typeof item !== 'object') return null;
+    const raw = item.researchId != null ? item.researchId : item.cardRef;
+    const id = String(raw == null ? '' : raw).trim();
+    return id || null;
+  },
+
+  normalizeNewsGroup(raw, legacySummary, legacyItems) {
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      const items = Array.isArray(raw.items) ? raw.items : (Array.isArray(raw.news) ? raw.news : []);
+      const summary = raw.summary != null ? String(raw.summary) : (legacySummary != null ? String(legacySummary) : null);
+      return { summary, items };
+    }
+    return {
+      summary: legacySummary == null ? null : String(legacySummary),
+      items: Array.isArray(legacyItems) ? legacyItems : []
+    };
+  },
+
+  normalizeMorningBrief(raw) {
+    const empty = this.emptyMorningBrief();
+    if (!raw || typeof raw !== 'object') return empty;
+    const executiveSummary = raw.executiveSummary != null
+      ? String(raw.executiveSummary)
+      : (raw.summary != null ? String(raw.summary) : null);
+    return {
+      date: raw.date == null ? null : String(raw.date).trim() || null,
+      executiveSummary,
+      summary: raw.summary != null ? String(raw.summary) : executiveSummary,
+      macroDecisionLens: Array.isArray(raw.macroDecisionLens)
+        ? raw.macroDecisionLens
+        : (Array.isArray(raw.topThings) ? raw.topThings : []),
+      marketTemperature: raw.marketTemperature && typeof raw.marketTemperature === 'object'
+        ? raw.marketTemperature
+        : {},
+      globalMarketAndNews: this.normalizeNewsGroup(raw.globalMarketAndNews, raw.globalMarket, raw.globalNews),
+      taiwanMarketAndNews: this.normalizeNewsGroup(raw.taiwanMarketAndNews, raw.taiwanMarket, raw.taiwanNews),
+      aiIndustryHighlights: Array.isArray(raw.aiIndustryHighlights)
+        ? raw.aiIndustryHighlights
+        : (Array.isArray(raw.aiHighlights) ? raw.aiHighlights : []),
+      upcomingEvents: Array.isArray(raw.upcomingEvents) ? raw.upcomingEvents : [],
+      today3Things: Array.isArray(raw.today3Things)
+        ? raw.today3Things
+        : (Array.isArray(raw.todaysThreeThings) ? raw.todaysThreeThings : []),
+      opportunityRadar: Array.isArray(raw.opportunityRadar) ? raw.opportunityRadar : [],
+      opportunityRadarException: raw.opportunityRadarException === true
+    };
+  },
+
+  collectMorningBriefResearchIds(data) {
+    const brief = data || this.morningBriefHome || this.emptyMorningBrief();
+    const ids = [];
+    const seen = {};
+    const push = (value) => {
+      const id = this.researchLinkId(value);
+      if (!id || seen[id]) return;
+      seen[id] = true;
+      ids.push(id);
+    };
+    const group = (block) => {
+      (block && Array.isArray(block.items) ? block.items : []).forEach(push);
+    };
+    group(brief.globalMarketAndNews);
+    group(brief.taiwanMarketAndNews);
+    (brief.aiIndustryHighlights || []).forEach(push);
+    (brief.upcomingEvents || []).forEach(push);
+    (brief.today3Things || []).forEach(push);
+    (brief.opportunityRadar || []).forEach(push);
+    return ids;
   },
 
   async getCard(id) {
@@ -140,7 +235,9 @@ const DataEngine = {
       if (!listEl) return;
       listEl.innerHTML = '';
       (values || []).forEach(value => {
-        const text = (value || '').trim();
+        const text = typeof value === 'string'
+          ? value.trim()
+          : String(value && value.text != null ? value.text : '').trim();
         if (!text) return;
         const li = document.createElement('li');
         li.className = 'morning-brief-static';
@@ -169,7 +266,7 @@ const DataEngine = {
           sourceEl.textContent = source;
           li.appendChild(sourceEl);
         }
-        bindResearchClick(li, item?.researchId);
+        bindResearchClick(li, this.researchLinkId(item));
         listEl.appendChild(li);
       });
       if (!listEl.children.length) renderEmpty(listEl);
@@ -184,7 +281,7 @@ const DataEngine = {
         if (!title) return;
         const li = document.createElement('li');
         li.textContent = title;
-        bindResearchClick(li, item?.researchId);
+        bindResearchClick(li, this.researchLinkId(item));
         listEl.appendChild(li);
       });
       if (!listEl.children.length) renderEmpty(listEl);
@@ -209,7 +306,7 @@ const DataEngine = {
           whenEl.textContent = when;
           li.appendChild(whenEl);
         }
-        bindResearchClick(li, item?.researchId);
+        bindResearchClick(li, this.researchLinkId(item));
         listEl.appendChild(li);
       });
       if (!listEl.children.length) renderEmpty(listEl);
@@ -224,7 +321,7 @@ const DataEngine = {
         if (!text) return;
         const li = document.createElement('li');
         li.textContent = text;
-        bindResearchClick(li, typeof item === 'object' ? item?.researchId : null);
+        bindResearchClick(li, this.researchLinkId(item));
         listEl.appendChild(li);
       });
       if (!listEl.children.length) renderEmpty(listEl);
@@ -291,16 +388,16 @@ const DataEngine = {
       });
     };
 
-    setText('morningExecutiveSummary', data.executiveSummary);
-    setText('morningGlobalMarket', data.globalMarket);
-    setText('morningTaiwanMarket', data.taiwanMarket);
-    renderTextList('morningTopThings', data.topThings);
+    setText('morningExecutiveSummary', data.executiveSummary || data.summary);
+    setText('morningGlobalMarket', data.globalMarketAndNews && data.globalMarketAndNews.summary);
+    setText('morningTaiwanMarket', data.taiwanMarketAndNews && data.taiwanMarketAndNews.summary);
+    renderTextList('morningTopThings', data.macroDecisionLens);
     renderMarketTemperature();
-    renderNews('morningGlobalNews', data.globalNews);
-    renderNews('morningTaiwanNews', data.taiwanNews);
-    renderHighlights('morningAiHighlights', data.aiHighlights);
+    renderNews('morningGlobalNews', data.globalMarketAndNews && data.globalMarketAndNews.items);
+    renderNews('morningTaiwanNews', data.taiwanMarketAndNews && data.taiwanMarketAndNews.items);
+    renderHighlights('morningAiHighlights', data.aiIndustryHighlights);
     renderEvents('morningUpcomingEvents', data.upcomingEvents);
-    renderThreeThings('morningTodaysThreeThings', data.todaysThreeThings);
+    renderThreeThings('morningTodaysThreeThings', data.today3Things);
 
     const radarSection = document.getElementById('morningRadarSection');
     const radarTitle = document.getElementById('morningRadarTitle');

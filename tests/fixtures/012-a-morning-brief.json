@@ -1,0 +1,55 @@
+{
+  "sprint": "012-A",
+  "canonicalSource": "data/morning-brief.json",
+  "deprecatedSource": "data/morning-brief/latest.json",
+  "requiredFields": [
+    "date",
+    "executiveSummary",
+    "macroDecisionLens",
+    "marketTemperature",
+    "globalMarketAndNews",
+    "taiwanMarketAndNews",
+    "aiIndustryHighlights",
+    "upcomingEvents",
+    "today3Things",
+    "opportunityRadar"
+  ],
+  "aliasFields": {
+    "summary": "executiveSummary",
+    "topThings": "macroDecisionLens",
+    "globalMarket": "globalMarketAndNews.summary",
+    "globalNews": "globalMarketAndNews.items",
+    "taiwanMarket": "taiwanMarketAndNews.summary",
+    "taiwanNews": "taiwanMarketAndNews.items",
+    "aiHighlights": "aiIndustryHighlights",
+    "todaysThreeThings": "today3Things",
+    "cardRef": "researchId"
+  },
+  "homepageIds": [
+    "today",
+    "morningExecutiveSummary",
+    "morningTopThings",
+    "morningMarketTemperature",
+    "morningGlobalMarket",
+    "morningGlobalNews",
+    "morningTaiwanMarket",
+    "morningTaiwanNews",
+    "morningAiHighlights",
+    "morningUpcomingEvents",
+    "morningTodaysThreeThings",
+    "morningRadarSection",
+    "morningOpportunityRadar"
+  ],
+  "opportunityRadar": {
+    "mondayTitle": "Opportunity Radar｜上週機會變化",
+    "exceptionField": "opportunityRadarException"
+  },
+  "researchIdRules": {
+    "optional": true,
+    "mustMatchExistingCard": true,
+    "doNotAutoCreateCard": true
+  },
+  "queueItemKeys": ["id", "addedFrom"],
+  "expectedAddedFrom": "Morning Brief",
+  "expectedLoadPath": "data/morning-brief.json"
+}
