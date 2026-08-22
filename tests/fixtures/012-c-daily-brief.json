@@ -1,0 +1,23 @@
+{
+  "sprint": "012-C",
+  "canonicalSource": "data/morning-brief.json",
+  "deprecatedSource": "data/morning-brief/latest.json",
+  "dateElementId": "morningBriefDate",
+  "dateField": "date",
+  "queueItemKeys": ["id", "addedFrom"],
+  "expectedAddedFrom": "Morning Brief",
+  "homepageIds": [
+    "today",
+    "morningBriefDate",
+    "morningExecutiveSummary",
+    "todayQueue",
+    "morningTopThings",
+    "morningMarketTemperature",
+    "morningGlobalNews",
+    "morningTaiwanNews",
+    "morningAiHighlights",
+    "morningUpcomingEvents",
+    "morningTodaysThreeThings",
+    "morningOpportunityRadar"
+  ]
+}

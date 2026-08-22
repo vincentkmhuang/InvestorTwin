@@ -15,6 +15,7 @@ main{flex:1;padding:20px}
 .morning-brief .box ol{margin-top:8px}
 .morning-brief-title{font-weight:600}
 .morning-brief-summary{margin-top:4px;padding-left:1em;line-height:1.5;color:#64748b}
+.morning-brief-date{margin:0 0 12px;color:#64748b;font-size:13px}
 .morning-brief .box li.morning-brief-static{cursor:default}
 .today-queue-empty{cursor:default;color:#94a3b8}
 .morning-market{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}

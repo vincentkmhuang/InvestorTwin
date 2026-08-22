@@ -205,14 +205,14 @@ if mode == "schema":
 elif mode == "source":
     if "data/morning-brief/latest.json" in engine_src or "data/morning-brief/latest.json" in app_src:
         fail.append("production JS still fetches latest.json")
-    if engine_src.count("fetch('data/morning-brief.json')") < 2:
+    if engine_src.count("data/morning-brief.json") < 2:
         fail.append("init/loadMorningBrief do not both load morning-brief.json")
     if "normalizeMorningBrief(" not in engine_src:
         fail.append("normalizeMorningBrief missing")
     if "data/morning-brief.json" not in engine_src:
         fail.append("canonical source path missing")
-    if "data-engine.js?v=012a1" not in index_src:
-        fail.append("index.html cache token is not 012a1")
+    if "data-engine.js?v=012c1" not in index_src:
+        fail.append("index.html cache token is not 012c1")
 
 elif mode == "render":
     for hid in contract["homepageIds"]:

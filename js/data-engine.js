@@ -12,7 +12,7 @@ const DataEngine = {
 
   async init() {
     const [morningBrief, opportunityRadar, investmentThesis, investmentCases] = await Promise.all([
-      fetch('data/morning-brief.json').then(r => r.json()),
+      fetch('data/morning-brief.json?t=' + Date.now()).then(r => r.json()),
       fetch('data/opportunity-radar.json').then(r => r.json()),
       fetch('data/investment-thesis.json').then(r => r.json()),
       fetch('data/investment-cases.json')
@@ -66,7 +66,7 @@ const DataEngine = {
 
   async loadMorningBrief() {
     try {
-      const response = await fetch('data/morning-brief.json');
+      const response = await fetch('data/morning-brief.json?t=' + Date.now());
       this.morningBriefHome = response.ok
         ? this.normalizeMorningBrief(await response.json())
         : this.emptyMorningBrief();
@@ -388,6 +388,7 @@ const DataEngine = {
       });
     };
 
+    setText('morningBriefDate', data.date || '--');
     setText('morningExecutiveSummary', data.executiveSummary || data.summary);
     setText('morningGlobalMarket', data.globalMarketAndNews && data.globalMarketAndNews.summary);
     setText('morningTaiwanMarket', data.taiwanMarketAndNews && data.taiwanMarketAndNews.summary);

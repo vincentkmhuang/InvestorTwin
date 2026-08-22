@@ -103,8 +103,8 @@ if mode == "markup":
         fail.append("app.js cache token is not 012b1")
     if "style.css?v=012b1" not in index_src:
         fail.append("style.css cache token is not 012b1")
-    if "data-engine.js?v=012a1" not in index_src:
-        fail.append("012-A data-engine cache token was removed")
+    if "data-engine.js?v=012c1" not in index_src:
+        fail.append("012-C data-engine cache token missing")
 
 elif mode == "preview":
     if not preview:
