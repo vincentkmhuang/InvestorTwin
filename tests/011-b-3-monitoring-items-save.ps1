@@ -108,6 +108,29 @@ with open(dest, "w", encoding="utf-8", newline="\n") as f:
   return ([System.IO.File]::ReadAllText($outPath, $Utf8) | ConvertFrom-Json)
 }
 
+function Get-MonitoringInfoFromHttp {
+  $py = Join-Path $script:TempRoot 'dump_monitoring_http.py'
+  $outPath = Join-Path $script:TempRoot 'monitoring-http.json'
+  [System.IO.File]::WriteAllText($py, @'
+import json, sys, time, urllib.request
+port, dest = sys.argv[1], sys.argv[2]
+url = "http://localhost:%s/data/investment-cases.json?t=%s" % (port, int(time.time() * 1000))
+store = json.loads(urllib.request.urlopen(url).read().decode("utf-8"))
+case = next(c for c in store["cases"] if c["id"] == "3363-glass-bridge")
+items = (case.get("positionPlaybook") or {}).get("monitoringItems")
+info = {
+    "isList": isinstance(items, list),
+    "count": len(items) if isinstance(items, list) else (0 if items is None else 1),
+    "items": items if isinstance(items, list) else ([items] if items is not None else []),
+}
+with open(dest, "w", encoding="utf-8", newline="\n") as f:
+    json.dump(info, f, ensure_ascii=False, separators=(",", ":"))
+'@, $Utf8)
+  & python $py ([string]$script:TestPort) $outPath
+  if ($LASTEXITCODE -ne 0) { throw 'dump_monitoring_http.py failed' }
+  return ([System.IO.File]::ReadAllText($outPath, $Utf8) | ConvertFrom-Json)
+}
+
 function Write-TempStoreFromFixture {
   $py = Join-Path $script:TempRoot 'seed_store.py'
   [System.IO.File]::WriteAllText($py, @'
@@ -275,13 +298,19 @@ open(sys.argv[1], "w", encoding="utf-8").write("Glass Bridge \u91cf\u7522\u9a57\
   $fail1 = New-Object System.Collections.Generic.List[string]
   if ([int]$resp1.StatusCode -ne 200) { $fail1.Add("HTTP $($resp1.StatusCode) $($resp1.Body)") }
   $info1 = Get-MonitoringInfo
+  $http1 = Get-MonitoringInfoFromHttp
   if (-not $info1.isList) { $fail1.Add('monitoringItems is not a JSON array after save') }
+  if (-not $http1.isList) { $fail1.Add('GET monitoringItems is not a JSON array') }
   $hit1 = @(Get-MonitoringHits $info1)
+  $hitHttp1 = @(Get-MonitoringHits $http1)
   if ($hit1.Count -ne 1) {
-    $fail1.Add("count=$($hit1.Count) expected 1")
+    $fail1.Add("file count=$($hit1.Count) expected 1")
   } else {
     if ([string]$hit1[0].text -ne $objectText) { $fail1.Add('saved text mismatch') }
     if ([string]$hit1[0].researchId -ne $objectId) { $fail1.Add('saved researchId mismatch') }
+  }
+  if ($hitHttp1.Count -ne 1 -or [string]$hitHttp1[0].researchId -ne $objectId) {
+    $fail1.Add("GET count=$($hitHttp1.Count) did not return saved monitoringItems")
   }
   Add-TestResult 'TEST 1' ($fail1.Count -eq 0) ($fail1 -join "`n")
 
@@ -321,9 +350,14 @@ open(sys.argv[1], "w", encoding="utf-8").write("Glass Bridge \u91cf\u7522\u9a57\
   $respKeep = Invoke-CasesPostJson (Write-UiSaveBody 'ignored' '' $false)
   if ([int]$respKeep.StatusCode -ne 200) { $fail4.Add("keep HTTP $($respKeep.StatusCode) $($respKeep.Body)") }
   $info4 = Get-MonitoringInfo
+  $http4 = Get-MonitoringInfoFromHttp
   $hit4 = @(Get-MonitoringHits $info4)
+  $hitHttp4 = @(Get-MonitoringHits $http4)
   if ($hit4.Count -ne 1 -or [string]$hit4[0].researchId -ne $objectId) {
     $fail4.Add('missing monitoringItems cleared existing value')
+  }
+  if ($hitHttp4.Count -ne 1 -or [string]$hitHttp4[0].researchId -ne $objectId) {
+    $fail4.Add('GET after omit monitoringItems did not keep existing value')
   }
   Add-TestResult 'TEST 4' ($fail4.Count -eq 0) ($fail4 -join "`n")
 
@@ -331,8 +365,10 @@ open(sys.argv[1], "w", encoding="utf-8").write("Glass Bridge \u91cf\u7522\u9a57\
   $fail5 = New-Object System.Collections.Generic.List[string]
   if ([int]$respClear.StatusCode -ne 200) { $fail5.Add("HTTP $($respClear.StatusCode) $($respClear.Body)") }
   $info5 = Get-MonitoringInfo
+  $http5 = Get-MonitoringInfoFromHttp
   if (-not $info5.isList) { $fail5.Add('cleared monitoringItems is not a list') }
   if ([int]$info5.count -ne 0) { $fail5.Add("count=$($info5.count) expected 0 after explicit []") }
+  if (-not $http5.isList -or [int]$http5.count -ne 0) { $fail5.Add('GET after explicit [] did not return empty monitoringItems') }
   Add-TestResult 'TEST 5' ($fail5.Count -eq 0) ($fail5 -join "`n")
 
   Write-TempStoreFromFixture
@@ -348,11 +384,56 @@ open(sys.argv[1], "w", encoding="utf-8").write("Glass Bridge \u91cf\u7522\u9a57\
       (Assert-Unchanged 'supportingEvidence' $before6.supportingEvidence $after6.supportingEvidence)
       (Assert-Unchanged 'counterEvidence' $before6.counterEvidence $after6.counterEvidence)
       (Assert-Unchanged 'valuation' $before6.valuation $after6.valuation)
+      (Assert-Unchanged 'MOS' $before6.valuation.marginOfSafety $after6.valuation.marginOfSafety)
       (Assert-Unchanged 'case.status' $before6.caseStatus $after6.caseStatus)
     )) {
     if ($msg) { $fail6.Add([string]$msg) }
   }
   Add-TestResult 'TEST 6' ($fail6.Count -eq 0) ($fail6 -join "`n")
+
+  $fail8 = New-Object System.Collections.Generic.List[string]
+  Write-TempStoreFromFixture
+  $resp8zero = Invoke-CasesPostJson (Write-UiSaveBody '__EMPTY_ARRAY__' '' $true)
+  if ([int]$resp8zero.StatusCode -ne 200) { $fail8.Add("0-item HTTP $($resp8zero.StatusCode)") }
+  $http8zero = Get-MonitoringInfoFromHttp
+  if (-not $http8zero.isList -or [int]$http8zero.count -ne 0) { $fail8.Add('GET 0-item count expected 0') }
+
+  Write-TempStoreFromFixture
+  $resp8one = Invoke-CasesPostJson (Write-UiSaveBody $objectText $objectId $true)
+  if ([int]$resp8one.StatusCode -ne 200) { $fail8.Add("1-item HTTP $($resp8one.StatusCode) $($resp8one.Body)") }
+  $http8one = Get-MonitoringInfoFromHttp
+  if (-not $http8one.isList) { $fail8.Add('GET 1-item monitoringItems is not a JSON array') }
+  if ([int]$http8one.count -ne 1) { $fail8.Add("GET 1-item count=$($http8one.count) expected 1") }
+  elseif ([string](@(Get-MonitoringHits $http8one)[0].researchId) -ne $objectId) { $fail8.Add('GET 1-item researchId mismatch') }
+
+  $twoPath = Join-Path $script:TempRoot 'two-items.json'
+  $twoPy = Join-Path $script:TempRoot 'two-items.py'
+  [System.IO.File]::WriteAllText($twoPy, @'
+import json, sys
+text = sys.argv[1]
+out = sys.argv[2]
+body = {
+    "id": "3363-glass-bridge",
+    "positionPlaybook": {
+        "targetPosition": "keep-target",
+        "initialPosition": "keep-initial",
+        "entryTriggers": ["keep-entry"],
+        "monitoringItems": [
+            {"text": text, "researchId": "glass-bridge"},
+            {"text": "second monitoring item", "researchId": "fau"},
+        ],
+    },
+}
+json.dump(body, open(out, "w", encoding="utf-8", newline="\n"), ensure_ascii=False, separators=(",", ":"))
+'@, $Utf8)
+  & python $twoPy $objectText $twoPath
+  $resp8two = Invoke-CasesPostJson ([System.IO.File]::ReadAllText($twoPath, $Utf8))
+  if ([int]$resp8two.StatusCode -ne 200) { $fail8.Add("2-item HTTP $($resp8two.StatusCode)") }
+  $http8two = Get-MonitoringInfoFromHttp
+  if (-not $http8two.isList -or [int]$http8two.count -ne 2) {
+    $fail8.Add("GET 2-item count=$($http8two.count) expected 2")
+  }
+  Add-TestResult 'TEST 8' ($fail8.Count -eq 0) ($fail8 -join "`n")
 }
 catch {
   Add-TestResult 'SETUP' $false $_.Exception.Message

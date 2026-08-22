@@ -217,18 +217,18 @@ function ConvertTo-PositionPlaybookJson($raw) {
   $entryTriggers = @()
   $addConditions = @()
   $exitConditions = @()
-  $monitoringItems = @()
   if ($raw.PSObject.Properties['entryTriggers']) { $entryTriggers = @(Get-AsArray $raw.entryTriggers) }
   if ($raw.PSObject.Properties['addConditions']) { $addConditions = @(Get-AsArray $raw.addConditions) }
   if ($raw.PSObject.Properties['exitConditions']) { $exitConditions = @(Get-AsArray $raw.exitConditions) }
-  if ($raw.PSObject.Properties['monitoringItems']) { $monitoringItems = @(Get-AsArray $raw.monitoringItems) }
+  $monitoringRaw = $null
+  if (Test-HasJsonProperty $raw 'monitoringItems') { $monitoringRaw = $raw.monitoringItems }
   return ('{"targetPosition":' + (Get-JsonNullOrString $target) +
     ',"initialPosition":' + (Get-JsonNullOrString $initial) +
     ',"addPosition":' + (Get-JsonNullOrString $add) +
     ',"entryTriggers":' + (ConvertTo-JsonArrayText $entryTriggers) +
     ',"addConditions":' + (ConvertTo-JsonArrayText $addConditions) +
     ',"exitConditions":' + (ConvertTo-JsonArrayText $exitConditions) +
-    ',"monitoringItems":' + (ConvertTo-MonitoringItemsJson $monitoringItems) + '}')
+    ',"monitoringItems":' + (ConvertTo-MonitoringItemsJson $monitoringRaw) + '}')
 }
 
 function New-EmptyPositionPlaybook {
@@ -313,28 +313,54 @@ function Normalize-MonitoringItem($item) {
   return Get-PlaybookTextOrNull $item
 }
 
+function Get-MonitoringItemList($raw) {
+  $items = New-Object System.Collections.Generic.List[object]
+  if ($null -eq $raw) { return ,$items }
+  if ($raw -is [string]) {
+    [void]$items.Add($raw)
+    return ,$items
+  }
+  # A 1-element JSON array is often unwrapped to a single object. If it has
+  # `text`, it is one monitoring item — do not enumerate PSObject properties.
+  if (Test-HasJsonProperty $raw 'text') {
+    [void]$items.Add($raw)
+    return ,$items
+  }
+  if ($raw -is [System.Collections.IDictionary]) {
+    [void]$items.Add($raw)
+    return ,$items
+  }
+  if ($raw -is [System.Collections.IEnumerable]) {
+    $tmp = New-Object System.Collections.Generic.List[object]
+    $allChars = $true
+    foreach ($item in $raw) {
+      if ($null -eq $item) { continue }
+      if ($item -isnot [char]) { $allChars = $false }
+      [void]$tmp.Add($item)
+    }
+    if ($allChars -and $tmp.Count -gt 0) {
+      [void]$items.Add([string]$raw)
+      return ,$items
+    }
+    foreach ($item in $tmp) { [void]$items.Add($item) }
+    return ,$items
+  }
+  [void]$items.Add($raw)
+  return ,$items
+}
+
 function Get-NormalizedMonitoringItems($raw) {
   $result = New-Object System.Collections.Generic.List[object]
-  $items = @()
-  if ($null -eq $raw) {
-    return @()
-  } elseif ($raw -is [string]) {
-    $items = @($raw)
-  } elseif ((Test-IsJsonObject $raw) -and (Test-HasJsonProperty $raw 'text')) {
-    $items = @($raw)
-  } else {
-    $items = @(Get-AsArray $raw)
-  }
-  foreach ($item in $items) {
+  foreach ($item in (Get-MonitoringItemList $raw)) {
     $norm = Normalize-MonitoringItem $item
     if ($null -ne $norm) { [void]$result.Add($norm) }
   }
-  return $result
+  return ,$result
 }
 
 function ConvertTo-MonitoringItemsJson($items) {
   $kept = New-Object System.Collections.Generic.List[string]
-  foreach ($item in (Get-NormalizedMonitoringItems $items)) {
+  foreach ($item in (Get-MonitoringItemList (Get-NormalizedMonitoringItems $items))) {
     if (Test-IsJsonObject $item) {
       [void]$kept.Add(('{"text":' + (Get-JsonString $item.text) + ',"researchId":' + (Get-JsonNullOrString $item.researchId) + '}'))
     } else {
@@ -347,11 +373,13 @@ function ConvertTo-MonitoringItemsJson($items) {
 
 function Merge-PlaybookMonitoringItemsField($base, $incoming) {
   if (-not (Test-HasJsonProperty $incoming 'monitoringItems')) {
-    return @(Get-NormalizedMonitoringItems (Get-ExistingPlaybookList $base 'monitoringItems'))
+    $existing = $null
+    if (Test-HasJsonProperty $base 'monitoringItems') { $existing = $base.monitoringItems }
+    return Get-NormalizedMonitoringItems $existing
   }
   $raw = $incoming.monitoringItems
-  if ($null -eq $raw) { return @() }
-  return @(Get-NormalizedMonitoringItems $raw)
+  if ($null -eq $raw) { return Get-NormalizedMonitoringItems @() }
+  return Get-NormalizedMonitoringItems $raw
 }
 
 function Merge-PositionPlaybookFromEditor($existing, $incoming) {
