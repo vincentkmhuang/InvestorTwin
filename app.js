@@ -52,7 +52,7 @@ function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
   document.getElementById(id).style.display = 'block';
   document.getElementById('title').textContent = id === 'today'
-    ? '🌅 Morning Brief'
+    ? '今日工作台'
     : document.querySelector('[onclick="showPage(\'' + id + '\')"]').textContent.trim();
   setViewHash(id);
 }
@@ -401,6 +401,32 @@ async function selectKnowledgeTag(tag) {
   }
 }
 
+function renderTodayQueue() {
+  const listEl = document.getElementById('todayQueue');
+  if (!listEl) return;
+  listEl.innerHTML = '';
+  const ids = WorkflowEngine.getQueueIds();
+  if (!ids.length) {
+    const li = document.createElement('li');
+    li.className = 'today-queue-empty';
+    li.textContent = '--';
+    listEl.appendChild(li);
+    return;
+  }
+  ids.forEach(q => {
+    const li = document.createElement('li');
+    li.textContent = WorkflowEngine.cardTitle(q);
+    li.onclick = () => {
+      showPage('cards');
+      openResearchCard(q, document.getElementById('card'), {
+        resetPath: true,
+        fromPage: 'today'
+      });
+    };
+    listEl.appendChild(li);
+  });
+}
+
 function render() {
   queueList.innerHTML = '';
   cardList.innerHTML = '';
@@ -420,6 +446,7 @@ function render() {
     li2.onclick = () => openResearchCard(q, undefined, { resetPath: true });
     cardList.appendChild(li2);
   });
+  renderTodayQueue();
   renderCaseList();
 }
 

@@ -1,0 +1,22 @@
+{
+  "sprint": "012-B",
+  "todayQueueId": "todayQueue",
+  "todayQueueSectionId": "todayQueueSection",
+  "todayQueueHeading": "今日佇列",
+  "todayPageTitle": "今日工作台",
+  "queueItemKeys": ["id", "addedFrom"],
+  "emptyPreview": "--",
+  "homepageBriefIds": [
+    "today",
+    "morningExecutiveSummary",
+    "morningTopThings",
+    "morningMarketTemperature",
+    "morningGlobalNews",
+    "morningTaiwanNews",
+    "morningAiHighlights",
+    "morningUpcomingEvents",
+    "morningTodaysThreeThings",
+    "morningOpportunityRadar"
+  ],
+  "forbiddenInPreview": ["/api/queue", "/api/research/", "monitoringTrigger"]
+}
