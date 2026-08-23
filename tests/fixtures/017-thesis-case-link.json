@@ -1,0 +1,26 @@
+{
+  "validThesisId": "cpo-glass-bridge",
+  "invalidThesisId": "does-not-exist",
+  "linkedCaseId": "017-linked",
+  "nullCaseId": "017-null",
+  "legacyCaseId": "017-legacy",
+  "invalidCaseId": "017-invalid",
+  "legacyThesisText": "legacy embedded thesis must stay on the Case",
+  "decision": {
+    "stance": "watch",
+    "asOf": "2026-08-23",
+    "reason": "017 manual decision; no auto judgement",
+    "basedOn": {
+      "researchIds": ["glass-bridge"],
+      "supportingCount": 0,
+      "counterCount": 0,
+      "thesisStatus": "forming"
+    }
+  },
+  "positionPlaybook": {
+    "targetPosition": 0.1,
+    "initialPosition": 0.05,
+    "entryTriggers": ["manual entry after research"],
+    "monitoringItems": []
+  }
+}

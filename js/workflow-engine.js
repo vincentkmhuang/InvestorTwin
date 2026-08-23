@@ -1015,6 +1015,7 @@ const WorkflowEngine = {
         updatedAt: today
       },
       researchIds,
+      thesisId: null,
       thesis: {
         thesis: card?.investmentThesis || '',
         growthDrivers: [],

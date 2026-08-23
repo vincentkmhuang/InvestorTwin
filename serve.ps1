@@ -695,6 +695,43 @@ function Set-CaseLevelValuation($caseObj) {
   $caseObj.valuation.buyUnder = Get-BuyUnder $base $caseObj.valuation.marginOfSafety
 }
 
+function Get-CaseThesisId($caseObj) {
+  if (-not (Test-HasJsonProperty $caseObj 'thesisId')) { return $null }
+  $raw = $caseObj.thesisId
+  if ($null -eq $raw -or $raw -eq '') { return $null }
+  if (Test-IsJsonObject $raw) { return $null }
+  if ($raw -is [System.Collections.IEnumerable] -and $raw -isnot [string]) { return $null }
+  $text = ([string]$raw).Trim()
+  if ([string]::IsNullOrWhiteSpace($text)) { return $null }
+  return $text
+}
+
+function Resolve-CaseThesisId($rootPath, $caseObj) {
+  if (Test-HasJsonProperty $caseObj 'thesisId') {
+    $raw = $caseObj.thesisId
+    if ($null -ne $raw) {
+      if (Test-IsJsonObject $raw) {
+        return @{ ok = $false; value = $null; message = 'thesisId must be a string or null' }
+      }
+      if ($raw -is [System.Collections.IEnumerable] -and $raw -isnot [string]) {
+        return @{ ok = $false; value = $null; message = 'thesisId must be a string or null' }
+      }
+    }
+  }
+  $thesisId = Get-CaseThesisId $caseObj
+  if ($null -eq $thesisId) {
+    return @{ ok = $true; value = $null; message = $null }
+  }
+  if ($thesisId -match '[\\/]' -or $thesisId -eq '.' -or $thesisId -eq '..') {
+    return @{ ok = $false; value = $null; message = 'thesisId is invalid' }
+  }
+  $path = Join-Path $rootPath ('data\theses\' + $thesisId + '.json')
+  if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+    return @{ ok = $false; value = $null; message = 'thesisId does not match an existing Thesis' }
+  }
+  return @{ ok = $true; value = $thesisId; message = $null }
+}
+
 function ConvertTo-InvestmentCaseJson($caseObj) {
   $company = $caseObj.company
   if (-not $company) { $company = [PSCustomObject]@{ name = ''; ticker = ''; exchange = $null; currency = $null } }
@@ -731,6 +768,7 @@ function ConvertTo-InvestmentCaseJson($caseObj) {
     '"company":{"name":' + (Get-JsonString $company.name) + ',"ticker":' + (Get-JsonString $company.ticker) + ',"exchange":' + (Get-JsonNullOrString $company.exchange) + ',"currency":' + (Get-JsonNullOrString $company.currency) + '}'
     '"origin":{"source":' + (Get-JsonString $origin.source) + ',"createdAt":' + (Get-JsonString $origin.createdAt) + ',"updatedAt":' + (Get-JsonString $origin.updatedAt) + '}'
     '"researchIds":' + (ConvertTo-JsonArrayText (Get-AsArray $caseObj.researchIds))
+    '"thesisId":' + (Get-JsonNullOrString (Get-CaseThesisId $caseObj))
     '"thesis":{"thesis":' + (Get-JsonString $thesis.thesis) + ',"growthDrivers":' + (ConvertTo-JsonArrayText (Get-AsArray $thesis.growthDrivers)) + ',"competitiveAdvantage":' + (Get-JsonString $thesis.competitiveAdvantage) + ',"earningsTranslation":' + (Get-JsonString $thesis.earningsTranslation) + ',"duration":' + (Get-JsonString $thesis.duration) + ',"supportingEvidence":' + (ConvertTo-EvidenceJson $thesis.supportingEvidence) + ',"counterEvidence":' + (ConvertTo-EvidenceJson $thesis.counterEvidence) + ',"toBeVerified":' + (ConvertTo-EvidenceJson $thesis.toBeVerified) + ',"killCriteria":' + (ConvertTo-JsonArrayText (Get-AsArray $thesis.killCriteria)) + ',"status":' + (Get-JsonString $thesis.status) + '}'
     '"valuationProfile":{"companyType":' + (Get-JsonNullOrString $profile.companyType) + ',"primaryMethod":' + (Get-JsonNullOrString $profile.primaryMethod) + ',"secondaryMethod":' + (Get-JsonNullOrString $profile.secondaryMethod) + ',"crossCheckMethod":' + (Get-JsonNullOrString $profile.crossCheckMethod) + ',"userConfirmed":' + $(if ($confirmed) { 'true' } else { 'false' }) + '}'
     '"valuation":{"bear":' + (Get-JsonNullOrNumber $val.bear) + ',"base":' + (Get-JsonNullOrNumber $val.base) + ',"bull":' + (Get-JsonNullOrNumber $val.bull) + ',"marginOfSafety":' + (Get-JsonNullOrNumber $val.marginOfSafety) + ',"buyUnder":' + (Get-JsonNullOrNumber $val.buyUnder) + ',"currentPrice":null,"currentDiscount":null,"methodInputs":' + (ConvertTo-MethodInputsJson $val.methodInputs) + ',"methodFairValues":' + (ConvertTo-MethodFairValuesJson $val.methodFairValues) + '}'
@@ -931,27 +969,33 @@ while ($listener.IsListening) {
           if ($existing.Count -gt 0) {
             Send-Json $response @{ created = $false; existing = $true; id = $id }
           } else {
-            $caseObj | Add-Member -NotePropertyName decision -NotePropertyValue $null -Force
-            $caseObj | Add-Member -NotePropertyName decisionHistory -NotePropertyValue @() -Force
-            if (-not (Test-IsJsonObject $caseObj.positionPlaybook)) {
-              $caseObj | Add-Member -NotePropertyName positionPlaybook -NotePropertyValue $null -Force
+            $thesisIdResult = Resolve-CaseThesisId $root $caseObj
+            if (-not $thesisIdResult.ok) {
+              Send-Json $response @{ error = 'invalid_payload'; message = $thesisIdResult.message } 400
+            } else {
+              $caseObj | Add-Member -NotePropertyName thesisId -NotePropertyValue $thesisIdResult.value -Force
+              $caseObj | Add-Member -NotePropertyName decision -NotePropertyValue $null -Force
+              $caseObj | Add-Member -NotePropertyName decisionHistory -NotePropertyValue @() -Force
+              if (-not (Test-IsJsonObject $caseObj.positionPlaybook)) {
+                $caseObj | Add-Member -NotePropertyName positionPlaybook -NotePropertyValue $null -Force
+              }
+              $caseObj.monitoring = $null
+              if (-not $caseObj.valuation) {
+                $caseObj | Add-Member -NotePropertyName valuation -NotePropertyValue ([PSCustomObject]@{
+                  bear = $null; base = $null; bull = $null
+                  marginOfSafety = $null; buyUnder = $null
+                  currentPrice = $null; currentDiscount = $null
+                }) -Force
+              }
+              $caseObj.valuation.currentPrice = $null
+              $caseObj.valuation.currentDiscount = $null
+              $caseObj.valuation.buyUnder = Get-BuyUnder $caseObj.valuation.base $caseObj.valuation.marginOfSafety
+              $store.cases = @(Get-AsArray $store.cases) + @($caseObj)
+              $store.updated = $today
+              if (-not $store.schemaVersion) { $store | Add-Member -NotePropertyName schemaVersion -NotePropertyValue '1.0' -Force }
+              Write-InvestmentCasesFile $casesPath $store
+              Send-Json $response @{ created = $true; existing = $false; id = $id }
             }
-            $caseObj.monitoring = $null
-            if (-not $caseObj.valuation) {
-              $caseObj | Add-Member -NotePropertyName valuation -NotePropertyValue ([PSCustomObject]@{
-                bear = $null; base = $null; bull = $null
-                marginOfSafety = $null; buyUnder = $null
-                currentPrice = $null; currentDiscount = $null
-              }) -Force
-            }
-            $caseObj.valuation.currentPrice = $null
-            $caseObj.valuation.currentDiscount = $null
-            $caseObj.valuation.buyUnder = Get-BuyUnder $caseObj.valuation.base $caseObj.valuation.marginOfSafety
-            $store.cases = @(Get-AsArray $store.cases) + @($caseObj)
-            $store.updated = $today
-            if (-not $store.schemaVersion) { $store | Add-Member -NotePropertyName schemaVersion -NotePropertyValue '1.0' -Force }
-            Write-InvestmentCasesFile $casesPath $store
-            Send-Json $response @{ created = $true; existing = $false; id = $id }
           }
         }
       } elseif ($body -and $body.id -and ($body.PSObject.Properties.Name -contains 'companyType')) {
