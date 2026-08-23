@@ -1,0 +1,32 @@
+{
+  "sprint": "014",
+  "layer": "evidence",
+  "capturedAt": "2026-08-23T06:20:52Z",
+  "note": "Replay of Stooq HTML challenge. Do not invent closes.",
+  "raw": [
+    {
+      "sourceId": "us-index-nasdaq",
+      "status": "unavailable",
+      "payload": null,
+      "error": "stooq returned HTML challenge, not CSV"
+    },
+    {
+      "sourceId": "us-index-spx",
+      "status": "unavailable",
+      "payload": null,
+      "error": "stooq returned HTML challenge, not CSV"
+    },
+    {
+      "sourceId": "us-index-dji",
+      "status": "unavailable",
+      "payload": null,
+      "error": "stooq returned HTML challenge, not CSV"
+    },
+    {
+      "sourceId": "us-index-sox",
+      "status": "unavailable",
+      "payload": null,
+      "error": "stooq returned HTML challenge, not CSV"
+    }
+  ]
+}

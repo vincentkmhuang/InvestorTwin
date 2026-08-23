@@ -1,4 +1,4 @@
-# Investor Twin 013 — Evidence Layer collector.
+# Investor Twin 014 — Evidence collector (Live + fixture).
 # Writes Raw + Normalized evidence only. Never writes Morning Brief files.
 import csv
 import datetime
@@ -12,9 +12,12 @@ import urllib.error
 import urllib.request
 
 DATE_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
+MAX_OBSERVATIONS = 30
 FORBIDDEN_WRITES = (
     os.path.join("data", "morning-brief.json"),
     os.path.join("data", "morning-brief", "latest.json"),
+    os.path.join("data", "research-queue.json"),
+    os.path.join("data", "investment-cases.json"),
 )
 
 SOURCE_CATALOG = {
@@ -149,15 +152,60 @@ def load_json(path):
         return json.load(handle)
 
 
-def write_json(path, payload):
+def ends_with_protected(path, protected):
+    normalized = os.path.normpath(path).replace("/", os.sep)
+    return normalized.endswith(protected)
+
+
+def refuse_brief_input(path):
+    for forbidden in FORBIDDEN_WRITES[:2]:
+        if ends_with_protected(path, forbidden):
+            fail("refusing to read Brief as evidence input: " + forbidden)
+
+
+def evidence_relpath(root, path):
+    try:
+        rel = os.path.relpath(os.path.abspath(path), os.path.abspath(root))
+    except ValueError:
+        fail("refusing to write outside data/evidence/: " + path)
+    return rel.replace("\\", "/")
+
+
+def write_json(path, payload, root=None):
     normalized = os.path.normpath(path)
     for forbidden in FORBIDDEN_WRITES:
-        if normalized.replace("/", os.sep).endswith(forbidden):
+        if ends_with_protected(normalized, forbidden):
             fail("refusing to write protected file: " + forbidden)
+    if root:
+        rel = evidence_relpath(root, path)
+        if rel.startswith("..") or not rel.startswith("data/evidence/"):
+            fail("refusing to write outside data/evidence/: " + rel)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
         json.dump(payload, handle, ensure_ascii=False, indent=2)
         handle.write("\n")
+
+
+def row_as_of(row):
+    return iso_date(
+        row.get("observation_date")
+        or row.get("DATE")
+        or row.get("date")
+        or row.get("asOf")
+    )
+
+
+def trim_observation_payload(payload):
+    if not isinstance(payload, dict):
+        return payload
+    rows = payload.get("observations")
+    if not isinstance(rows, list) or len(rows) <= MAX_OBSERVATIONS:
+        return payload
+    dated = [row for row in rows if isinstance(row, dict) and row_as_of(row)]
+    dated.sort(key=lambda row: row_as_of(row))
+    out = dict(payload)
+    out["observations"] = dated[-MAX_OBSERVATIONS:]
+    return out
 
 
 def observations_from_payload(payload):
@@ -187,7 +235,7 @@ def observations_from_payload(payload):
     for row in rows:
         if not isinstance(row, dict):
             continue
-        as_of = iso_date(row.get("date") or row.get("asOf"))
+        as_of = row_as_of(row)
         value = parse_number(row.get("value") if "value" in row else row.get("close"))
         extras = {}
         for extra in ("foreign", "trust", "dealer"):
@@ -286,7 +334,7 @@ def change_vs(series, as_of, mode):
 
 
 def http_get(url, timeout=20, insecure=False):
-    request = urllib.request.Request(url, headers={"User-Agent": "InvestorTwin-Evidence/013"})
+    request = urllib.request.Request(url, headers={"User-Agent": "InvestorTwin-Evidence/014"})
     context = ssl._create_unverified_context() if insecure else None
     with urllib.request.urlopen(request, timeout=timeout, context=context) as response:
         return response.read().decode("utf-8", errors="replace")
@@ -305,28 +353,22 @@ def live_fred(series_id):
         rows = []
         for item in data.get("observations") or []:
             value = parse_number(item.get("value"))
-            as_of = iso_date(
-                item.get("observation_date")
-                or item.get("DATE")
-                or item.get("date")
-            )
+            as_of = row_as_of(item)
             if as_of and value is not None:
                 rows.append({"date": as_of, "value": value})
-        return {"observations": rows}
+        rows.sort(key=lambda item: item["date"])
+        return {"observations": rows[-MAX_OBSERVATIONS:]}
     url = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=" + series_id
     text = http_get(url)
     rows = []
     reader = csv.DictReader(io.StringIO(text))
     for item in reader:
-        as_of = iso_date(
-            item.get("observation_date")
-            or item.get("DATE")
-            or item.get("date")
-        )
+        as_of = row_as_of(item)
         value = parse_number(item.get(series_id) or item.get("value"))
         if as_of and value is not None:
             rows.append({"date": as_of, "value": value})
-    return {"observations": rows}
+    rows.sort(key=lambda item: item["date"])
+    return {"observations": rows[-MAX_OBSERVATIONS:]}
 
 
 def live_stooq(symbol):
@@ -349,7 +391,7 @@ def live_stooq(symbol):
             rows.append({"date": as_of, "value": value})
     if not rows:
         raise ValueError("stooq CSV had Date/Close but no usable observations")
-    return {"observations": rows[-30:]}
+    return {"observations": rows[-MAX_OBSERVATIONS:]}
 
 
 def twse_date(value):
@@ -522,7 +564,7 @@ def write_history(root, instrument, record):
         "asOf": record["asOf"],
         "asOfKind": record.get("asOfKind"),
         "sourceId": record["sourceId"],
-    })
+    }, root=root)
 
 
 def instruments_for_source(source_id, raw_item, catalog):
@@ -545,6 +587,7 @@ def process_source(root, raw_item, expected_as_of, captured_at, run_dir):
     payload = raw_item.get("payload")
     if payload is None and raw_item.get("observations") is not None:
         payload = {"observations": raw_item.get("observations")}
+    payload = trim_observation_payload(payload)
     raw = raw_record(
         source_id,
         catalog["source"],
@@ -554,7 +597,7 @@ def process_source(root, raw_item, expected_as_of, captured_at, run_dir):
         error=raw_item.get("error"),
         file_ref=raw_item.get("fileRef"),
     )
-    write_json(os.path.join(run_dir, "raw", source_id + ".json"), raw)
+    write_json(os.path.join(run_dir, "raw", source_id + ".json"), raw, root=root)
 
     produced = []
     observations = observations_from_payload(payload) if raw["status"] == "ok" else []
@@ -587,7 +630,7 @@ def process_source(root, raw_item, expected_as_of, captured_at, run_dir):
             series,
             captured_at,
         )
-        write_json(os.path.join(run_dir, "normalized", instrument + ".json"), record)
+        write_json(os.path.join(run_dir, "normalized", instrument + ".json"), record, root=root)
         write_history(root, instrument, record)
         produced.append(record)
     return raw, produced
@@ -663,6 +706,8 @@ def main(argv):
         fail("use either --input or --live, not both")
     if not args["live"] and not args["input"]:
         fail("InputPath fixture is required unless --live is set")
+    if args["input"]:
+        refuse_brief_input(os.path.abspath(args["input"]))
 
     captured_raw = args["captured"]
     expected_as_of = iso_date(args["expected"]) if args["expected"] else None
@@ -706,7 +751,7 @@ def main(argv):
         "normalizedCount": len(normalized_rows),
         "statuses": {row["instrument"]: row["status"] for row in normalized_rows},
     }
-    write_json(os.path.join(run_dir, "run.json"), summary)
+    write_json(os.path.join(run_dir, "run.json"), summary, root=root)
     print("EVIDENCE_OK")
     print("runId=" + run_id)
     print("expectedAsOf=" + expected_as_of)

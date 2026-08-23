@@ -1,3 +1,4 @@
+# 014 Live collector wrapper. Use either -InputPath or -Live, not both.
 param(
   [string]$InputPath,
   [string]$RootPath,
