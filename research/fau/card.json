@@ -3,7 +3,11 @@
   "title": "FAU",
   "summary": "",
   "investmentThesis": "追蹤上詮相關標的與供應鏈動態。",
-  "questions": [],
+  "questions": [
+    "FAU 台廠是否已出現對應訂單或營收指引，而不只是供應鏈點名？",
+    "上詮是否已進入相關客戶驗證名單，或具備可出貨產能？",
+    "上詮是否仍未被列入相關供應鏈，或 FAU 營收指引沒有對應變化？"
+  ],
   "status": "researching",
-  "updated": "2026-08-06"
+  "updated": "2026-08-23"
 }

@@ -3,7 +3,12 @@
   "title": "HBM",
   "summary": "",
   "investmentThesis": "追蹤 SK hynix、Micron 相關標的與供應鏈動態。",
-  "questions": [],
+  "questions": [
+    "HBM / DRAM 供給是否仍緊俏，交期是否仍構成約束？",
+    "AI 伺服器的 Memory 成本是否持續上升，還是已經回落？",
+    "CapEx 是否仍在擴張；若明顯放緩，記憶體是否已重新回到典型消費電子週期？",
+    "HBM / DRAM 是否已出現供給過剩，價格與交期不再構成約束？"
+  ],
   "status": "researching",
-  "updated": "2026-08-06"
+  "updated": "2026-08-23"
 }

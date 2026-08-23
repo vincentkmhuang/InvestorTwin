@@ -3,7 +3,9 @@
   "title": "CPO",
   "summary": "",
   "investmentThesis": "追蹤光通訊供應鏈相關標的與供應鏈動態。",
-  "questions": [],
+  "questions": [
+    "CPO 台廠是否已出現對應訂單或營收指引，而不只是題材點名？"
+  ],
   "status": "researching",
-  "updated": "2026-08-06"
+  "updated": "2026-08-23"
 }
