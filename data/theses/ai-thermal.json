@@ -1,0 +1,24 @@
+{
+  "thesisId": "ai-thermal",
+  "type": "industry",
+  "title": "AI × Thermal / 奇鋐、雙鴻",
+  "subject": "AI server thermal",
+  "thesis": "AI 伺服器功耗上升會把散熱做成中期硬需求；在台灣，奇鋐與雙鴻是這個產業假設下最直接的受惠公司，而不是一般電子週期股。",
+  "rationale": "加速器功耗與機櫃功率密度上升後，風冷邊際很快被打穿，液冷、均熱板與高功耗散熱模組會從選配變成伺服器能否出貨的條件。這個需求跟 AI 機櫃部署綁在一起，而不是跟消費電子換機潮綁在一起。奇鋐與雙鴻已經在高功耗／AI 伺服器散熱供應鏈裡，所以它們是這個產業假設的台廠表達，而不是兩張分開的公司基本面故事。",
+  "supportingEvidence": [],
+  "contradictingEvidence": [],
+  "keyIndicators": [
+    "AI 伺服器功耗與液冷／均熱板需求是否擴散",
+    "散熱是否成為伺服器出貨瓶頸，而不只是題材",
+    "奇鋐、雙鴻營收是否跟 AI 伺服器出貨而非消費電子"
+  ],
+  "invalidationConditions": [
+    "AI 伺服器散熱方案改走其他供應鏈，奇鋐／雙鴻未進入主力名單",
+    "散熱需求被證明只是短題材，沒有對應的出貨與毛利"
+  ],
+  "status": "under_review",
+  "confidence": "low",
+  "linkedResearch": [],
+  "linkedDecision": null,
+  "updatedAt": "2026-08-23"
+}

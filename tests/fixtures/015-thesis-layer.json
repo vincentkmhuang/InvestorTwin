@@ -1,0 +1,124 @@
+{
+  "sprint": "015",
+  "layer": "thesis",
+  "note": "Four real theses. Evidence and Research are references only.",
+  "theses": [
+    {
+      "thesisId": "ai-dram",
+      "type": "industry",
+      "title": "AI × DRAM",
+      "subject": "AI server memory / DRAM / HBM",
+      "thesis": "AI 伺服器需求把 DRAM／HBM 從典型消費電子週期，轉成與 Data Center 資本支出綁定的供給約束。記憶體緊俏若持續，會先反映在供應鏈與 SOX，而不是短線股價情緒。",
+      "rationale": "既有 HBM Research Card 把追蹤對象放在 SK hynix 與 Micron；Brief 也將 Memory 成本與 NVIDIA 伺服器報價連在一起。Thesis Layer 只記錄這個產業假設，不把 Brief 數字或 Evidence 數值複製進來。",
+      "supportingEvidence": [
+        { "instrument": "SOX" }
+      ],
+      "contradictingEvidence": [
+        { "instrument": "Nasdaq" }
+      ],
+      "keyIndicators": [
+        "HBM / DRAM 供給是否仍緊",
+        "AI 伺服器與 Memory 成本是否持續上升",
+        "SOX 是否重新取得相對大盤的領導權"
+      ],
+      "invalidationConditions": [
+        "AI Data Center 資本支出明顯放緩，記憶體重新回到典型消費電子週期",
+        "HBM／DRAM 供給過剩，價格與交期不再構成約束"
+      ],
+      "status": "active",
+      "confidence": "medium",
+      "linkedResearch": [
+        { "researchId": "hbm" }
+      ],
+      "linkedDecision": null,
+      "updatedAt": "2026-08-23"
+    },
+    {
+      "thesisId": "ai-thermal",
+      "type": "company",
+      "title": "AI × Thermal / 奇鋐、雙鴻",
+      "subject": "3017 奇鋐 / 3324 雙鴻",
+      "thesis": "AI 伺服器功耗上升會把散熱做成中期硬需求；奇鋐與雙鴻是這個假設下最直接的台廠暴露，而不是一般電子週期股。",
+      "rationale": "目前沒有獨立 Thermal Research Card，也沒有散熱專屬 Evidence instrument。這個 Thesis 先獨立記錄公司假設，Evidence 只連到現有半導體代理指標，等待後續研究補齊。",
+      "supportingEvidence": [
+        { "instrument": "SOX" }
+      ],
+      "contradictingEvidence": [
+        { "instrument": "SPX" }
+      ],
+      "keyIndicators": [
+        "AI 伺服器功耗與液冷／均熱板需求是否擴散",
+        "奇鋐、雙鴻營收是否跟 AI 伺服器出貨而非消費電子",
+        "SOX 與相關供應鏈是否同步轉弱"
+      ],
+      "invalidationConditions": [
+        "AI 伺服器散熱方案改走其他供應鏈，奇鋐／雙鴻未進入主力名單",
+        "散熱需求被證明只是短題材，沒有對應的出貨與毛利"
+      ],
+      "status": "under_review",
+      "confidence": "low",
+      "linkedResearch": [],
+      "linkedDecision": null,
+      "updatedAt": "2026-08-23"
+    },
+    {
+      "thesisId": "00687b",
+      "type": "position",
+      "title": "00687B Position Thesis",
+      "subject": "00687B 國泰20年美債",
+      "thesis": "長天期美債利率仍是高估值資產的核心約束；00687B 用來表達／管理這個 duration 假設，而不是一個股票基本面部位。",
+      "rationale": "Evidence Layer 已能獨立取得 US10Y／US30Y。這個 Position Thesis 只連到那兩個 instrument，不複製殖利率數值，也不需要先有 Research Card 或 Decision。",
+      "supportingEvidence": [
+        { "instrument": "US10Y" },
+        { "instrument": "US30Y" }
+      ],
+      "contradictingEvidence": [],
+      "keyIndicators": [
+        "US 10Y 是否仍停留在對高估值不友善的區間",
+        "US 30Y 是否維持高位",
+        "長債 ETF 價格是否只反映利率，而不是被當成信用交易"
+      ],
+      "invalidationConditions": [
+        "US 10Y 與 US 30Y 持續回落，長天期利率不再構成估值約束",
+        "00687B 的部位目的改成短線交易，而不再表達 duration 假設"
+      ],
+      "status": "active",
+      "confidence": "high",
+      "linkedResearch": [],
+      "linkedDecision": null,
+      "updatedAt": "2026-08-23"
+    },
+    {
+      "thesisId": "cpo-glass-bridge",
+      "type": "industry",
+      "title": "CPO / Glass Bridge",
+      "subject": "CPO / Glass Bridge / FAU",
+      "thesis": "若康寧 Glass Bridge 量產驗證成立，AI 光通訊需求會帶到 CPO／FAU 供應鏈；上詮是這個假設下已有 Research Card 與 Case 的台廠暴露。",
+      "rationale": "glass-bridge、cpo、fau 三張 Research Card 與 Case 3363-glass-bridge 已經存在。Thesis Layer 只存 reference，不複製 Card 結論或 Case Decision／Playbook。",
+      "supportingEvidence": [
+        { "instrument": "SOX" }
+      ],
+      "contradictingEvidence": [
+        { "instrument": "DJI" }
+      ],
+      "keyIndicators": [
+        "Glass Bridge 量產驗證是否成立",
+        "CPO／FAU 台廠是否出現對應訂單或指引",
+        "SOX 是否顯示半導體／光通訊重新取得領導權"
+      ],
+      "invalidationConditions": [
+        "Glass Bridge 量產時程明確延後或取消",
+        "上詮未被列入相關供應鏈，或 FAU 營收指引沒有對應變化"
+      ],
+      "status": "challenged",
+      "confidence": "medium",
+      "linkedResearch": [
+        { "researchId": "glass-bridge" },
+        { "researchId": "cpo" },
+        { "researchId": "fau" }
+      ],
+      "linkedDecision": "3363-glass-bridge",
+      "updatedAt": "2026-08-23"
+    }
+  ]
+}

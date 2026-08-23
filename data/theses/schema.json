@@ -1,0 +1,61 @@
+{
+  "schemaVersion": "015-a",
+  "layer": "thesis",
+  "writesBrief": false,
+  "writesEvidence": false,
+  "writesQueue": false,
+  "writesCases": false,
+  "writesDecision": false,
+  "writesPlaybook": false,
+  "directories": {
+    "thesis": "data/theses/{thesisId}.json"
+  },
+  "types": ["industry", "company", "position"],
+  "statuses": ["active", "under_review", "challenged", "confirmed", "invalidated"],
+  "confidence": ["low", "medium", "high", "very_high"],
+  "confidencePolicy": "Confidence measures evidence quality, quantity, independence, and degree of verification. It is not subjective belief strength.",
+  "required": [
+    "thesisId",
+    "type",
+    "title",
+    "subject",
+    "thesis",
+    "rationale",
+    "supportingEvidence",
+    "contradictingEvidence",
+    "keyIndicators",
+    "invalidationConditions",
+    "status",
+    "confidence",
+    "linkedResearch",
+    "linkedDecision",
+    "updatedAt"
+  ],
+  "evidenceRefRequired": ["instrument"],
+  "evidenceRefForbidden": [
+    "value",
+    "asOf",
+    "source",
+    "sourceId",
+    "changeDoD",
+    "changeWoW",
+    "priorValue",
+    "unit",
+    "status",
+    "capturedAt",
+    "expectedAsOf"
+  ],
+  "researchRefRequired": ["researchId"],
+  "researchRefForbidden": [
+    "title",
+    "summary",
+    "investmentThesis",
+    "questions",
+    "researchConclusion",
+    "notes",
+    "tags"
+  ],
+  "linkedDecisionPolicy": "linkedDecision is a Decision/Case id string or null. Do not embed Decision, decisionHistory, or Playbook fields.",
+  "evidencePolicy": "supportingEvidence and contradictingEvidence store Evidence references only. Evidence values remain in data/evidence/.",
+  "researchPolicy": "linkedResearch stores Research Card references only. Card content remains in research/{id}/card.json."
+}

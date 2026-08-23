@@ -1,0 +1,27 @@
+{
+  "thesisId": "00687b",
+  "type": "position",
+  "title": "00687B Position Thesis",
+  "subject": "00687B 國泰20年美債",
+  "thesis": "長天期美債利率仍是高估值資產的核心約束；00687B 用來表達／管理這個 duration 假設，而不是一個股票基本面部位。",
+  "rationale": "當 10 年與 30 年美債殖利率維持高位時，AI 與成長股即使基本面還在，也必須接受折現率上升後的估值壓縮。00687B 追蹤長天期美債，能直接表達「長端利率是否仍構成約束」這個部位假設：利率若維持高位，它反映 duration 壓力；利率若明顯回落，它會先於股票告訴我這個約束是否正在解除。它不是要選一家公司、也不是看盈餘品質，而是投資組合裡用來盯住長端利率風險的部位。",
+  "supportingEvidence": [
+    { "instrument": "US10Y" },
+    { "instrument": "US30Y" }
+  ],
+  "contradictingEvidence": [],
+  "keyIndicators": [
+    "US 10Y 是否仍停留在對高估值不友善的區間",
+    "US 30Y 是否維持高位",
+    "長債 ETF 價格是否只反映利率，而不是被當成信用交易"
+  ],
+  "invalidationConditions": [
+    "US 10Y 與 US 30Y 持續回落，長天期利率不再構成估值約束",
+    "00687B 的部位目的改成短線交易，而不再表達 duration 假設"
+  ],
+  "status": "active",
+  "confidence": "high",
+  "linkedResearch": [],
+  "linkedDecision": null,
+  "updatedAt": "2026-08-23"
+}

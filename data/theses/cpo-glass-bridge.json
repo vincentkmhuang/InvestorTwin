@@ -1,0 +1,28 @@
+{
+  "thesisId": "cpo-glass-bridge",
+  "type": "industry",
+  "title": "CPO / Glass Bridge",
+  "subject": "CPO / Glass Bridge / FAU",
+  "thesis": "若康寧 Glass Bridge 量產驗證成立，AI 光通訊需求會帶到 CPO／FAU 供應鏈；上詮是這個假設下最直接的台廠暴露。",
+  "rationale": "AI 叢集把光通訊從 nicety 變成機櫃之間的頻寬瓶頸，CPO 與更高密度的光引擎會拉高 FAU 與相關被動元件用量。Glass Bridge 若真的從技術驗證走到量產驗證，代表這條路徑開始有可製造性，而不只是展會題材；上詮已經站在 FAU／光通訊供應鏈上，所以會比一般電子組裝更直接暴露在這個放量。目前量產時程與訂單仍未確認，所以這是「驗證若成立才成立」的產業假設，還不是已經被價格或出貨證明的結論。",
+  "supportingEvidence": [],
+  "contradictingEvidence": [],
+  "keyIndicators": [
+    "Glass Bridge 量產驗證是否成立",
+    "CPO／FAU 台廠是否出現對應訂單或指引",
+    "上詮是否進入相關客戶驗證或可出貨名單"
+  ],
+  "invalidationConditions": [
+    "Glass Bridge 量產時程明確延後或取消",
+    "上詮未被列入相關供應鏈，或 FAU 營收指引沒有對應變化"
+  ],
+  "status": "under_review",
+  "confidence": "medium",
+  "linkedResearch": [
+    { "researchId": "glass-bridge" },
+    { "researchId": "cpo" },
+    { "researchId": "fau" }
+  ],
+  "linkedDecision": "3363-glass-bridge",
+  "updatedAt": "2026-08-23"
+}
