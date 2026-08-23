@@ -1,1 +1,20 @@
-[]
+{
+  "notes": [
+    {
+      "date": "2026-08-23",
+      "text": "Q1 supply: SK hynix official 2Q26 release (asOf 2026-07-29) states customer demand exceeds supply capabilities, additional supply requests continue to mount, and it has finalized LTAs with around 10 customers. Micron SEC 8-K (asOf 2026-06-24) says it is investing at record levels to address rapidly growing demand and that HBM4 is in high-volume shipments. No sourced numeric lead-time (weeks) was found. Brief Reuters NVIDIA server-price item was not used."
+    },
+    {
+      "date": "2026-08-23",
+      "text": "Q2 cost/ASP: SK hynix official 2Q26 release states both DRAM and NAND flash memory prices experienced significant quarter-over-quarter increases. Morning Brief Reuters line (possible NVIDIA server price hike, pending official confirmation) is a lead only and is not used as the Q2 conclusion. NVIDIA FY2027 Q2 print dated 2026-08-26 has not occurred as of this note."
+    },
+    {
+      "date": "2026-08-23",
+      "text": "Q3 CapEx: Alphabet official Q2 2026 call (2026-07-22) raised full-year 2026 CapEx guidance to $195-205B from $180-190B, citing acceleration in capacity delivery to meet growing demand. Amazon official Q2 2026 release (2026-07-30) reports TTM purchases of property and equipment up $66.1B YoY, primarily AI investments. SK hynix official text says major tech companies are increasing AI infrastructure investments. No sourced finding that memory has returned to a typical consumer-electronics cycle; SK hynix instead says demand for AI memory and conventional memory is expanding in tandem."
+    },
+    {
+      "date": "2026-08-23",
+      "text": "Q4 oversupply: No official source located that states HBM/DRAM oversupply has already arrived, or that price and lead-time have stopped being constraints. SK hynix official 2Q26 language (demand exceeds supply) is the opposite of oversupply. Q4 remains uncertain under the rule that oversupply requires explicit oversupply + price/lead-time-easing evidence."
+    }
+  ]
+}

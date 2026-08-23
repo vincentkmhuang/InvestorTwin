@@ -10,5 +10,10 @@
     "HBM / DRAM 是否已出現供給過剩，價格與交期不再構成約束？"
   ],
   "status": "researching",
-  "updated": "2026-08-23"
+  "updated": "2026-08-23",
+  "researchConclusion": {
+    "conclusion": "Q1 supply tight；lead-time uncertain：SK hynix 2Q26 官方稿（2026-07-29）寫 customer demand exceeds supply capabilities；未找到以週計的交期數字，因此不把交期判為 tight。Q2 up：同一官方稿寫 DRAM 與 NAND 價格較上季明顯上升；未採用 Brief 的 Reuters「可能漲價」句，也未使用尚未公布的 NVIDIA 2026-08-26 財報。Q3 expanding：Alphabet 2026-07-22 官方 call 上修 2026 CapEx 至 $195-205B；Amazon 2026-07-30 官方稿 TTM 設備投資年增 $66.1B、主因為 AI。Q3 consumer-cycle uncertain：未找到「已回到消費電子週期」的來源。Q4 uncertain：沒有官方來源聲明已經 oversupply，或價格／交期已不再構成約束。",
+    "status": "uncertain",
+    "asOf": "2026-08-23"
+  }
 }

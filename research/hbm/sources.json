@@ -1,1 +1,20 @@
-[]
+{
+  "sources": [
+    {
+      "title": "SK hynix Announces 2Q26 Financial Results (official newsroom, 2026-07-29)",
+      "url": "https://news.skhynix.com/en/q2-2026-business-results/"
+    },
+    {
+      "title": "Micron Technology, Inc. Reports Record Results for the Third Quarter of Fiscal 2026 (SEC Exhibit 99.1, 2026-06-24)",
+      "url": "https://www.sec.gov/Archives/edgar/data/723125/000072312526000013/a2026q3ex991-pressrelease.htm"
+    },
+    {
+      "title": "Alphabet 2026 Q2 Earnings Call (official IR, 2026-07-22)",
+      "url": "https://abc.xyz/investor/events/event-details/2026/2026-Q2-Earnings-Call-2026-GgTAq7Is0z/default.aspx"
+    },
+    {
+      "title": "Amazon.com Announces Second Quarter Results (official IR, 2026-07-30)",
+      "url": "https://ir.aboutamazon.com/news-release/news-release-details/2026/Amazon-com-Announces-Second-Quarter-Results/"
+    }
+  ]
+}
