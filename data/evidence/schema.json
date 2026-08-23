@@ -1,0 +1,90 @@
+{
+  "schemaVersion": "013-a",
+  "layer": "evidence",
+  "canonicalBrief": "data/morning-brief.json",
+  "writesBrief": false,
+  "directories": {
+    "raw": "data/evidence/runs/{runId}/raw/{sourceId}.json",
+    "normalized": "data/evidence/runs/{runId}/normalized/{instrument}.json",
+    "history": "data/evidence/history/{instrument}/{asOf}.json"
+  },
+  "rawRequired": [
+    "sourceId",
+    "capturedAt",
+    "source",
+    "status"
+  ],
+  "rawOptional": [
+    "payload",
+    "fileRef",
+    "error"
+  ],
+  "normalizedRequired": [
+    "instrument",
+    "sourceId",
+    "status"
+  ],
+  "normalizedWhenValued": [
+    "value",
+    "unit",
+    "asOf",
+    "asOfKind",
+    "priorValue",
+    "changeDoD",
+    "changeWoW"
+  ],
+  "statuses": ["fresh", "stale", "missing", "unavailable"],
+  "asOfPolicy": "asOf comes from the source observation only. capturedAt is fetch time. expectedAsOf is used only to classify fresh/stale/missing. Never overwrite asOf with the system clock.",
+  "changePolicy": "changeDoD and changeWoW are computed from prior source asOf values in payload or history. If history is insufficient, the change is null and change status is unavailable.",
+  "firstBatchSources": [
+    {
+      "sourceId": "fred-dgs10",
+      "source": "fred",
+      "instrument": "US10Y",
+      "unit": "percent"
+    },
+    {
+      "sourceId": "fred-dgs30",
+      "source": "fred",
+      "instrument": "US30Y",
+      "unit": "percent"
+    },
+    {
+      "sourceId": "us-index-nasdaq",
+      "source": "us-index",
+      "instrument": "Nasdaq",
+      "unit": "index"
+    },
+    {
+      "sourceId": "us-index-spx",
+      "source": "us-index",
+      "instrument": "SPX",
+      "unit": "index"
+    },
+    {
+      "sourceId": "us-index-dji",
+      "source": "us-index",
+      "instrument": "DJI",
+      "unit": "index"
+    },
+    {
+      "sourceId": "us-index-sox",
+      "source": "us-index",
+      "instrument": "SOX",
+      "unit": "index"
+    },
+    {
+      "sourceId": "twse-taiex",
+      "source": "twse",
+      "instrument": "TAIEX",
+      "unit": "index"
+    },
+    {
+      "sourceId": "twse-institutional",
+      "source": "twse",
+      "instrument": "TW_FOREIGN_NET",
+      "unit": "TWD_hundred_million",
+      "alsoProduces": ["TW_TRUST_NET", "TW_DEALER_NET"]
+    }
+  ]
+}

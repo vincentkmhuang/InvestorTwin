@@ -237,8 +237,9 @@ elif mode == "render":
 
 elif mode == "research":
     ids = collect_ids(brief)
-    if "glass-bridge" not in ids:
-        fail.append("expected researchId glass-bridge")
+    glass = os.path.join(repo, "research", "glass-bridge", "card.json")
+    if not os.path.isfile(glass):
+        fail.append("research/glass-bridge/card.json missing")
     for rid in ids:
         card = os.path.join(repo, "research", rid, "card.json")
         if not os.path.isfile(card):

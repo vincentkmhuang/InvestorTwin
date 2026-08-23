@@ -1,0 +1,112 @@
+{
+  "sprint": "013",
+  "layer": "evidence",
+  "capturedAt": "2026-08-23T01:00:00Z",
+  "expectedAsOf": "2026-08-21",
+  "note": "Fixture observations only. Not a live market feed. Sunday capture of Friday close.",
+  "raw": [
+    {
+      "sourceId": "fred-dgs10",
+      "status": "ok",
+      "payload": {
+        "observations": [
+          { "date": "2026-08-14", "value": 4.60 },
+          { "date": "2026-08-20", "value": 4.70 },
+          { "date": "2026-08-21", "value": 4.73 }
+        ]
+      }
+    },
+    {
+      "sourceId": "fred-dgs30",
+      "status": "ok",
+      "payload": {
+        "observations": [
+          { "date": "2026-08-14", "value": 5.10 },
+          { "date": "2026-08-20", "value": 5.20 },
+          { "date": "2026-08-21", "value": 5.27 }
+        ]
+      }
+    },
+    {
+      "sourceId": "us-index-nasdaq",
+      "status": "ok",
+      "payload": {
+        "observations": [
+          { "date": "2026-08-14", "value": 26800.00 },
+          { "date": "2026-08-20", "value": 26000.00 },
+          { "date": "2026-08-21", "value": 26180.46 }
+        ]
+      }
+    },
+    {
+      "sourceId": "us-index-spx",
+      "status": "ok",
+      "payload": {
+        "observations": [
+          { "date": "2026-08-14", "value": 7700.00 },
+          { "date": "2026-08-20", "value": 7640.00 },
+          { "date": "2026-08-21", "value": 7674.37 }
+        ]
+      }
+    },
+    {
+      "sourceId": "us-index-dji",
+      "status": "ok",
+      "payload": {
+        "observations": [
+          { "date": "2026-08-14", "value": 52800.00 },
+          { "date": "2026-08-20", "value": 53000.00 },
+          { "date": "2026-08-21", "value": 53277.01 }
+        ]
+      }
+    },
+    {
+      "sourceId": "us-index-sox",
+      "status": "ok",
+      "payload": {
+        "observations": [
+          { "date": "2026-08-14", "value": 12100.00 },
+          { "date": "2026-08-20", "value": 11800.00 },
+          { "date": "2026-08-21", "value": 11740.4 }
+        ]
+      }
+    },
+    {
+      "sourceId": "twse-taiex",
+      "status": "ok",
+      "payload": {
+        "observations": [
+          { "date": "2026-08-14", "value": 44800.00 },
+          { "date": "2026-08-20", "value": 44933.74 },
+          { "date": "2026-08-21", "value": 45224.29 }
+        ]
+      }
+    },
+    {
+      "sourceId": "twse-institutional",
+      "status": "ok",
+      "payload": {
+        "observations": [
+          {
+            "date": "2026-08-14",
+            "foreign": 120.0,
+            "trust": 10.0,
+            "dealer": -5.0
+          },
+          {
+            "date": "2026-08-20",
+            "foreign": 200.0,
+            "trust": 15.0,
+            "dealer": 2.0
+          },
+          {
+            "date": "2026-08-21",
+            "foreign": 283.0,
+            "trust": 30.0,
+            "dealer": 18.0
+          }
+        ]
+      }
+    }
+  ]
+}
