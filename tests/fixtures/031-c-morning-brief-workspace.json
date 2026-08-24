@@ -1,0 +1,23 @@
+{
+  "briefResearchId": "hbm",
+  "queueSchemaKeys": ["id", "addedFrom"],
+  "addedFromBrief": "Morning Brief",
+  "addedFromRadar": "Opportunity Radar",
+  "homepageIds": [
+    "today",
+    "morningBriefDate",
+    "morningExecutiveSummary",
+    "morningTopThings",
+    "morningMarketTemperature",
+    "morningGlobalMarket",
+    "morningGlobalNews",
+    "morningTaiwanMarket",
+    "morningTaiwanNews",
+    "morningAiHighlights",
+    "morningUpcomingEvents",
+    "morningTodaysThreeThings",
+    "morningRadarSection",
+    "morningOpportunityRadar",
+    "todayQueue"
+  ]
+}

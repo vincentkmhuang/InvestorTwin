@@ -225,6 +225,7 @@ const DataEngine = {
         el.classList.add('morning-brief-static');
         return;
       }
+      el.classList.add('morning-brief-linked');
       el.dataset.researchId = researchId;
       el.onclick = () => handler(researchId);
     };
@@ -323,10 +324,43 @@ const DataEngine = {
       if (!listEl) return;
       listEl.innerHTML = '';
       (items || []).forEach(item => {
-        const text = (typeof item === 'string' ? item : item?.text || '').trim();
-        if (!text) return;
+        if (item == null) return;
+        if (typeof item === 'string') {
+          const text = item.trim();
+          if (!text) return;
+          const li = document.createElement('li');
+          li.className = 'morning-brief-static';
+          li.textContent = text;
+          listEl.appendChild(li);
+          return;
+        }
+        const title = String(item.title || item.text || '').trim();
+        if (!title) return;
         const li = document.createElement('li');
-        li.textContent = text;
+        const titleEl = document.createElement('div');
+        titleEl.className = 'morning-brief-title';
+        titleEl.textContent = title;
+        li.appendChild(titleEl);
+        const why = String(item.whyItMatters || '').trim();
+        if (why) {
+          const whyEl = document.createElement('div');
+          whyEl.className = 'morning-brief-summary';
+          whyEl.textContent = why;
+          li.appendChild(whyEl);
+        }
+        const source = String(item.source || '').trim();
+        const evidenceIds = Array.isArray(item.evidence)
+          ? item.evidence.map(value => String(value || '').trim()).filter(Boolean)
+          : [];
+        const meta = [];
+        if (source) meta.push(source);
+        if (evidenceIds.length) meta.push(evidenceIds.join(', '));
+        if (meta.length) {
+          const metaEl = document.createElement('div');
+          metaEl.className = 'morning-brief-evidence';
+          metaEl.textContent = meta.join(' · ');
+          li.appendChild(metaEl);
+        }
         bindResearchClick(li, this.researchLinkId(item));
         listEl.appendChild(li);
       });
