@@ -1,0 +1,15 @@
+{
+  "briefResearchId": "hbm",
+  "homepageIds": [
+    "today",
+    "morningBriefDate",
+    "morningExecutiveSummary",
+    "morningMarketTemperature",
+    "morningGlobalNews",
+    "morningTaiwanNews",
+    "morningAiHighlights",
+    "morningUpcomingEvents",
+    "morningTodaysThreeThings",
+    "morningOpportunityRadar"
+  ]
+}
