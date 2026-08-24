@@ -1,5 +1,6 @@
 {
   "id": "cpo",
+  "thesisId": "cpo-glass-bridge",
   "title": "CPO",
   "summary": "",
   "investmentThesis": "追蹤光通訊供應鏈相關標的與供應鏈動態。",
@@ -7,5 +8,10 @@
     "CPO 台廠是否已出現對應訂單或營收指引，而不只是題材點名？"
   ],
   "status": "researching",
-  "updated": "2026-08-23"
+  "updated": "2026-08-23",
+  "researchConclusion": {
+    "conclusion": "Q1 uncertain：TSMC 2026-04-23 官方稿寫 COUPE on substrate beginning production in 2026；2026-07-16 法說 C.C. Wei 說 We started the production right now，但被問 material top-line 時沒有給美元／營收指引。NVIDIA 2026-05-31 官方稿 Spectrum-X Ethernet Photonics now in production，是客戶端 CPO 產品，不是台廠訂單簿。Himax 2Q26 官方稿（with FOCI）寫 Q3 已開始 engineering production ramps，但 H2 重點仍是 mass production readiness 與 customer qualification，official mass-production timing remains subject to customer deployment schedules，且沒有 2026 CPO 營收數字。上詮 115H1 合併財報沒有 CPO 分項或訂單金額。相關量產／工程爬坡 ≠ 台廠已揭露對應訂單或營收指引。",
+    "status": "uncertain",
+    "asOf": "2026-08-23"
+  }
 }

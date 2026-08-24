@@ -1,7 +1,8 @@
 {
   "id": "glass-bridge",
+  "thesisId": "cpo-glass-bridge",
   "title": "Glass Bridge",
-  "summary": "Glass Bridge 已開始進入量產驗證，觀察是否形成投資機會。",
+  "summary": "追蹤康寧 GlassBridge 是否已由產品平台／展會展示走到量產驗證，而不是把展示當成已量產。",
   "investmentThesis": "康寧 Glass Bridge 技術若順利量產，將帶動光通訊供應鏈（正崴、上詮）需求。",
   "questions": [
     "Glass Bridge 量產驗證是否已成立，還是仍停在技術驗證或進行中？",
@@ -14,8 +15,8 @@
   "status": "研究中",
   "updated": "2026-08-23",
   "researchConclusion": {
-    "conclusion": "Glass Bridge 已由技術驗證逐步進入量產驗證階段；若後續量產驗證成立，AI 光通訊需求可能帶動 FAU 用量增加，上詮有機會受惠於供應鏈需求擴張。",
+    "conclusion": "Q1 uncertain：康寧官方產品頁把 GlassBridge 寫成 wafer-based fiber-to-PIC 平台與 manufacturable path，並定位為傳統 FAU 的 complement；OFC 2026 官方稿是 showcasing / demonstrations / highlights，不是量產驗證成立。Q2 2026 官方財報（2026-07-28）Optical Communications 銷售成長，但未聲明 Glass Bridge 量產驗證完成。NVIDIA／康寧 2026-05-06 官方合作是美國光纖與 connectivity 產能，不是 Glass Bridge 驗證。舊結論「已進入量產驗證」「若後續可能……」超出 source，已刪。Q2 uncertain：官方未點名正崴或上詮為 Glass Bridge 受惠台廠。Q3 uncertain：沒有官方來源聲明量產時程已明確延後或取消；也沒有可被延後的官方量產時程。",
     "status": "uncertain",
-    "asOf": "2026-08-15"
+    "asOf": "2026-08-23"
   }
 }

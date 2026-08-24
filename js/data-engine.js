@@ -55,6 +55,11 @@ const DataEngine = {
     );
   },
 
+  findCasesByThesisId(thesisId) {
+    if (!thesisId) return [];
+    return this.getCases().filter(item => item && item.thesisId === thesisId);
+  },
+
   upsertCase(caseObj) {
     if (!this.investmentCases) this.investmentCases = this.emptyCaseStore();
     if (!Array.isArray(this.investmentCases.cases)) this.investmentCases.cases = [];

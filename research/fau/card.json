@@ -1,5 +1,6 @@
 {
   "id": "fau",
+  "thesisId": "cpo-glass-bridge",
   "title": "FAU",
   "summary": "",
   "investmentThesis": "追蹤上詮相關標的與供應鏈動態。",
@@ -9,5 +10,10 @@
     "上詮是否仍未被列入相關供應鏈，或 FAU 營收指引沒有對應變化？"
   ],
   "status": "researching",
-  "updated": "2026-08-23"
+  "updated": "2026-08-23",
+  "researchConclusion": {
+    "conclusion": "Q1 uncertain：上詮 115H1 官方財報與 7 月合併營收沒有 FAU 分項或 FAU 營收指引；Himax 官方 CPO 更新是與 FOCI 的工程爬坡／出貨展望，不是上詮自己揭露的 FAU 訂單金額。Q2 uncertain：Himax 2026-01-05 官方稿寫 first-generation solution is currently being validated by key customers，未公布名單；2Q26 官方稿 H2 重點仍包括 key customer qualification milestones，同時寫 Gen 1／Gen 2 已開始 Q3 engineering production ramps，official mass-production timing remains subject to customer deployment schedules。這是進行中驗證與工程爬坡，不是已完成的客戶驗證名單或已確認可出貨產能。董事長媒體專訪的 Q3 交貨句未採用。Q3 uncertain：Himax 官方持續點名 FOCI 為 CPO strategic partner，因此不能把「上詮未被列入相關供應鏈」寫成已發生；但上詮本身沒有可對照的 FAU 營收指引，1H 營收下滑也不是 FAU 分項。InvalidationCondition 2 未完整滿足。",
+    "status": "uncertain",
+    "asOf": "2026-08-23"
+  }
 }

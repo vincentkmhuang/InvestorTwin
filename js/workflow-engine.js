@@ -237,6 +237,176 @@ const WorkflowEngine = {
     return bundle;
   },
 
+  async listTheses() {
+    try {
+      const res = await fetch('/api/theses');
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data.items) ? data.items : [];
+    } catch (_) {
+      return [];
+    }
+  },
+
+  async loadThesis(thesisId) {
+    const id = String(thesisId || '').trim();
+    if (!id) return null;
+    try {
+      const res = await fetch(`data/theses/${encodeURIComponent(id)}.json?t=${Date.now()}`);
+      if (!res.ok) return null;
+      const thesis = await res.json();
+      if (!thesis || thesis.thesisId !== id) return null;
+      return thesis;
+    } catch (_) {
+      return null;
+    }
+  },
+
+  integrityGateView(card, sources, thesis) {
+    const missing = [];
+    const conclusion = card?.researchConclusion?.conclusion;
+    if (!String(conclusion || '').trim()) missing.push('Research Conclusion');
+    if (!Array.isArray(sources) || sources.length === 0) missing.push('Sources');
+    const thesisId = String(card?.thesisId || '').trim();
+    if (!thesisId) missing.push('Thesis link');
+    else if (!thesis || thesis.thesisId !== thesisId) missing.push('Thesis file');
+    const ready = missing.length === 0;
+    return {
+      ready,
+      label: ready ? 'Ready for Thesis Review' : 'Not ready for Thesis Review',
+      missing
+    };
+  },
+
+  renderIntegrityGate(gate) {
+    const state = gate.ready ? 'ready' : 'blocked';
+    let html = `<p data-integrity-gate="${state}"><b>Integrity Gate</b></p>`;
+    html += `<p data-integrity-label>${this.escapeHtml(gate.label)}</p>`;
+    if (!gate.ready && gate.missing.length) {
+      html += `<p>Missing: ${this.escapeHtml(gate.missing.join(', '))}</p>`;
+    }
+    return html;
+  },
+
+  renderTraceChain(thesis, linkedCases) {
+    const thesisLine = thesis
+      ? `${thesis.title || thesis.thesisId} (${thesis.thesisId})`
+      : '尚未連結';
+    const caseLine = linkedCases.length
+      ? linkedCases.map(item => item.title || item.id).join('、')
+      : '尚未建立';
+    const decisionLine = linkedCases.some(item => this.isPersistedDecision(item.decision))
+      ? linkedCases
+        .filter(item => this.isPersistedDecision(item.decision))
+        .map(item => `${item.id}: ${item.decision.stance}`)
+        .join('、')
+      : '尚未建立（需在 Case 上手動建立）';
+    let html = '<p><b>Research → Thesis → Case → Decision</b></p>';
+    html += '<p data-trace="research-conclusion">[Research Conclusion]</p><p>↓</p>';
+    html += `<p data-trace="thesis">[Thesis] ${this.escapeHtml(thesisLine)}</p><p>↓</p>`;
+    html += `<p data-trace="case">[Investment Case] ${this.escapeHtml(caseLine)}</p><p>↓</p>`;
+    html += `<p data-trace="decision">[Decision / Position Playbook] ${this.escapeHtml(decisionLine)}</p>`;
+    return html;
+  },
+
+  renderEvidenceItems(items, emptyLabel) {
+    const list = Array.isArray(items) ? items : [];
+    if (!list.length) return `<p>${this.escapeHtml(emptyLabel || '--')}</p>`;
+    return `<ul>${list.map(item => `<li>${this.escapeHtml(item)}</li>`).join('')}</ul>`;
+  },
+
+  researchCardEvidenceLines(side, thesis, linkedCases, researchId) {
+    const lines = [];
+    const thesisKey = side === 'counter' ? 'contradictingEvidence' : 'supportingEvidence';
+    const caseKey = side === 'counter' ? 'counterEvidence' : 'supportingEvidence';
+    for (const ref of (Array.isArray(thesis?.[thesisKey]) ? thesis[thesisKey] : [])) {
+      if (ref?.instrument) lines.push(`Thesis ${ref.instrument}`);
+    }
+    for (const caseObj of linkedCases) {
+      const nested = Array.isArray(caseObj?.thesis?.[caseKey]) ? caseObj.thesis[caseKey] : [];
+      for (const item of nested) {
+        if (item?.researchId && item.researchId !== researchId) continue;
+        if (item?.text) lines.push(item.text);
+      }
+    }
+    return lines;
+  },
+
+  async linkResearchThesis(researchId, thesisId) {
+    const id = String(thesisId || '').trim();
+    if (!id) return { ok: false, message: 'Select a Thesis' };
+    const confirmed = window.confirm(
+      `確定連結 Thesis ${id}？\n按「確定」後才會寫入 Research Card。\n不會修改 Thesis.status、Decision 或 Position Playbook。`
+    );
+    if (!confirmed) return { ok: false, cancelled: true, message: '已取消，未寫入 Thesis' };
+    try {
+      const res = await fetch(`/api/research/${encodeURIComponent(researchId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ thesisId: id })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return { ok: false, message: data.message || 'Failed to link Thesis' };
+      delete this.researchCache[researchId];
+      return { ok: true, thesisId: data.thesisId || id };
+    } catch (_) {
+      return { ok: false, message: 'Failed to link Thesis' };
+    }
+  },
+
+  async createThesisFromResearch(researchId, thesisId, title, thesisText) {
+    const id = String(thesisId || '').trim();
+    const heading = String(title || '').trim();
+    const text = String(thesisText || '').trim();
+    if (!id || !heading || !text) {
+      return { ok: false, message: 'thesisId, title, and thesis are required' };
+    }
+    const confirmed = window.confirm(
+      `確定建立 Thesis ${id}？\n按「確定」後才會寫入 data/theses。\nstatus 會是 under_review，系統不會自動改成 confirmed。`
+    );
+    if (!confirmed) return { ok: false, cancelled: true, message: '已取消，未建立 Thesis' };
+    try {
+      const res = await fetch('/api/theses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          thesisId: id,
+          title: heading,
+          thesis: text,
+          researchId
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return { ok: false, message: data.message || 'Failed to create Thesis' };
+      delete this.researchCache[researchId];
+      return { ok: true, thesisId: data.thesisId || id, status: data.status };
+    } catch (_) {
+      return { ok: false, message: 'Failed to create Thesis' };
+    }
+  },
+
+  async persistCaseThesisId(caseId, thesisId) {
+    const id = String(thesisId || '').trim();
+    if (!id) return { ok: false, message: 'Select a Thesis' };
+    const confirmed = window.confirm(
+      `確定將 Case 連結到 Thesis ${id}？\n按「確定」後才會寫入 Investment Case。\n不會覆寫 Case working notes，也不會修改 Decision 或 Position Playbook。`
+    );
+    if (!confirmed) return { ok: false, cancelled: true, message: '已取消，未連結 Thesis' };
+    try {
+      const res = await fetch('/api/cases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: caseId, thesisId: id })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return { ok: false, message: data.message || 'Failed to link Thesis' };
+      await DataEngine.loadInvestmentCases();
+      return { ok: true, thesisId: data.thesisId || id };
+    } catch (_) {
+      return { ok: false, message: 'Failed to link Thesis' };
+    }
+  },
+
   nextStatus(current) {
     return this.states?.transitions?.[current] ?? null;
   },
@@ -252,6 +422,16 @@ const WorkflowEngine = {
     const tags = Array.isArray(card.tags) ? card.tags : [];
     const related = await KnowledgeEngine.getResolvedRelated(card.id);
     const linkedCases = DataEngine.findCasesByResearchId(card.id);
+    const thesisId = String(card.thesisId || '').trim();
+    const layerThesis = thesisId ? await this.loadThesis(thesisId) : null;
+    const theses = await this.listTheses();
+    const thesisCases = thesisId
+      ? DataEngine.findCasesByThesisId(thesisId)
+      : [];
+    const chainCases = thesisCases.length ? thesisCases : linkedCases;
+    const gate = this.integrityGateView(card, sources, layerThesis);
+    const supportingLines = this.researchCardEvidenceLines('supporting', layerThesis, linkedCases, card.id);
+    const counterLines = this.researchCardEvidenceLines('counter', layerThesis, linkedCases, card.id);
 
     let html = `<h3>${card.title}</h3>`;
     html += `<p><b>Summary</b></p><p>${card.summary || '--'}</p>`;
@@ -274,6 +454,29 @@ const WorkflowEngine = {
       html += `<p>${this.escapeHtml(researchConclusion.conclusion || '--')}</p>`;
       html += `<p>Status: ${this.escapeHtml(researchConclusion.status || '--')}</p>`;
       html += `<p>As of: ${this.escapeHtml(researchConclusion.asOf || '--')}</p>`;
+      html += '<p><b>Supporting Evidence</b></p>';
+      html += this.renderEvidenceItems(supportingLines);
+      html += '<p><b>Counter Evidence</b></p>';
+      html += this.renderEvidenceItems(counterLines);
+      html += '<p><b>Thesis</b></p>';
+      if (layerThesis) {
+        html += `<p data-thesis-id="${this.escapeHtml(layerThesis.thesisId)}">${this.escapeHtml(layerThesis.title || layerThesis.thesisId)}</p>`;
+        html += `<p>${this.escapeHtml(layerThesis.thesis || '--')}</p>`;
+        html += `<p>Status: ${this.escapeHtml(layerThesis.status || '--')}</p>`;
+        html += `<p>Source: data/theses/${this.escapeHtml(layerThesis.thesisId)}.json</p>`;
+      } else {
+        html += '<p data-thesis-id="">尚未連結 Thesis</p>';
+        html += '<p><button type="button" data-create-thesis>建立 Thesis</button> ';
+        html += '<button type="button" data-link-thesis>連結既有 Thesis</button></p>';
+        html += '<p><select data-existing-thesis style="max-width:24em">';
+        html += '<option value="">選擇既有 Thesis</option>';
+        html += theses.map(item =>
+          `<option value="${this.escapeHtml(item.thesisId)}">${this.escapeHtml(item.title || item.thesisId)}</option>`
+        ).join('');
+        html += '</select></p>';
+      }
+      html += this.renderTraceChain(layerThesis, chainCases);
+      html += this.renderIntegrityGate(gate);
       if (linkedCases.length) {
         html += '<p><b>加入 Investment Case 證據</b></p>';
         html += `<p>${linkedCases.map(item => this.escapeHtml(item.title || item.id)).join('、')}</p>`;
@@ -383,6 +586,67 @@ const WorkflowEngine = {
         if (typeof render === 'function') render();
         if (typeof openInvestmentCase === 'function') {
           await openInvestmentCase(result.id);
+        }
+      };
+    }
+
+    const createThesisBtn = container.querySelector('[data-create-thesis]');
+    if (createThesisBtn) {
+      createThesisBtn.onclick = async () => {
+        const defaultId = `${card.id}-thesis`;
+        const thesisIdInput = window.prompt('Thesis id', defaultId);
+        if (thesisIdInput == null) return;
+        const titleInput = window.prompt('Thesis title', card.title || card.id);
+        if (titleInput == null) return;
+        const defaultText = (card.researchConclusion?.conclusion || card.investmentThesis || '').trim();
+        const thesisInput = window.prompt('Thesis', defaultText);
+        if (thesisInput == null) return;
+        const result = await this.createThesisFromResearch(
+          card.id,
+          thesisIdInput,
+          titleInput,
+          thesisInput
+        );
+        if (result.cancelled) {
+          window.alert(result.message);
+          return;
+        }
+        if (!result.ok) {
+          window.alert(result.message || 'Failed to create Thesis');
+          return;
+        }
+        if (typeof openResearchCard === 'function') {
+          await openResearchCard(card.id, container, { fromNavigation: true });
+        } else {
+          const fresh = await this.loadResearch(card.id);
+          await this.renderResearch(fresh, container);
+        }
+      };
+    }
+
+    const linkThesisBtn = container.querySelector('[data-link-thesis]');
+    const thesisSelect = container.querySelector('[data-existing-thesis]');
+    if (linkThesisBtn) {
+      linkThesisBtn.onclick = async () => {
+        const selected = (thesisSelect?.value || '').trim();
+        if (!selected) {
+          window.alert('請先選擇既有 Thesis');
+          return;
+        }
+        const result = await this.linkResearchThesis(card.id, selected);
+        if (result.cancelled) {
+          window.alert(result.message);
+          return;
+        }
+        if (!result.ok) {
+          window.alert(result.message || 'Failed to link Thesis');
+          return;
+        }
+        if (typeof openResearchCard === 'function') {
+          await openResearchCard(card.id, container, { fromNavigation: true });
+        } else {
+          const fresh = await this.loadResearch(card.id);
+          await this.renderResearch(fresh, container);
         }
       };
     }
@@ -1848,11 +2112,42 @@ const WorkflowEngine = {
       );
     }
 
+    const layerThesis = caseObj.thesisId ? await this.loadThesis(caseObj.thesisId) : null;
+    const theses = layerThesis ? [] : await this.listTheses();
+    const chainCases = [caseObj];
+    let gateCard = { researchConclusion: null, thesisId: caseObj.thesisId || null };
+    let gateSources = [];
+    if (researchIds[0]) {
+      try {
+        const cardRes = await fetch(`research/${encodeURIComponent(researchIds[0])}/card.json`);
+        if (cardRes.ok) gateCard = await cardRes.json();
+        const srcRes = await fetch(`research/${encodeURIComponent(researchIds[0])}/sources.json`);
+        if (srcRes.ok) gateSources = this.parseJsonArray(await srcRes.json(), 'sources');
+      } catch (_) {}
+    }
+    const gate = this.integrityGateView(gateCard, gateSources, layerThesis);
+
     let html = `<h3>${this.escapeHtml(caseObj.title || caseObj.id)}</h3>`;
     html += `<p><b>Company</b></p><p>${this.escapeHtml(companyLine || '--')}</p>`;
     html += '<p><b>Research Cards</b></p>';
     html += researchItems.length ? `<ul>${researchItems.join('')}</ul>` : '<p>--</p>';
-    html += `<p><b>Investment Thesis</b></p><p>${this.escapeHtml(thesis.thesis || '--')}</p>`;
+    html += this.renderTraceChain(layerThesis, chainCases);
+    html += this.renderIntegrityGate(gate);
+    html += '<p><b>Investment Thesis</b></p>';
+    if (layerThesis) {
+      html += `<p data-case-thesis-id="${this.escapeHtml(layerThesis.thesisId)}">${this.escapeHtml(layerThesis.thesis || '--')}</p>`;
+      html += `<p>${this.escapeHtml(layerThesis.title || layerThesis.thesisId)} · Status: ${this.escapeHtml(layerThesis.status || '--')}</p>`;
+      html += `<p>Source: data/theses/${this.escapeHtml(layerThesis.thesisId)}.json</p>`;
+    } else {
+      html += '<p data-case-thesis-id="">尚未連結 Thesis</p>';
+      html += '<p><select data-case-existing-thesis style="max-width:24em">';
+      html += '<option value="">選擇既有 Thesis</option>';
+      html += theses.map(item =>
+        `<option value="${this.escapeHtml(item.thesisId)}">${this.escapeHtml(item.title || item.thesisId)}</option>`
+      ).join('');
+      html += '</select> <button type="button" data-case-link-thesis>連結 Thesis</button></p>';
+    }
+    html += `<p><b>Case working notes</b></p><p>${this.escapeHtml(thesis.thesis || '--')}</p>`;
     html += '<p><b>Growth Drivers</b></p>';
     html += this.renderStringList(thesis.growthDrivers);
     html += '<p><b>Competitive Advantage</b></p>';
@@ -1868,7 +2163,7 @@ const WorkflowEngine = {
     html += this.renderEvidenceList(thesis.toBeVerified);
     html += '<p><b>Kill Criteria</b></p>';
     html += this.renderStringList(thesis.killCriteria);
-    html += `<p><b>Thesis Status</b></p><p>${this.escapeHtml(thesis.status || '--')}</p>`;
+    html += `<p><b>Case working notes status</b></p><p>${this.escapeHtml(thesis.status || '--')}</p>`;
     html += this.renderValuationProfile(caseObj.valuationProfile);
     html += this.renderValuationInputs(caseObj.valuationProfile, valuation, caseObj.researchIds);
     html += '<p><b>Fair Value</b></p>';
@@ -1904,6 +2199,28 @@ const WorkflowEngine = {
         }
       };
     });
+
+    const linkCaseThesisBtn = container.querySelector('[data-case-link-thesis]');
+    const caseThesisSelect = container.querySelector('[data-case-existing-thesis]');
+    if (linkCaseThesisBtn) {
+      linkCaseThesisBtn.onclick = async () => {
+        const selected = (caseThesisSelect?.value || '').trim();
+        if (!selected) {
+          window.alert('請先選擇既有 Thesis');
+          return;
+        }
+        const result = await this.persistCaseThesisId(caseObj.id, selected);
+        if (result.cancelled) {
+          window.alert(result.message);
+          return;
+        }
+        if (!result.ok) {
+          window.alert(result.message || 'Failed to link Thesis');
+          return;
+        }
+        await this.renderInvestmentCase(DataEngine.getCase(caseObj.id), container);
+      };
+    }
 
     const typeSelect = container.querySelector('[data-case-company-type]');
     if (typeSelect) {

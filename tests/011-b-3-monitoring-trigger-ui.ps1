@@ -322,7 +322,7 @@ open(sys.argv[2], "w", encoding="utf-8").write(json.dumps({"ok": marker in src})
       $fail9.Add("trigger calls $forbidden")
     }
   }
-  if ($IndexSrc -notlike '*workflow-engine.js?v=011b3*') { $fail9.Add('index.html cache version was not updated') }
+  if ($IndexSrc -notlike '*workflow-engine.js?v=025a*') { $fail9.Add('index.html cache version was not updated') }
 
   Start-TempServer
   $casesHashBefore = (Get-FileHash -Path $script:TempCasesPath -Algorithm SHA256).Hash

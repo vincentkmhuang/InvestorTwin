@@ -732,6 +732,149 @@ function Resolve-CaseThesisId($rootPath, $caseObj) {
   return @{ ok = $true; value = $thesisId; message = $null }
 }
 
+function Get-ThesesDir($rootPath) {
+  return (Join-Path $rootPath 'data\theses')
+}
+
+function Get-ThesisFilePath($rootPath, $thesisId) {
+  return (Join-Path (Get-ThesesDir $rootPath) ($thesisId + '.json'))
+}
+
+function Test-ValidThesisId($thesisId) {
+  if ([string]::IsNullOrWhiteSpace($thesisId)) { return $false }
+  if ($thesisId -match '[\\/]' -or $thesisId -eq '.' -or $thesisId -eq '..') { return $false }
+  if ($thesisId -eq 'schema') { return $false }
+  return [bool]($thesisId -match '^[A-Za-z0-9][A-Za-z0-9_-]*$')
+}
+
+function Read-ThesisFile($rootPath, $thesisId) {
+  if (-not (Test-ValidThesisId $thesisId)) { return $null }
+  $path = Get-ThesisFilePath $rootPath $thesisId
+  if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $null }
+  return Read-Utf8Json $path
+}
+
+function ConvertTo-ThesisJson($thesisObj) {
+  $parts = @(
+    '"thesisId":' + (Get-JsonString $thesisObj.thesisId)
+    '"type":' + (Get-JsonString $thesisObj.type)
+    '"title":' + (Get-JsonString $thesisObj.title)
+    '"subject":' + (Get-JsonString $thesisObj.subject)
+    '"thesis":' + (Get-JsonString $thesisObj.thesis)
+    '"rationale":' + (Get-JsonString $thesisObj.rationale)
+    '"supportingEvidence":' + (ConvertTo-JsonArrayText @(Get-AsArray $thesisObj.supportingEvidence))
+    '"contradictingEvidence":' + (ConvertTo-JsonArrayText @(Get-AsArray $thesisObj.contradictingEvidence))
+    '"keyIndicators":' + (ConvertTo-JsonArrayText @(Get-AsArray $thesisObj.keyIndicators))
+    '"invalidationConditions":' + (ConvertTo-JsonArrayText @(Get-AsArray $thesisObj.invalidationConditions))
+    '"status":' + (Get-JsonString $thesisObj.status)
+    '"confidence":' + (Get-JsonString $thesisObj.confidence)
+    '"linkedResearch":' + (ConvertTo-JsonArrayText @(Get-AsArray $thesisObj.linkedResearch))
+    '"linkedDecision":' + (Get-JsonNullOrString $thesisObj.linkedDecision)
+    '"updatedAt":' + (Get-JsonString $thesisObj.updatedAt)
+  )
+  return '{' + ($parts -join ',') + '}'
+}
+
+function Write-ThesisFile($rootPath, $thesisObj) {
+  $thesisId = [string]$thesisObj.thesisId
+  $path = Get-ThesisFilePath $rootPath $thesisId
+  Write-Utf8Text $path (ConvertTo-ThesisJson $thesisObj)
+}
+
+function Get-ThesisList($rootPath) {
+  $dir = Get-ThesesDir $rootPath
+  $items = New-Object System.Collections.Generic.List[object]
+  if (-not (Test-Path -LiteralPath $dir)) { return @() }
+  $files = @(Get-ChildItem -LiteralPath $dir -Filter '*.json' | Where-Object { $_.BaseName -ne 'schema' })
+  foreach ($file in $files) {
+    try {
+      $obj = Read-Utf8Json $file.FullName
+      if ($null -eq $obj) { continue }
+      if (-not (Test-HasJsonProperty $obj 'thesisId') -and -not $file.BaseName) { continue }
+      $id = if ($obj.PSObject.Properties['thesisId'] -and $obj.thesisId) { [string]$obj.thesisId } else { $file.BaseName }
+      $linked = @()
+      foreach ($ref in @(Get-AsArray $obj.linkedResearch)) {
+        if ($ref -and $ref.researchId) {
+          $linked += [PSCustomObject]@{ researchId = [string]$ref.researchId }
+        }
+      }
+      [void]$items.Add([PSCustomObject]@{
+        thesisId = $id
+        title = [string]$obj.title
+        thesis = [string]$obj.thesis
+        status = [string]$obj.status
+        linkedResearch = $linked
+        linkedDecision = $(if ($null -eq $obj.linkedDecision -or $obj.linkedDecision -eq '') { $null } else { [string]$obj.linkedDecision })
+      })
+    } catch {
+      continue
+    }
+  }
+  return @($items.ToArray())
+}
+
+function Get-CardThesisId($cardObj) {
+  if (-not (Test-HasJsonProperty $cardObj 'thesisId')) { return $null }
+  $raw = $cardObj.thesisId
+  if ($null -eq $raw -or $raw -eq '') { return $null }
+  $text = ([string]$raw).Trim()
+  if ([string]::IsNullOrWhiteSpace($text)) { return $null }
+  return $text
+}
+
+function Add-ThesisLinkedResearch($rootPath, $thesisId, $researchId) {
+  $thesis = Read-ThesisFile $rootPath $thesisId
+  if (-not $thesis) { return $false }
+  $statusBefore = [string]$thesis.status
+  $refs = @(Get-AsArray $thesis.linkedResearch)
+  $exists = $false
+  foreach ($ref in $refs) {
+    if ($ref -and [string]$ref.researchId -eq $researchId) { $exists = $true; break }
+  }
+  if ($exists) { return $true }
+  $refs = @($refs + @([PSCustomObject]@{ researchId = $researchId }))
+  $thesis | Add-Member -NotePropertyName linkedResearch -NotePropertyValue $refs -Force
+  $thesis | Add-Member -NotePropertyName status -NotePropertyValue $statusBefore -Force
+  Write-ThesisFile $rootPath $thesis
+  $after = Read-ThesisFile $rootPath $thesisId
+  return ([string]$after.status -eq $statusBefore)
+}
+
+function Set-CardThesisId($rootPath, $researchId, $thesisId) {
+  $cardPath = Join-Path $rootPath ("research\" + $researchId + "\card.json")
+  if (-not (Test-Path -LiteralPath $cardPath -PathType Leaf)) { return $false }
+  $card = Read-Utf8Json $cardPath
+  $questions = @(Get-AsArray $card.questions)
+  $card | Add-Member -NotePropertyName thesisId -NotePropertyValue $thesisId -Force
+  Write-ResearchCardJson $cardPath $card $questions
+  return $true
+}
+
+function New-ThesisRecord($thesisId, $title, $thesisText, $researchId) {
+  $today = Get-Date -Format 'yyyy-MM-dd'
+  $linked = @()
+  if ($researchId) {
+    $linked = @([PSCustomObject]@{ researchId = $researchId })
+  }
+  return [PSCustomObject]@{
+    thesisId = $thesisId
+    type = 'industry'
+    title = $title
+    subject = $title
+    thesis = $thesisText
+    rationale = ''
+    supportingEvidence = @()
+    contradictingEvidence = @()
+    keyIndicators = @('To be filled during Thesis Review')
+    invalidationConditions = @('To be filled during Thesis Review')
+    status = 'under_review'
+    confidence = 'medium'
+    linkedResearch = $linked
+    linkedDecision = $null
+    updatedAt = $today
+  }
+}
+
 function ConvertTo-InvestmentCaseJson($caseObj) {
   $company = $caseObj.company
   if (-not $company) { $company = [PSCustomObject]@{ name = ''; ticker = ''; exchange = $null; currency = $null } }
@@ -939,6 +1082,42 @@ while ($listener.IsListening) {
         sprint = $info.sprint
         build = $info.build
         commit = (Get-GitCommit $root)
+      }
+    }
+    elseif ($localPath -eq '/api/theses' -and $method -eq 'GET') {
+      Send-Json $response ([PSCustomObject]@{ items = @(Get-ThesisList $root) })
+    }
+    elseif ($localPath -eq '/api/theses' -and $method -eq 'POST') {
+      $body = Read-Body $request
+      $thesisId = if ($body -and $body.thesisId) { ([string]$body.thesisId).Trim() } else { '' }
+      $title = if ($body -and $body.title) { ([string]$body.title).Trim() } else { '' }
+      $thesisText = if ($body -and $body.thesis) { ([string]$body.thesis).Trim() } else { '' }
+      $researchId = if ($body -and $body.researchId) { ([string]$body.researchId).Trim() } else { '' }
+      if (-not (Test-ValidThesisId $thesisId)) {
+        Send-Json $response @{ error = 'invalid_payload'; message = 'thesisId is invalid' } 400
+      } elseif (-not $title -or -not $thesisText) {
+        Send-Json $response @{ error = 'invalid_payload'; message = 'title and thesis are required' } 400
+      } elseif ($researchId -and ($researchId -match '[\\/]' -or $researchId -eq '.' -or $researchId -eq '..')) {
+        Send-Json $response @{ error = 'invalid_payload'; message = 'researchId is invalid' } 400
+      } elseif ($researchId -and -not (Test-Path -LiteralPath (Join-Path $root ("research\" + $researchId + "\card.json")) -PathType Leaf)) {
+        Send-Json $response @{ error = 'invalid_payload'; message = 'researchId does not match an existing Research Card' } 400
+      } elseif (Test-Path -LiteralPath (Get-ThesisFilePath $root $thesisId) -PathType Leaf) {
+        Send-Json $response @{ error = 'invalid_payload'; message = 'thesisId already exists' } 400
+      } else {
+        if (-not $researchId) { $researchId = $null }
+        # Client-supplied status is ignored. Create is always under_review.
+        $record = New-ThesisRecord $thesisId $title $thesisText $researchId
+        Write-ThesisFile $root $record
+        if ($researchId) {
+          Set-CardThesisId $root $researchId $thesisId | Out-Null
+        }
+        $written = Read-ThesisFile $root $thesisId
+        Send-Json $response @{
+          created = $true
+          thesisId = $thesisId
+          status = [string]$written.status
+          researchId = $researchId
+        }
       }
     }
     elseif ($localPath -eq '/api/queue' -and $method -eq 'POST') {
@@ -1175,6 +1354,31 @@ while ($listener.IsListening) {
             }
           }
         }
+      } elseif ($body -and $body.id -and (Test-HasJsonProperty $body 'thesisId') -and -not (Test-HasJsonProperty $body 'case') -and -not (Test-HasJsonProperty $body 'decision') -and -not (Test-HasJsonProperty $body 'positionPlaybook') -and -not (Test-HasJsonProperty $body 'thesisEvidence') -and -not (Test-HasJsonProperty $body 'marginOfSafety') -and -not (Test-HasJsonProperty $body 'methodInput') -and -not (Test-HasJsonProperty $body 'companyType') -and -not (Test-HasJsonProperty $body 'confirmValuationProfile') -and -not (Test-HasJsonProperty $body 'monitoringTrigger')) {
+        $id = [string]$body.id
+        $target = @($store.cases | Where-Object { $_.id -eq $id } | Select-Object -First 1)
+        if ($target.Count -eq 0) {
+          Send-Json $response @{ error = 'not_found'; message = 'Investment Case not found' } 404
+        } else {
+          $caseObj = $target[0]
+          $probe = [PSCustomObject]@{ thesisId = $body.thesisId }
+          $thesisIdResult = Resolve-CaseThesisId $root $probe
+          if (-not $thesisIdResult.ok) {
+            Send-Json $response @{ error = 'invalid_payload'; message = $thesisIdResult.message } 400
+          } elseif ($null -eq $thesisIdResult.value) {
+            Send-Json $response @{ error = 'invalid_payload'; message = 'thesisId is required to link a Thesis' } 400
+          } else {
+            $caseObj | Add-Member -NotePropertyName thesisId -NotePropertyValue $thesisIdResult.value -Force
+            if ($caseObj.origin) { $caseObj.origin.updatedAt = $today }
+            $store.updated = $today
+            Write-InvestmentCasesFile $casesPath $store
+            Send-Json $response @{
+              updated = $true
+              id = $id
+              thesisId = $thesisIdResult.value
+            }
+          }
+        }
       } elseif ($body -and $body.id -and $body.thesisEvidence) {
         $id = [string]$body.id
         $target = @($store.cases | Where-Object { $_.id -eq $id } | Select-Object -First 1)
@@ -1280,7 +1484,7 @@ while ($listener.IsListening) {
           }
         }
       } else {
-        Send-Json $response @{ error = 'invalid_payload'; message = 'case, companyType, confirmValuationProfile, methodInput, marginOfSafety, thesisEvidence, decision, positionPlaybook, or monitoringTrigger is required' } 400
+        Send-Json $response @{ error = 'invalid_payload'; message = 'case, companyType, confirmValuationProfile, methodInput, marginOfSafety, thesisEvidence, thesisId, decision, positionPlaybook, or monitoringTrigger is required' } 400
       }
       }
     }
@@ -1320,8 +1524,33 @@ while ($listener.IsListening) {
           if ($body -and $body.PSObject.Properties.Name -contains 'question' -and $body.question) {
             $questionText = ([string]$body.question).Trim()
           }
+          $hasThesisId = $body -and (Test-HasJsonProperty $body 'thesisId')
+          $incomingThesisId = $null
+          if ($hasThesisId) {
+            $incomingThesisId = if ($null -eq $body.thesisId) { '' } else { ([string]$body.thesisId).Trim() }
+          }
 
-          if (-not $noteText) {
+          if ($hasThesisId -and $noteText) {
+            Send-Json $response @{ error = 'invalid_payload'; message = 'send thesisId or appendNote, not both' } 400
+          } elseif ($hasThesisId) {
+            if (-not (Test-ValidThesisId $incomingThesisId)) {
+              Send-Json $response @{ error = 'invalid_payload'; message = 'thesisId is invalid' } 400
+            } elseif (-not (Read-ThesisFile $root $incomingThesisId)) {
+              Send-Json $response @{ error = 'invalid_payload'; message = 'thesisId does not match an existing Thesis' } 400
+            } else {
+              Set-CardThesisId $root $id $incomingThesisId | Out-Null
+              Add-ThesisLinkedResearch $root $incomingThesisId $id | Out-Null
+              $writtenCard = Read-Utf8Json (Join-Path $dir 'card.json')
+              $writtenThesis = Read-ThesisFile $root $incomingThesisId
+              Send-Json $response @{
+                created = $false
+                updated = $true
+                id = $id
+                thesisId = (Get-CardThesisId $writtenCard)
+                thesisStatus = [string]$writtenThesis.status
+              }
+            }
+          } elseif (-not $noteText) {
             Send-Json $response @{ error = 'invalid_payload'; message = 'appendNote/note text is required for update' } 400
           } else {
             try {

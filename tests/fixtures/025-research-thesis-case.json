@@ -1,0 +1,37 @@
+{
+  "createResearchId": "025-card",
+  "linkResearchId": "025-link",
+  "newThesisId": "025-test-thesis",
+  "existingThesisId": "cpo-glass-bridge",
+  "caseId": "025T-025-card",
+  "legacyThesisText": "025 nested working notes must not be replaced by Thesis Layer text",
+  "confirmedAttemptStatus": "confirmed",
+  "decision": {
+    "stance": "watch",
+    "asOf": "2026-08-23",
+    "reason": "025 manual decision after Case link; no auto judgement",
+    "basedOn": {
+      "researchIds": ["025-card"],
+      "supportingCount": 0,
+      "counterCount": 0,
+      "thesisStatus": "forming"
+    }
+  },
+  "decisionUpdate": {
+    "stance": "hold",
+    "asOf": "2026-08-23",
+    "reason": "025 manual update to create Decision History",
+    "basedOn": {
+      "researchIds": ["025-card"],
+      "supportingCount": 0,
+      "counterCount": 0,
+      "thesisStatus": "forming"
+    }
+  },
+  "positionPlaybook": {
+    "targetPosition": 0.1,
+    "initialPosition": 0.05,
+    "entryTriggers": ["manual entry after research"],
+    "monitoringItems": []
+  }
+}
