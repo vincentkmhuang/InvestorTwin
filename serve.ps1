@@ -979,6 +979,103 @@ function Write-ResearchQueue($rootPath, $queue) {
   $queue | ConvertTo-Json -Depth 10 | Set-Content $queuePath -Encoding UTF8
 }
 
+function Get-LatestEvidenceItems($rootPath) {
+  $map = @{}
+  $candidates = @()
+
+  $historyRoot = Join-Path $rootPath 'data\evidence\history'
+  if (Test-Path -LiteralPath $historyRoot) {
+    foreach ($instDir in @(Get-ChildItem -LiteralPath $historyRoot -Directory -ErrorAction SilentlyContinue)) {
+      $latest = @(Get-ChildItem -LiteralPath $instDir.FullName -Filter '*.json' -ErrorAction SilentlyContinue |
+        Sort-Object BaseName -Descending |
+        Select-Object -First 1)[0]
+      if ($latest) {
+        $candidates += [PSCustomObject]@{ File = $latest; Instrument = $instDir.Name; Rank = 2 }
+      }
+    }
+  }
+
+  $runsRoot = Join-Path $rootPath 'data\evidence\runs'
+  if (Test-Path -LiteralPath $runsRoot) {
+    $run = @(Get-ChildItem -LiteralPath $runsRoot -Directory -ErrorAction SilentlyContinue |
+      Sort-Object Name -Descending |
+      Select-Object -First 1)[0]
+    if ($run) {
+      $norm = Join-Path $run.FullName 'normalized'
+      if (Test-Path -LiteralPath $norm) {
+        foreach ($file in @(Get-ChildItem -LiteralPath $norm -Filter '*.json' -ErrorAction SilentlyContinue)) {
+          $candidates += [PSCustomObject]@{ File = $file; Instrument = $file.BaseName; Rank = 1 }
+        }
+      }
+    }
+  }
+
+  $pathSeps = [char[]]@(
+    [System.IO.Path]::DirectorySeparatorChar,
+    [System.IO.Path]::AltDirectorySeparatorChar
+  )
+  $rootFull = [System.IO.Path]::GetFullPath($rootPath).TrimEnd($pathSeps)
+  foreach ($candidate in @($candidates)) {
+    $file = @($candidate.File)[0]
+    if (-not $file) { continue }
+    $instrument = [string]$candidate.Instrument
+    $rank = [int]$candidate.Rank
+    $obj = $null
+    try { $obj = Read-Utf8Json $file.FullName } catch { continue }
+    if ($obj -and $obj.instrument) { $instrument = [string]$obj.instrument }
+    if (-not $instrument) { continue }
+    $asOf = ''
+    if ($obj -and $obj.asOf) {
+      $asOf = [string]$obj.asOf
+    } elseif ($file.BaseName -match '^\d{4}-\d{2}-\d{2}$') {
+      $asOf = $file.BaseName
+    } elseif ($obj -and $obj.expectedAsOf) {
+      $asOf = [string]$obj.expectedAsOf
+    }
+    $status = 'fresh'
+    if ($obj -and $obj.status) { $status = [string]$obj.status }
+    $sourceId = $null
+    if ($obj -and $obj.sourceId) { $sourceId = [string]$obj.sourceId }
+    $itemFull = [System.IO.Path]::GetFullPath([string]$file.FullName)
+    $rel = $itemFull
+    if ($itemFull.Length -gt $rootFull.Length -and $itemFull.Substring(0, $rootFull.Length).ToLowerInvariant() -eq $rootFull.ToLowerInvariant()) {
+      $rel = $itemFull.Substring($rootFull.Length).TrimStart($pathSeps)
+    }
+    $rel = ([string]$rel).Replace('\', '/')
+    $item = [PSCustomObject]@{
+      instrument = $instrument
+      asOf = $asOf
+      status = $status
+      sourceId = $sourceId
+      evidencePath = $rel
+      writesBrief = $false
+      rank = $rank
+    }
+    $existing = $map[$instrument]
+    if (-not $existing) {
+      $map[$instrument] = $item
+    } elseif ($rank -gt [int]$existing.rank) {
+      $map[$instrument] = $item
+    } elseif ($rank -eq [int]$existing.rank -and [string]$asOf -gt [string]$existing.asOf) {
+      $map[$instrument] = $item
+    }
+  }
+
+  $items = @()
+  foreach ($key in @($map.Keys)) {
+    $row = $map[$key]
+    $items += [PSCustomObject]@{
+      instrument = [string]$row.instrument
+      asOf = [string]$row.asOf
+      status = [string]$row.status
+      sourceId = $(if ($null -eq $row.sourceId) { $null } else { [string]$row.sourceId })
+      path = [string]$row.evidencePath
+      writesBrief = $false
+    }
+  }
+  return $items
+}
+
 function Ensure-QueueItem($rootPath, $id, $addedFrom) {
   $queue = Read-ResearchQueue $rootPath
   $added = $false
@@ -1086,6 +1183,14 @@ while ($listener.IsListening) {
     }
     elseif ($localPath -eq '/api/theses' -and $method -eq 'GET') {
       Send-Json $response ([PSCustomObject]@{ items = @(Get-ThesisList $root) })
+    }
+    elseif (($localPath -eq '/api/evidence' -or $localPath -eq '/api/evidence/latest') -and $method -eq 'GET') {
+      $evidenceItems = @(Get-LatestEvidenceItems $root)
+      $response.StatusCode = 200
+      $response.ContentType = 'application/json; charset=utf-8'
+      $payload = '{"writesBrief":false,"layer":"evidence","items":' + (ConvertTo-JsonArrayText $evidenceItems) + '}'
+      $bytes = [System.Text.Encoding]::UTF8.GetBytes($payload)
+      $response.OutputStream.Write($bytes, 0, $bytes.Length)
     }
     elseif ($localPath -eq '/api/theses' -and $method -eq 'POST') {
       $body = Read-Body $request

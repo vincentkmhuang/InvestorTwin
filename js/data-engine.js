@@ -219,13 +219,14 @@ const DataEngine = {
       if (el) el.textContent = value || '--';
     };
 
-    const bindResearchClick = (el, researchId) => {
-      if (!researchId || typeof onItemClick !== 'function') {
+    const bindResearchClick = (el, researchId, clickFn) => {
+      const handler = clickFn || onItemClick;
+      if (!researchId || typeof handler !== 'function') {
         el.classList.add('morning-brief-static');
         return;
       }
       el.dataset.researchId = researchId;
-      el.onclick = () => onItemClick(researchId);
+      el.onclick = () => handler(researchId);
     };
 
     const renderEmpty = (listEl) => {
@@ -361,7 +362,10 @@ const DataEngine = {
           li.appendChild(summaryEl);
         }
 
-        bindResearchClick(li, id);
+        const radarClick = (typeof openFromOpportunityRadar === 'function')
+          ? ((rid) => openFromOpportunityRadar(rid, 'today'))
+          : onItemClick;
+        bindResearchClick(li, id, radarClick);
         listEl.appendChild(li);
       }
       if (!listEl.children.length) renderEmpty(listEl);
@@ -421,11 +425,15 @@ const DataEngine = {
   },
 
   renderOpportunityRadar(container, onItemClick) {
-    container.innerHTML = this.opportunityRadar.items.map(item =>
+    if (!container) return;
+    const items = Array.isArray(this.opportunityRadar?.items) ? this.opportunityRadar.items : [];
+    container.innerHTML = items.map(item =>
       `<li data-id="${item.id}">${item.name}</li>`
     ).join('');
     container.querySelectorAll('li').forEach(el => {
-      el.onclick = () => onItemClick(el.dataset.id);
+      el.onclick = () => {
+        if (typeof onItemClick === 'function') onItemClick(el.dataset.id);
+      };
     });
   },
 

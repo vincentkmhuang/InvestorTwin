@@ -1,99 +1,110 @@
 {
-  "date": "2026-08-10",
-  "executiveSummary": "市場焦點仍集中在 AI 基礎設施與供應鏈驗證。Glass Bridge 量產進度與相關光通訊標的，是今日觀察重點。",
+  "date": "2026-08-23",
+  "executiveSummary": "週五美股反彈，但沒有扭轉整週走勢。市場溫度：高波動／中性偏弱。S&P 500 週跌約 1.4%，Nasdaq 週跌約 2.1%，Dow 週跌約 0.9%，SOX 本週明顯走弱。核心矛盾仍然是：長債殖利率高＋油價高 → AI／高估值股票的估值壓力仍在。一句話：這週市場沒有證明AI需求消失，卻證明了另一件事——當長債殖利率與油價同時偏高時，AI基本面再強，也必須接受估值考驗。今日問題：經過這一週的「高油價＋高長債殖利率＋AI股修正」，如果NVIDIA財報仍然非常強，但SOX與台積電沒有重新領漲，我們是否應把這視為「基本面強、估值受到壓縮」的新市場階段，而不是單純的短線修正？",
   "macroDecisionLens": [
-    "Glass Bridge 量產驗證，是否已形成台灣光通訊供應鏈的近期待投資機會。",
-    "美股 AI 基建支出延續，SOX 與大型科技走勢仍是台股科技族群的先行指標。",
-    "台股光通訊與 PCB 相關標的關注度高於整體電子，需對照供應鏈驗證進度。"
+    "US 10Y｜4.73%：仍處於對高估值科技股不友善的區域。",
+    "US 30Y｜5.27%：即使美國財政部提高長債回購規模，30Y仍維持高位，顯示市場對財政、供給與長期通膨仍有疑慮。這是目前最值得追蹤的宏觀指標之一。",
+    "Oil｜Brent ~$93.5：本週漲逾6%。如果油價繼續向上，會讓「通膨下降 → Fed寬鬆」的路徑更加困難。",
+    "美國景氣：服務業仍強，製造業放緩。目前比較像「經濟沒有失速，但成本與利率壓力升高」。"
   ],
   "marketTemperature": {
-    "Nasdaq": { "value": "21750.12", "asOf": "2026-08-07 16:00 ET" },
-    "S&P 500": { "value": "5620.44", "asOf": "2026-08-07 16:00 ET" },
-    "Dow": { "value": "40880.15", "asOf": "2026-08-07 16:00 ET" },
-    "SOX": { "value": "5480.30", "asOf": "2026-08-07 16:00 ET" }
+    "Nasdaq": {
+      "value": "26,180.46",
+      "asOf": "週五 close"
+    },
+    "S&P 500": {
+      "value": "7,674.37",
+      "asOf": "週五 close"
+    },
+    "Dow": {
+      "value": "53,277.01",
+      "asOf": "週五 close"
+    },
+    "SOX": {
+      "value": "11,740.4",
+      "asOf": "週五 close"
+    }
   },
   "globalMarketAndNews": {
-    "summary": "美股隔夜表現分歧。AI 基礎設施支出仍是主軸，利率與美元相對穩定。",
+    "summary": "週五 Dow 53,277.01（+0.98%）、S&P 500 7,674.37（+0.43%）、Nasdaq 26,180.46（+0.44%）、SOX 11,740.4（-0.51%）。US 10Y 4.73%、US 30Y 5.27%、Brent ~$93.5、WTI ~$87、VIX 15.42。美國8月服務業活動創近兩年來強勁水準，S&P Global服務業指數升至 56.8；製造業則降至 53.2。這意味著美國經濟目前比較像「成長仍在、但資金成本偏高」，而不是立即衰退；但這個正面訊號仍被高長債殖利率部分抵消。",
     "items": [
       {
-        "title": "大型雲端資本支出維持高檔，AI 伺服器與光通訊需求敘事延續",
+        "title": "美股週五反彈，但仍未脫離高利率壓力；10Y仍約 4.73%、30Y約 5.27%",
         "source": "Global",
         "researchId": null
       },
       {
-        "title": "半導體設備與記憶體供應鏈持續被點名為 AI 受惠族群",
+        "title": "油價仍是下週最大的宏觀變數；Brent接近 $93.5，本週漲逾6%",
         "source": "Global",
-        "researchId": "hbm"
+        "researchId": null
+      },
+      {
+        "title": "美國8月 S&P Global 服務業指數升至 56.8，製造業降至 53.2",
+        "source": "Global",
+        "researchId": null
       }
     ]
   },
   "taiwanMarketAndNews": {
-    "summary": "台股科技族群持續跟隨 AI 硬體敘事。光通訊與 PCB 相關標的較整體電子族群更受關注。",
+    "summary": "TAIEX 週五 45,224.29（+0.65%，+290.55點）；盤中最低曾到 44,583.87，最後拉回 45,000點以上。台積電 2,410元（+1.47%），聯發科 3,790元（+2.43%）。三大法人合計買超 331億元，其中外資買超 283億元，成交值僅 7,193億元。45,000點出現買盤，但目前還只能稱為「支撐被確認一次」，不能稱為趨勢反轉。",
     "items": [
       {
-        "title": "光通訊供應鏈關注 Glass Bridge 量產驗證進度",
-        "source": "工商時報",
-        "researchId": "glass-bridge"
-      },
-      {
-        "title": "AI 伺服器相關台廠訂單能見度仍是盤面焦點",
-        "source": "經濟日報",
+        "title": "台股週五止跌，但反彈量能不足；成交值僅 7,193億元",
+        "source": "台股",
         "researchId": null
       },
-      {
-        "title": "台股開盤觀察電子權值與光通訊族群",
-        "source": "鉅亨網台股新聞",
-        "researchId": null
-      },
-      {
-        "title": "上市買賣觀察需對照證交所與櫃買中心公告",
-        "source": "證交所",
-        "researchId": null
-      },
-      {
-        "title": "上櫃科技股訊息請核對櫃買中心與公開資訊觀測站",
-        "source": "櫃買中心",
-        "researchId": null
-      }
+    {
+      "title": "資金輪動：科技 → 金融／航運／石化；Memory仍有買盤，南亞科、華邦電等上漲",
+      "source": "台股",
+      "researchId": "hbm"
+    }
     ]
   },
   "aiIndustryHighlights": [
     {
-      "title": "HBM 供給仍緊，記憶體週期與 AI 伺服器綁定",
+      "title": "SOX 11,740.4（-0.51%）。即使Nasdaq反彈，半導體仍然落後；大盤可以反彈，但AI／半導體還沒有重新取得領導權。AI需求：強；AI股價格動能：中性偏弱。",
+      "researchId": null
+    },
+    {
+      "title": "08/26 NVIDIA FY2027第二季財報：要看AI需求是否持續、Data Center資本支出是否持續擴張、成長是否足以支撐AI估值。",
       "researchId": "hbm"
     },
     {
-      "title": "CPO / 光互連時程需對照資料中心採用進度",
-      "researchId": "cpo"
-    },
-    {
-      "title": "FAU 與台灣光通訊供應鏈驗證名單",
-      "researchId": "fau"
+      "title": "Reuters報導NVIDIA已通知部分客戶，搭載其AI晶片的伺服器可能漲價超過 15%，主要與Memory成本上升有關；值得等NVIDIA正式說法確認。",
+      "researchId": "hbm"
     }
   ],
   "upcomingEvents": [
-    { "title": "美國 CPI", "when": "2026-08-12" },
-    { "title": "台股期貨結算觀察", "when": "2026-08-19" }
-  ],
-  "today3Things": [
     {
-      "text": "核對 Glass Bridge 量產驗證是否有新的供應鏈點名",
-      "researchId": "glass-bridge"
+      "title": "NVIDIA FY2027第二季財報電話會議（美東時間下午5點；財報預計約在會議前公布）",
+      "when": "2026-08-26",
+      "researchId": "hbm"
     },
     {
-      "text": "檢視 FAU 研究卡待驗證問題",
-      "researchId": "fau"
+      "title": "Jackson Hole 經濟政策研討會（主題：Financial Innovation: Implications for Payments and Policy）",
+      "when": "2026-08-27",
+      "researchId": null
     },
     {
-      "text": "追蹤 SOX 與台股科技族群是否同步",
+      "title": "Fed主席 Kevin Warsh 演說",
+      "when": "2026-08-28",
       "researchId": null
     }
   ],
-  "opportunityRadar": [
-    "glass-bridge",
-    "fau",
-    "cpo",
-    "hbm"
+  "today3Things": [
+    {
+      "text": "美股反彈，但仍未脫離高利率壓力。S&P 500 +0.43%、Nasdaq +0.44%、Dow +0.98%；然而10Y仍約 4.73%、30Y約 5.27%。",
+      "researchId": null
+    },
+    {
+      "text": "油價仍是下週最大的宏觀變數。Brent接近 $93.5，本週漲逾6%；高油價讓通膨降溫與Fed政策之間的空間變得更複雜。",
+      "researchId": null
+    },
+    {
+      "text": "台股週五止跌，但反彈量能不足。TAIEX +290.55點、+0.65% 至 45,224.29；台積電 +1.47% 至2,410元。三大法人合計買超 331億元，其中外資買超 283億元，但成交值僅 7,193億元。",
+      "researchId": null
+    }
   ],
+  "opportunityRadar": ["glass-bridge", "fau", "cpo", "hbm"],
   "opportunityRadarException": false
 }

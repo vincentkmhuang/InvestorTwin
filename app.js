@@ -146,6 +146,18 @@ async function openMorningBriefResearch(id) {
   });
 }
 
+async function openFromOpportunityRadar(id, fromPage) {
+  const researchId = WorkflowEngine.resolveResearchId(id);
+  const added = await WorkflowEngine.ensureInQueue(researchId, 'Opportunity Radar');
+  if (added) render();
+
+  showPage('cards');
+  openResearchCard(id, document.getElementById('card'), {
+    resetPath: true,
+    fromPage: fromPage || 'queue'
+  });
+}
+
 async function openFromMorningBrief(id) {
   const researchId = WorkflowEngine.resolveResearchId(id);
   const added = await WorkflowEngine.ensureInQueue(researchId, 'Morning Brief');
@@ -446,6 +458,10 @@ function render() {
     li2.onclick = () => openResearchCard(q, undefined, { resetPath: true });
     cardList.appendChild(li2);
   });
+  const radarEl = document.getElementById('queueOpportunityRadar');
+  if (radarEl) {
+    DataEngine.renderOpportunityRadar(radarEl, openFromOpportunityRadar);
+  }
   renderTodayQueue();
   renderCaseList();
 }

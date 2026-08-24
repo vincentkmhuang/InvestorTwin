@@ -1,0 +1,9 @@
+{
+  "briefResearchId": "hbm",
+  "radarResearchId": "cpo",
+  "existingQueueId": "glass-bridge",
+  "existingQueueFrom": "Morning Brief",
+  "queueSchemaKeys": ["id", "addedFrom"],
+  "evidenceInstruments": ["US10Y", "SOX"],
+  "radarIds": ["glass-bridge", "fau", "cpo", "hbm"]
+}

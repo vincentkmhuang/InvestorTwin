@@ -332,6 +332,48 @@ const WorkflowEngine = {
     return lines;
   },
 
+  researchIntakeInstruments(thesis) {
+    const ids = [];
+    for (const key of ['supportingEvidence', 'contradictingEvidence']) {
+      for (const ref of (Array.isArray(thesis?.[key]) ? thesis[key] : [])) {
+        const instrument = String(ref?.instrument || '').trim();
+        if (instrument && !ids.includes(instrument)) ids.push(instrument);
+      }
+    }
+    return ids;
+  },
+
+  async loadLatestEvidence() {
+    try {
+      const res = await fetch('/api/evidence');
+      if (!res.ok) return { writesBrief: false, items: [] };
+      const data = await res.json();
+      return {
+        writesBrief: data && data.writesBrief === true,
+        items: Array.isArray(data?.items) ? data.items : []
+      };
+    } catch (_) {
+      return { writesBrief: false, items: [] };
+    }
+  },
+
+  renderResearchIntakeEvidence(matched, writesBrief) {
+    let html = '<p data-evidence-intake="1"><b>Evidence Intake</b></p>';
+    html += '<p>Evidence is not Morning Brief.</p>';
+    if (writesBrief === true) {
+      html += '<p>Evidence API must not write Morning Brief.</p>';
+    }
+    if (!matched.length) return html + '<p>--</p>';
+    html += '<ul>' + matched.map(item => {
+      const instrument = this.escapeHtml(item.instrument || '--');
+      const asOf = this.escapeHtml(item.asOf || '--');
+      const status = this.escapeHtml(item.status || '--');
+      const path = this.escapeHtml(item.path || '--');
+      return `<li data-evidence-instrument="${instrument}">${instrument} · asOf ${asOf} · ${status} · ${path}</li>`;
+    }).join('') + '</ul>';
+    return html;
+  },
+
   async linkResearchThesis(researchId, thesisId) {
     const id = String(thesisId || '').trim();
     if (!id) return { ok: false, message: 'Select a Thesis' };
@@ -432,6 +474,11 @@ const WorkflowEngine = {
     const gate = this.integrityGateView(card, sources, layerThesis);
     const supportingLines = this.researchCardEvidenceLines('supporting', layerThesis, linkedCases, card.id);
     const counterLines = this.researchCardEvidenceLines('counter', layerThesis, linkedCases, card.id);
+    const evidenceLatest = await this.loadLatestEvidence();
+    const intakeWanted = this.researchIntakeInstruments(layerThesis);
+    const intakeMatched = (evidenceLatest.items || []).filter(item =>
+      intakeWanted.includes(String(item.instrument || '').trim())
+    );
 
     let html = `<h3>${card.title}</h3>`;
     html += `<p><b>Summary</b></p><p>${card.summary || '--'}</p>`;
@@ -496,6 +543,7 @@ const WorkflowEngine = {
     html += sources.length
       ? `<ul>${sources.map(entry => `<li>${entry.title}</li>`).join('')}</ul>`
       : '<p>--</p>';
+    html += this.renderResearchIntakeEvidence(intakeMatched, evidenceLatest.writesBrief);
     html += '<p><b>Notes</b></p>';
     html += notes.length
       ? `<ul>${notes.map(entry => `<li>${entry.date} — ${entry.text}</li>`).join('')}</ul>`

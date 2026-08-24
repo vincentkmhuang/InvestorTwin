@@ -5,7 +5,9 @@
   "subject": "AI server memory / DRAM / HBM",
   "thesis": "AI 伺服器需求把 DRAM／HBM 從典型消費電子週期，轉成與 Data Center 資本支出綁定的供給約束。記憶體緊俏若持續，應先反映在供應鏈交期與成本，而不是短線股價情緒。",
   "rationale": "AI 訓練與推論伺服器對 HBM 與高容量 DRAM 的用量遠高於 PC／手機世代；只要 Data Center 資本支出沒有停，記憶體供給就比較像產能與良率約束，而不是消費電子的庫存週期。NVIDIA 伺服器因 Memory 成本可能調價，也符合「需求仍在、瓶頸在記憶體」而不是「AI 需求消失」。因此我把 DRAM／HBM 當成 AI 資本支出的配套假設，而不是可以獨立看空的傳統記憶體循環。",
-  "supportingEvidence": [],
+  "supportingEvidence": [
+    { "instrument": "SOX" }
+  ],
   "contradictingEvidence": [],
   "keyIndicators": [
     "HBM / DRAM 供給是否仍緊",
