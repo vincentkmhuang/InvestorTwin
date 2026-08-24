@@ -1,6 +1,6 @@
-# Investor Twin 031-A — Morning Brief generator.
-# Reads data/evidence/ only. Writes data/morning-brief.json.
-# Never creates Research Cards, Queue, Thesis, Case, or Decision.
+# Investor Twin 031-B — Morning Brief generator with Evidence selection.
+# Reads data/evidence/. Writes data/morning-brief.json only.
+# Never creates Research Cards, Queue, Thesis, Case, Decision, or Playbook.
 import json
 import os
 import re
@@ -27,8 +27,80 @@ TEMPERATURE_KEYS = {
     "DJI": "Dow",
     "SOX": "SOX",
 }
-INSTRUMENT_RESEARCH_ID = {
-    "SOX": "hbm",
+MAX_EXEC_SIGNALS = 3
+MAX_TODAY_THINGS = 3
+MATERIAL_FLOW = 50.0
+
+# Canonical Research Card ids only. Unmapped instruments stay unselected.
+INSTRUMENT_MAP = {
+    "US10Y": {
+        "sections": ["macroDecisionLens", "globalMarketAndNews"],
+        "priority": 100,
+        "theme": "macro",
+        "researchId": None,
+    },
+    "US30Y": {
+        "sections": ["macroDecisionLens", "globalMarketAndNews"],
+        "priority": 95,
+        "theme": "macro",
+        "researchId": None,
+    },
+    "SPX": {
+        "sections": ["marketTemperature", "globalMarketAndNews"],
+        "priority": 72,
+        "theme": "global",
+        "researchId": None,
+    },
+    "Nasdaq": {
+        "sections": ["marketTemperature", "globalMarketAndNews"],
+        "priority": 70,
+        "theme": "global",
+        "researchId": None,
+    },
+    "DJI": {
+        "sections": ["marketTemperature", "globalMarketAndNews"],
+        "priority": 60,
+        "theme": "global",
+        "researchId": None,
+    },
+    "SOX": {
+        "sections": ["marketTemperature", "aiIndustryHighlights"],
+        "priority": 90,
+        "theme": "ai",
+        "researchId": "hbm",
+    },
+    "TAIEX": {
+        "sections": ["taiwanMarketAndNews", "macroDecisionLens"],
+        "priority": 88,
+        "theme": "taiwan",
+        "researchId": None,
+    },
+    "TW_FOREIGN_NET": {
+        "sections": ["taiwanMarketAndNews"],
+        "priority": 80,
+        "theme": "taiwan",
+        "researchId": None,
+    },
+    "TW_TRUST_NET": {
+        "sections": ["taiwanMarketAndNews"],
+        "priority": 40,
+        "theme": "taiwan",
+        "researchId": None,
+        "noise": True,
+    },
+    "TW_DEALER_NET": {
+        "sections": ["taiwanMarketAndNews"],
+        "priority": 25,
+        "theme": "taiwan",
+        "researchId": None,
+        "noise": True,
+    },
+}
+THEME_WHY = {
+    "macro": "長債利率是高估值與 AI 資產的估值約束。",
+    "global": "美股指數反映全球風險偏好，不是個股研究結論。",
+    "taiwan": "台股水位與外資流向會改變台灣半導體風險偏好。",
+    "ai": "SOX 是半導體風險偏好，對既有 HBM 研究主題有關。",
 }
 
 
@@ -61,8 +133,8 @@ def card_exists(root, research_id):
     return os.path.isfile(os.path.join(root, "research", rid, "card.json"))
 
 
-def resolve_research_id(root, instrument=None, existing_id=None):
-    rid = existing_id if existing_id else INSTRUMENT_RESEARCH_ID.get(instrument)
+def resolve_research_id(root, candidate=None, existing_id=None):
+    rid = existing_id if existing_id else candidate
     if rid and card_exists(root, rid):
         return rid
     return None
@@ -75,6 +147,29 @@ def is_valued(item):
         return False
     as_of = item.get("asOf")
     return isinstance(as_of, str) and DATE_RE.match(as_of.strip()) is not None
+
+
+def is_latest(item, brief_date):
+    if not is_valued(item):
+        return False
+    status = item.get("status")
+    if status in ("unavailable", "missing"):
+        return False
+    if status == "stale":
+        return False
+    return item.get("asOf") == brief_date
+
+
+def is_material_flow(item):
+    try:
+        value = abs(float(item.get("value")))
+    except (TypeError, ValueError):
+        value = 0.0
+    try:
+        change = abs(float(item.get("changeDoD"))) if item.get("changeDoD") is not None else 0.0
+    except (TypeError, ValueError):
+        change = 0.0
+    return value >= MATERIAL_FLOW or change >= MATERIAL_FLOW
 
 
 def latest_history_item(history_dir):
@@ -153,7 +248,7 @@ def fmt_number(value, unit):
     try:
         number = float(value)
     except (TypeError, ValueError):
-        return "--"
+        return None
     if unit == "percent":
         return f"{number:.2f}%"
     if unit == "TWD_hundred_million":
@@ -164,9 +259,6 @@ def fmt_number(value, unit):
 
 
 def item_as_of(item):
-    if not is_valued(item):
-        status = item.get("status") if isinstance(item, dict) else None
-        return "unavailable" if status == "unavailable" else "--"
     kind = item.get("asOfKind") or "close"
     return f"{item.get('asOf')} {kind}"
 
@@ -190,6 +282,9 @@ def carry_linked_items(raw_items, root):
         else:
             rid = None
         if not rid or not card_exists(root, rid):
+            continue
+        title = str(item.get("title") or "")
+        if "unavailable" in title.lower() or "missing" in title.lower():
             continue
         out = {key: value for key, value in item.items() if key != "cardRef"}
         out["researchId"] = rid
@@ -218,106 +313,260 @@ def radar_ids(root):
     return ids
 
 
+def classify_evidence(root, instrument, row, brief_date):
+    mapping = INSTRUMENT_MAP.get(instrument)
+    decision = {
+        "instrument": instrument,
+        "selected": False,
+        "priority": 0,
+        "sections": [],
+        "theme": None,
+        "researchId": None,
+        "latest": False,
+        "reason": None,
+        "row": row if isinstance(row, dict) else {},
+    }
+    if mapping is None:
+        decision["reason"] = "unmapped"
+        return decision
+    if not is_valued(row):
+        decision["reason"] = "not_valued"
+        return decision
+    status = row.get("status")
+    if status in ("unavailable", "missing"):
+        decision["reason"] = status
+        return decision
+    if mapping.get("noise") and not is_material_flow(row):
+        decision["reason"] = "noise"
+        return decision
+
+    latest = is_latest(row, brief_date)
+    sections = list(mapping["sections"])
+    if not latest:
+        sections = [name for name in sections if name in ("macroDecisionLens", "globalMarketAndNews") and mapping["theme"] == "macro"]
+        if not sections:
+            decision["reason"] = "not_latest"
+            return decision
+        decision["reason"] = "dated_macro"
+    else:
+        decision["reason"] = "selected"
+
+    decision["selected"] = True
+    decision["priority"] = mapping["priority"]
+    decision["sections"] = sections
+    decision["theme"] = mapping["theme"]
+    decision["researchId"] = resolve_research_id(root, mapping.get("researchId"))
+    decision["latest"] = latest
+    return decision
+
+
+def select_evidence(root, evidence, brief_date):
+    selected = []
+    excluded = []
+    for instrument in sorted(evidence.keys()):
+        decision = classify_evidence(root, instrument, evidence.get(instrument) or {}, brief_date)
+        if decision["selected"]:
+            selected.append(decision)
+        else:
+            excluded.append(decision)
+    selected.sort(key=lambda item: (-item["priority"], item["instrument"]))
+    return selected, excluded
+
+
+def selected_map(selected):
+    return {item["instrument"]: item for item in selected}
+
+
+def in_section(decision, section):
+    return section in (decision.get("sections") or [])
+
+
+def theme_items(selected, theme, latest_only=False):
+    out = []
+    for item in selected:
+        if item.get("theme") != theme:
+            continue
+        if latest_only and not item.get("latest"):
+            continue
+        out.append(item)
+    return out
+
+
+def format_group(items, unit_fallback="index"):
+    bits = []
+    for item in items:
+        row = item["row"]
+        unit = row.get("unit") or unit_fallback
+        number = fmt_number(row.get("value"), unit)
+        if number is None:
+            continue
+        label = item["instrument"]
+        as_of = row.get("asOf")
+        suffix = "" if item.get("latest") else "，非最新"
+        bits.append(f"{label} {number}（asOf {as_of}{suffix}）")
+    return bits
+
+
+def today_item(title, why, source, evidence_ids, research_id):
+    text = title
+    if why:
+        text = title.rstrip("。") + "。" + why
+    return {
+        "title": title,
+        "text": text,
+        "whyItMatters": why,
+        "source": source,
+        "evidence": evidence_ids,
+        "researchId": research_id,
+    }
+
+
+def build_executive_summary(selected):
+    signals = []
+    macro = theme_items(selected, "macro")
+    taiwan = theme_items(selected, "taiwan", latest_only=True)
+    ai = theme_items(selected, "ai", latest_only=True)
+    global_eq = theme_items(selected, "global", latest_only=True)
+
+    if macro:
+        bits = format_group(macro, "percent")
+        if bits:
+            signals.append("美債：" + "、".join(bits) + "。Evidence " + "/".join(item["instrument"] for item in macro) + "。")
+    if taiwan:
+        bits = format_group(taiwan, taiwan[0]["row"].get("unit") or "index")
+        if bits:
+            signals.append("台股：" + "、".join(bits) + "。Evidence " + "/".join(item["instrument"] for item in taiwan) + "。")
+    if ai:
+        bits = format_group(ai, "index")
+        rid = ai[0].get("researchId")
+        link = f" 對既有研究卡 {rid}。" if rid else ""
+        if bits:
+            signals.append("半導體：" + "、".join(bits) + "。" + link + "Evidence " + "/".join(item["instrument"] for item in ai) + "。")
+    elif global_eq and len(signals) < MAX_EXEC_SIGNALS:
+        bits = format_group(global_eq, "index")
+        if bits:
+            signals.append("美股：" + "、".join(bits) + "。Evidence " + "/".join(item["instrument"] for item in global_eq) + "。")
+
+    signals = signals[:MAX_EXEC_SIGNALS]
+    if not signals:
+        return "今日沒有足夠的 investment-relevant Evidence。", []
+    lines = [f"{index}. {text}" for index, text in enumerate(signals, start=1)]
+    return "\n".join(lines), signals
+
+
+def build_today_things(selected):
+    things = []
+    groups = [
+        ("macro", theme_items(selected, "macro", latest_only=True), "percent"),
+        ("taiwan", theme_items(selected, "taiwan", latest_only=True), None),
+        ("ai", theme_items(selected, "ai", latest_only=True), "index"),
+        ("global", theme_items(selected, "global", latest_only=True), "index"),
+    ]
+    for theme, items, unit in groups:
+        if len(things) >= MAX_TODAY_THINGS:
+            break
+        if not items:
+            continue
+        fallback = unit or (items[0]["row"].get("unit") or "index")
+        bits = format_group(items, fallback)
+        if not bits:
+            continue
+        sources = []
+        for item in items:
+            source_id = item["row"].get("sourceId")
+            if source_id and source_id not in sources:
+                sources.append(source_id)
+        rid = None
+        for item in items:
+            if item.get("researchId"):
+                rid = item["researchId"]
+                break
+        title = "；".join(bits)
+        things.append(today_item(
+            title,
+            THEME_WHY.get(theme) or "",
+            "；".join(sources),
+            [item["instrument"] for item in items],
+            rid,
+        ))
+    return things[:MAX_TODAY_THINGS]
+
+
 def build_brief(root, evidence, previous):
     valued_dates = [item.get("asOf") for item in evidence.values() if is_valued(item)]
     if not valued_dates:
         fail("no valued Evidence asOf found")
     date = sorted(valued_dates)[-1]
-
-    def get(name):
-        return evidence.get(name) or {}
-
-    us10 = get("US10Y")
-    us30 = get("US30Y")
-    nasdaq = get("Nasdaq")
-    spx = get("SPX")
-    dji = get("DJI")
-    sox = get("SOX")
-    taiex = get("TAIEX")
-    foreign = get("TW_FOREIGN_NET")
-    trust = get("TW_TRUST_NET")
-    dealer = get("TW_DEALER_NET")
+    selected, excluded = select_evidence(root, evidence, date)
+    by_id = selected_map(selected)
 
     temperature = {}
     for instrument, label in TEMPERATURE_KEYS.items():
-        row = get(instrument)
-        if is_valued(row):
+        hit = by_id.get(instrument)
+        if hit and hit.get("latest") and in_section(hit, "marketTemperature"):
+            number = fmt_number(hit["row"].get("value"), hit["row"].get("unit") or "index")
+            if number is None:
+                continue
             temperature[label] = {
-                "value": fmt_number(row.get("value"), row.get("unit") or "index"),
-                "asOf": item_as_of(row),
+                "value": number,
+                "asOf": item_as_of(hit["row"]),
             }
-        elif isinstance(row, dict) and row.get("status") == "unavailable":
-            temperature[label] = {"value": "--", "asOf": "unavailable"}
 
     lens = []
-    if is_valued(us10):
-        lens.append(f"US 10Y｜{fmt_number(us10.get('value'), 'percent')}：asOf {us10.get('asOf')}（Evidence {us10.get('sourceId') or 'fred-dgs10'}）。")
-    if is_valued(us30):
-        lens.append(f"US 30Y｜{fmt_number(us30.get('value'), 'percent')}：asOf {us30.get('asOf')}（Evidence {us30.get('sourceId') or 'fred-dgs30'}）。")
-    if is_valued(taiex):
-        lens.append(f"TAIEX｜{fmt_number(taiex.get('value'), 'index')}：asOf {taiex.get('asOf')}。")
-    if not lens:
-        lens.append("今日 Evidence 尚未提供足夠的宏觀數值。")
-
-    global_bits = []
-    if is_valued(us10):
-        global_bits.append(f"US10Y {fmt_number(us10.get('value'), 'percent')}（{us10.get('asOf')}）")
-    if is_valued(us30):
-        global_bits.append(f"US30Y {fmt_number(us30.get('value'), 'percent')}（{us30.get('asOf')}）")
-    for row, label in ((nasdaq, "Nasdaq"), (spx, "S&P 500"), (dji, "Dow"), (sox, "SOX")):
-        if is_valued(row):
-            global_bits.append(f"{label} {fmt_number(row.get('value'), 'index')}（{row.get('asOf')}）")
-        elif row.get("status") == "unavailable":
-            global_bits.append(f"{label} unavailable")
-    global_summary = "；".join(global_bits) if global_bits else "全球市場 Evidence 不足。"
-
-    global_items = []
-    if is_valued(us10) or is_valued(us30):
-        global_items.append(news_item(
-            f"美債：US10Y {fmt_number(us10.get('value'), 'percent') if is_valued(us10) else '--'}、US30Y {fmt_number(us30.get('value'), 'percent') if is_valued(us30) else '--'}",
-            "Global",
-            None,
-        ))
-    if any(is_valued(row) or row.get("status") == "unavailable" for row in (nasdaq, spx, dji)):
-        global_items.append(news_item(
-            f"美股指數 Evidence：Nasdaq {fmt_number(nasdaq.get('value'), 'index') if is_valued(nasdaq) else '--'}、S&P 500 {fmt_number(spx.get('value'), 'index') if is_valued(spx) else '--'}、Dow {fmt_number(dji.get('value'), 'index') if is_valued(dji) else '--'}",
-            "Global",
-            None,
-        ))
-
-    taiwan_bits = []
-    if is_valued(taiex):
-        taiwan_bits.append(f"TAIEX {fmt_number(taiex.get('value'), 'index')}（{taiex.get('asOf')}）")
-    if is_valued(foreign):
-        taiwan_bits.append(f"外資淨買超 {fmt_number(foreign.get('value'), 'TWD_hundred_million')}（{foreign.get('asOf')}）")
-    if is_valued(trust):
-        taiwan_bits.append(f"投信 {fmt_number(trust.get('value'), 'TWD_hundred_million')}")
-    if is_valued(dealer):
-        taiwan_bits.append(f"自營 {fmt_number(dealer.get('value'), 'TWD_hundred_million')}")
-    taiwan_summary = "；".join(taiwan_bits) if taiwan_bits else "台股 Evidence 不足。"
-    taiwan_items = []
-    if is_valued(taiex):
-        taiwan_items.append(news_item(
-            f"台股加權 {fmt_number(taiex.get('value'), 'index')}（{taiex.get('asOf')}）",
-            "台股",
-            None,
-        ))
-    if is_valued(foreign) or is_valued(trust) or is_valued(dealer):
-        taiwan_items.append(news_item(
-            f"三大法人：外資 {fmt_number(foreign.get('value'), 'TWD_hundred_million') if is_valued(foreign) else '--'}、投信 {fmt_number(trust.get('value'), 'TWD_hundred_million') if is_valued(trust) else '--'}、自營 {fmt_number(dealer.get('value'), 'TWD_hundred_million') if is_valued(dealer) else '--'}",
-            "台股",
-            None,
-        ))
-
-    sox_rid = resolve_research_id(root, "SOX")
-    ai_items = []
-    if is_valued(sox) or sox.get("status") == "unavailable":
-        title = (
-            f"SOX {fmt_number(sox.get('value'), 'index')}（{sox.get('asOf')}）"
-            if is_valued(sox)
-            else "SOX Evidence unavailable"
+    for name in ("US10Y", "US30Y", "TAIEX"):
+        hit = by_id.get(name)
+        if not hit or not in_section(hit, "macroDecisionLens"):
+            continue
+        row = hit["row"]
+        number = fmt_number(row.get("value"), row.get("unit") or "index")
+        if number is None:
+            continue
+        latest_note = "" if hit.get("latest") else "，非最新"
+        lens.append(
+            f"{name}｜{number}：asOf {row.get('asOf')}{latest_note}（Evidence {row.get('sourceId') or name}）。"
         )
-        ai_items.append({"title": title, "researchId": sox_rid})
+
+    global_hits = [item for item in selected if in_section(item, "globalMarketAndNews")]
+    global_bits = format_group(global_hits, "index")
+    global_summary = "；".join(global_bits) if global_bits else "全球市場沒有可選入 Brief 的最新 Evidence。"
+    global_items = []
+    macro_hits = [item for item in global_hits if item.get("theme") == "macro"]
+    equity_hits = [item for item in global_hits if item.get("theme") == "global" and item.get("latest")]
+    if macro_hits:
+        global_items.append(news_item("美債：" + "、".join(format_group(macro_hits, "percent")), "Global", None))
+    if equity_hits:
+        global_items.append(news_item("美股指數：" + "、".join(format_group(equity_hits, "index")), "Global", None))
+
+    taiwan_hits = [item for item in selected if in_section(item, "taiwanMarketAndNews") and item.get("latest")]
+    taiwan_bits = format_group(taiwan_hits, "index")
+    taiwan_summary = "；".join(taiwan_bits) if taiwan_bits else "台股沒有可選入 Brief 的最新 Evidence。"
+    taiwan_items = []
+    taiex = by_id.get("TAIEX")
+    if taiex and taiex.get("latest"):
+        number = fmt_number(taiex["row"].get("value"), "index")
+        if number is not None:
+            taiwan_items.append(news_item(
+                f"TAIEX {number}（{taiex['row'].get('asOf')}）",
+                "台股",
+                None,
+            ))
+    flow = [item for item in taiwan_hits if item["instrument"].startswith("TW_")]
+    if flow:
+        taiwan_items.append(news_item(
+            "三大法人：" + "、".join(format_group(flow, "TWD_hundred_million")),
+            "台股",
+            None,
+        ))
+
+    sox = by_id.get("SOX")
+    ai_items = []
+    if sox and sox.get("latest") and in_section(sox, "aiIndustryHighlights"):
+        number = fmt_number(sox["row"].get("value"), "index")
+        if number is not None:
+            ai_items.append({
+                "title": f"SOX {number}（{sox['row'].get('asOf')}）",
+                "researchId": sox.get("researchId"),
+            })
 
     prev = previous if isinstance(previous, dict) else {}
     ai_items.extend(carry_linked_items(prev.get("aiIndustryHighlights"), root))
@@ -331,37 +580,8 @@ def build_brief(root, evidence, previous):
         seen_titles.add(key)
         deduped_ai.append(item)
 
-    things = []
-    if is_valued(us10) or is_valued(us30):
-        things.append({
-            "text": f"美債 Evidence：US10Y {fmt_number(us10.get('value'), 'percent') if is_valued(us10) else '--'}、US30Y {fmt_number(us30.get('value'), 'percent') if is_valued(us30) else '--'}。",
-            "researchId": None,
-        })
-    if is_valued(taiex) or is_valued(foreign):
-        things.append({
-            "text": f"台股 Evidence：{taiwan_summary}",
-            "researchId": None,
-        })
-    if is_valued(sox) or sox.get("status") == "unavailable":
-        things.append({
-            "text": (
-                f"半導體指數 SOX {fmt_number(sox.get('value'), 'index')}（{sox.get('asOf')}）。"
-                if is_valued(sox)
-                else "SOX Evidence unavailable。"
-            ),
-            "researchId": sox_rid,
-        })
-    while len(things) < 3:
-        things.append({"text": "今日其餘 Evidence 欄位不足，不虛構新聞。", "researchId": None})
-    things = things[:3]
-
-    summary = (
-        f"Evidence Brief asOf {date}。"
-        + global_summary
-        + "。"
-        + taiwan_summary
-        + "。本 Brief 由 data/evidence 產生，不虛構未出現在 Evidence 的新聞。"
-    )
+    things = build_today_things(selected)
+    summary, _signals = build_executive_summary(selected)
 
     return {
         "date": date,
@@ -375,6 +595,10 @@ def build_brief(root, evidence, previous):
         "today3Things": things,
         "opportunityRadar": radar_ids(root),
         "opportunityRadarException": False,
+        "_selection": {
+            "selected": [item["instrument"] for item in selected],
+            "excluded": [item["instrument"] for item in excluded],
+        },
     }
 
 
@@ -393,6 +617,7 @@ def main(argv):
     previous = load_json(dest) if os.path.isfile(dest) else {}
     evidence = load_evidence(root)
     brief = build_brief(root, evidence, previous)
+    selection = brief.pop("_selection", {})
     for key in CANONICAL_FIELDS:
         if key not in brief:
             fail("generator omitted canonical field: " + key)
@@ -405,6 +630,8 @@ def main(argv):
     print("date=" + brief["date"])
     print("dest=" + dest)
     print("instruments=" + ",".join(sorted(evidence.keys())))
+    print("selected=" + ",".join(selection.get("selected") or []))
+    print("excluded=" + ",".join(selection.get("excluded") or []))
     return 0
 
 

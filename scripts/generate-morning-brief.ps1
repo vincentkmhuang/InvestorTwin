@@ -1,4 +1,4 @@
-# 031-A Morning Brief generator wrapper. Reads Evidence, writes data/morning-brief.json.
+# 031-B Morning Brief generator wrapper. Selection + mapping; writes data/morning-brief.json.
 param(
   [string]$RootPath
 )

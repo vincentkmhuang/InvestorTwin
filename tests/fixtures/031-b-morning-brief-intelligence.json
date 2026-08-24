@@ -1,0 +1,7 @@
+{
+  "soxResearchId": "hbm",
+  "missingResearchId": "does-not-exist-031b",
+  "excludedInstrument": "ORPHAN_NEWS",
+  "noiseInstrument": "TW_DEALER_NET",
+  "paddingPhrase": "不虛構新聞"
+}
