@@ -1,0 +1,14 @@
+{
+  "statusKeys": [
+    "ok",
+    "startedAt",
+    "finishedAt",
+    "briefDate",
+    "runId",
+    "exitCode",
+    "stage",
+    "error"
+  ],
+  "canonicalBrief": "data/morning-brief.json",
+  "legacyLatest": "data/morning-brief/latest.json"
+}

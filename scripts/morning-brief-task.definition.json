@@ -1,0 +1,51 @@
+{
+  "taskPath": "\\InvestorTwin\\",
+  "taskName": "MorningBriefDailyUpdate",
+  "description": "Investor Twin daily Morning Brief update. Collector then Generator. Does not commit, push, deploy, open a browser, POST Queue, or create Cards.",
+  "powershellExe": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+  "scriptPath": "C:\\InvestorTwin\\scripts\\update-morning-brief.ps1",
+  "rootPath": "C:\\InvestorTwin",
+  "workingDirectory": "C:\\InvestorTwin",
+  "requiredArguments": [
+    "-NoProfile",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    "-Live",
+    "-RootPath",
+    "-PythonPath"
+  ],
+  "trigger": {
+    "type": "Daily",
+    "at": "08:00",
+    "timezone": "local",
+    "expectedTimeZoneId": "Taipei Standard Time"
+  },
+  "principal": {
+    "logonType": "Interactive",
+    "runLevel": "Limited",
+    "forbidSystemAccount": true
+  },
+  "settings": {
+    "multipleInstances": "IgnoreNew",
+    "executionTimeLimitMinutes": 30,
+    "allowDemandStart": true,
+    "startWhenAvailable": true,
+    "wakeToRun": false,
+    "disallowStartIfOnBatteries": false,
+    "stopIfGoingOnBatteries": false,
+    "runOnlyIfNetworkAvailable": false
+  },
+  "statusFile": "C:\\InvestorTwin\\data\\morning-brief-update-status.json",
+  "canonicalBrief": "C:\\InvestorTwin\\data\\morning-brief.json",
+  "forbid": [
+    "github-actions",
+    "vercel-cron",
+    "git-commit",
+    "git-push",
+    "deploy",
+    "api-queue",
+    "card-create",
+    "browser"
+  ]
+}

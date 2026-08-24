@@ -1,6 +1,7 @@
 # 031-B Morning Brief generator wrapper. Selection + mapping; writes data/morning-brief.json.
 param(
-  [string]$RootPath
+  [string]$RootPath,
+  [string]$PythonPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -16,10 +17,13 @@ if (-not (Test-Path -LiteralPath $Generator)) {
   throw "Missing generator: $Generator"
 }
 
+if (-not $PythonPath) { $PythonPath = $env:INVESTORTWIN_PYTHON }
+if (-not $PythonPath) { $PythonPath = 'python' }
+
 $prev = $ErrorActionPreference
 $ErrorActionPreference = 'Continue'
 try {
-  $output = & python $Generator --root $RootPath 2>&1
+  $output = & $PythonPath $Generator --root $RootPath 2>&1
   $exitCode = $LASTEXITCODE
 } finally {
   $ErrorActionPreference = $prev

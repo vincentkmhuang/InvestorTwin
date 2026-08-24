@@ -1,0 +1,19 @@
+{
+  "taskName": "MorningBriefDailyUpdate",
+  "taskPath": "\\InvestorTwin\\",
+  "powershellExe": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+  "scriptPath": "C:\\InvestorTwin\\scripts\\update-morning-brief.ps1",
+  "workingDirectory": "C:\\InvestorTwin",
+  "at": "08:00",
+  "logonType": "Interactive",
+  "statusKeys": [
+    "ok",
+    "startedAt",
+    "finishedAt",
+    "briefDate",
+    "runId",
+    "exitCode",
+    "stage",
+    "error"
+  ]
+}

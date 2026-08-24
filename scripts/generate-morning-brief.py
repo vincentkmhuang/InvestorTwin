@@ -119,9 +119,25 @@ def write_json(path, payload):
     if not unix.endswith("data/morning-brief.json"):
         fail("generator may only write data/morning-brief.json")
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8", newline="\n") as handle:
-        json.dump(payload, handle, ensure_ascii=False, indent=2)
-        handle.write("\n")
+    tmp = path + ".tmp"
+    backup = os.path.join(os.path.dirname(path), "morning-brief.backup.json")
+    try:
+        with open(tmp, "w", encoding="utf-8", newline="\n") as handle:
+            json.dump(payload, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+        loaded = load_json(tmp)
+        for key in CANONICAL_FIELDS:
+            if key not in loaded:
+                fail("temp brief omitted canonical field: " + key)
+        if os.path.isfile(path):
+            shutil.copy2(path, backup)
+        os.replace(tmp, path)
+    finally:
+        if os.path.isfile(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
 
 
 def card_exists(root, research_id):
@@ -621,10 +637,6 @@ def main(argv):
     for key in CANONICAL_FIELDS:
         if key not in brief:
             fail("generator omitted canonical field: " + key)
-    backup = os.path.join(root, "data", "morning-brief.backup.json")
-    os.makedirs(os.path.dirname(dest), exist_ok=True)
-    if os.path.isfile(dest):
-        shutil.copy2(dest, backup)
     write_json(dest, brief)
     print("BRIEF_GEN_OK")
     print("date=" + brief["date"])

@@ -4,6 +4,7 @@ param(
   [string]$RootPath,
   [string]$ExpectedAsOf,
   [string]$CapturedAt,
+  [string]$PythonPath,
   [switch]$Live
 )
 
@@ -33,6 +34,9 @@ if ($InputPath) {
   }
 }
 
+if (-not $PythonPath) { $PythonPath = $env:INVESTORTWIN_PYTHON }
+if (-not $PythonPath) { $PythonPath = 'python' }
+
 $pyArgs = @($Collector, '--root', $RootPath)
 if ($InputPath) { $pyArgs += @('--input', $InputPath) }
 if ($ExpectedAsOf) { $pyArgs += @('--expected-asof', $ExpectedAsOf) }
@@ -42,7 +46,7 @@ if ($Live) { $pyArgs += '--live' }
 $prev = $ErrorActionPreference
 $ErrorActionPreference = 'Continue'
 try {
-  $output = & python @pyArgs 2>&1
+  $output = & $PythonPath @pyArgs 2>&1
   $exitCode = $LASTEXITCODE
 } finally {
   $ErrorActionPreference = $prev
