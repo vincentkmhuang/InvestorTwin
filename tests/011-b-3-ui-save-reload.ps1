@@ -369,7 +369,7 @@ try {
 
   $fail1 = New-Object System.Collections.Generic.List[string]
   if ($IndexSrc -notmatch 'js/workflow-engine\.js\?v=') { $fail1.Add('index.html does not load workflow-engine.js with a cache token') }
-  if ($IndexSrc -notlike '*workflow-engine.js?v=027a1*') { $fail1.Add('index.html is not on workflow-engine.js?v=027a1; a stale tab can keep an older editor/save path') }
+  if ($IndexSrc -notlike '*workflow-engine.js?v=029a1*') { $fail1.Add('index.html is not on workflow-engine.js?v=029a1; a stale tab can keep an older editor/save path') }
   if ($EngineSrc -notlike "*lastIndexOf('|')*") { $fail1.Add('parseMonitoringEditorLines does not split on |') }
   if ($EngineSrc -notlike '*monitoringItems: this.normalizeMonitoringItems(monitoringItems)*') { $fail1.Add('saveCasePositionPlaybook payload omits monitoringItems') }
   if ($EngineSrc -notlike '*JSON.stringify({ id: caseId, positionPlaybook: payload })*') { $fail1.Add('Save does not POST { id, positionPlaybook }') }

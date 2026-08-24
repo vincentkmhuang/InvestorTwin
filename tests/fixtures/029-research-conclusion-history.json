@@ -1,0 +1,11 @@
+{
+  "researchId": "sprint-029",
+  "thesisId": "sprint-029-thesis",
+  "conclusion1": "029 first conclusion: initial research on the same card.",
+  "conclusion2": "029 second conclusion: re-research after monitoring trigger.",
+  "status": "uncertain",
+  "asOf1": "2026-08-23",
+  "asOf2": "2026-08-24",
+  "triggerText": "official source no longer supports the prior production-qualification claim",
+  "queueSchemaKeys": ["id", "addedFrom"]
+}

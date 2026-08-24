@@ -138,6 +138,12 @@ const WorkflowEngine = {
         : legacy.split(/[、,]/).map(s => s.trim()).filter(Boolean);
     }
 
+    if (card.researchConclusionHistory == null) {
+      card.researchConclusionHistory = [];
+    } else if (!Array.isArray(card.researchConclusionHistory)) {
+      card.researchConclusionHistory = [card.researchConclusionHistory];
+    }
+
     return card;
   },
 
@@ -192,6 +198,39 @@ const WorkflowEngine = {
       return { ok: true, updated: data.updated === true, id: data.id || id };
     } catch (_) {
       return { ok: false, error: 'persistence_failure' };
+    }
+  },
+
+  async saveResearchConclusion(id, conclusion, status, asOf, reason) {
+    const text = (conclusion || '').trim();
+    if (!text) return { ok: false, message: 'Research Conclusion is empty' };
+    const payload = {
+      researchConclusion: {
+        conclusion: text,
+        status: (status || 'uncertain').trim() || 'uncertain',
+        asOf: (asOf || '').trim() || new Date().toISOString().slice(0, 10)
+      }
+    };
+    const reasonText = (reason || '').trim();
+    if (reasonText) payload.researchConclusion.reason = reasonText;
+    const confirmed = window.confirm(
+      `確定保存 Research Conclusion？\n按「確定」後才會寫入 Research Card。\n不會修改 Thesis.status、Decision 或 Position Playbook。`
+    );
+    if (!confirmed) return { ok: false, cancelled: true, message: '已取消，未保存' };
+    try {
+      const res = await fetch(`/api/research/${encodeURIComponent(id)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return { ok: false, error: data.error || 'persistence_failure', message: data.message };
+      }
+      delete this.researchCache[id];
+      return { ok: true, updated: data.updated === true, id: data.id || id, asOf: data.asOf };
+    } catch (_) {
+      return { ok: false, error: 'persistence_failure', message: 'Failed to save Research Conclusion' };
     }
   },
 
@@ -276,6 +315,25 @@ const WorkflowEngine = {
       label: ready ? 'Ready for Thesis Review' : 'Not ready for Thesis Review',
       missing
     };
+  },
+
+  renderResearchConclusionHistory(history) {
+    const list = Array.isArray(history) ? history : [];
+    if (!list.length) return '<p data-research-history>--</p>';
+    let reCount = 0;
+    const items = list.map(entry => {
+      const type = entry?.type === 're-research' ? 're-research' : 'initial';
+      let label = 'Initial Research';
+      if (type === 're-research') {
+        reCount += 1;
+        label = `Re-research #${reCount}`;
+      }
+      const reason = entry?.reason
+        ? `<br>Reason: ${this.escapeHtml(entry.reason)}`
+        : '';
+      return `<li data-history-type="${type}"><b>${this.escapeHtml(label)}</b> · ${this.escapeHtml(entry.asOf || '--')}${reason}<br>${this.escapeHtml(entry.conclusion || '--')}</li>`;
+    });
+    return `<ul data-research-history>${items.join('')}</ul>`;
   },
 
   renderIntegrityGate(gate) {
@@ -496,11 +554,20 @@ const WorkflowEngine = {
       : '<p>--</p>';
     html += `<p><b>Investment Thesis</b></p><p>${card.investmentThesis || '--'}</p>`;
     const researchConclusion = card.researchConclusion;
+    html += '<p><b>Current Research Conclusion</b></p>';
     if (researchConclusion && typeof researchConclusion === 'object') {
-      html += '<p><b>Research Conclusion</b></p>';
-      html += `<p>${this.escapeHtml(researchConclusion.conclusion || '--')}</p>`;
+      html += `<p data-current-conclusion>${this.escapeHtml(researchConclusion.conclusion || '--')}</p>`;
       html += `<p>Status: ${this.escapeHtml(researchConclusion.status || '--')}</p>`;
       html += `<p>As of: ${this.escapeHtml(researchConclusion.asOf || '--')}</p>`;
+    } else {
+      html += '<p data-current-conclusion>--</p>';
+    }
+    html += '<p><b>Research History</b></p>';
+    html += this.renderResearchConclusionHistory(card.researchConclusionHistory);
+    html += '<p><b>Save Research Conclusion</b></p>';
+    html += '<textarea data-conclusion-text rows="4" style="width:100%;box-sizing:border-box"></textarea>';
+    html += '<p><button type="button" data-conclusion-save>Save Research Conclusion</button></p>';
+    if (researchConclusion && typeof researchConclusion === 'object') {
       html += '<p><b>Supporting Evidence</b></p>';
       html += this.renderEvidenceItems(supportingLines);
       html += '<p><b>Counter Evidence</b></p>';
@@ -573,6 +640,34 @@ const WorkflowEngine = {
         }
       };
     });
+
+    const conclusionSaveBtn = container.querySelector('[data-conclusion-save]');
+    const conclusionInput = container.querySelector('[data-conclusion-text]');
+    if (conclusionSaveBtn && conclusionInput) {
+      conclusionSaveBtn.onclick = async () => {
+        const result = await this.saveResearchConclusion(
+          card.id,
+          conclusionInput.value,
+          card.researchConclusion?.status,
+          null,
+          null
+        );
+        if (result.cancelled) {
+          window.alert(result.message);
+          return;
+        }
+        if (!result.ok) {
+          window.alert(result.message || 'Failed to save Research Conclusion');
+          return;
+        }
+        if (typeof openResearchCard === 'function') {
+          await openResearchCard(card.id, container, { fromNavigation: true });
+        } else {
+          const fresh = await this.loadResearch(card.id);
+          await this.renderResearch(fresh, container);
+        }
+      };
+    }
 
     const saveBtn = container.querySelector('[data-append-save]');
     const noteInput = container.querySelector('[data-append-note]');

@@ -67,7 +67,7 @@ function ConvertTo-JsonArrayText($items) {
 }
 
 function Write-ResearchCardJson($cardPath, $cardObj, $questions) {
-  $arrayKeys = @('tags', 'related')
+  $arrayKeys = @('tags', 'related', 'researchConclusionHistory')
   $parts = New-Object System.Collections.Generic.List[string]
   $wroteQuestions = $false
   foreach ($prop in $cardObj.PSObject.Properties) {
@@ -1125,6 +1125,130 @@ function Add-ResearchNoteAndQuestion($rootPath, $id, $noteText, $questionText) {
   return $true
 }
 
+function Get-ResearchConclusionText($obj) {
+  if (-not (Test-IsJsonObject $obj)) { return '' }
+  if (-not (Test-HasJsonProperty $obj 'conclusion')) { return '' }
+  return ([string]$obj.conclusion).Trim()
+}
+
+function Get-LatestReResearchReasonFromNotes($rootPath, $researchId) {
+  $notesPath = Join-Path $rootPath ("research\" + $researchId + "\notes.json")
+  if (-not (Test-Path $notesPath)) { return $null }
+  $parsed = Read-Utf8Json $notesPath
+  $notes = @()
+  if ($parsed -is [System.Array]) {
+    $notes = @($parsed)
+  } elseif ($parsed -and (Test-HasJsonProperty $parsed 'notes')) {
+    $notes = @(Get-AsArray $parsed.notes)
+  }
+  $reason = $null
+  foreach ($entry in $notes) {
+    $text = ''
+    if (Test-IsJsonObject $entry) {
+      if (Test-HasJsonProperty $entry 'text') { $text = [string]$entry.text }
+    } else {
+      $text = [string]$entry
+    }
+    if ($text -like 'needs re-research:*') { $reason = $text.Trim() }
+  }
+  return $reason
+}
+
+function Save-ResearchConclusion($rootPath, $researchId, $incoming) {
+  $cardPath = Join-Path $rootPath ("research\" + $researchId + "\card.json")
+  if (-not (Test-Path $cardPath)) {
+    return @{ ok = $false; error = 'missing_research'; message = 'card.json missing for existing research' }
+  }
+  $conclusionText = Get-ResearchConclusionText $incoming
+  if (-not $conclusionText) {
+    return @{ ok = $false; error = 'invalid_payload'; message = 'researchConclusion.conclusion is required' }
+  }
+
+  $card = Read-Utf8Json $cardPath
+  $today = Get-Date -Format 'yyyy-MM-dd'
+  $asOf = $today
+  if (Test-IsJsonObject $incoming -and (Test-HasJsonProperty $incoming 'asOf') -and $incoming.asOf) {
+    $asOfText = ([string]$incoming.asOf).Trim()
+    if ($asOfText) { $asOf = $asOfText }
+  }
+  $status = 'uncertain'
+  if (Test-IsJsonObject $incoming -and (Test-HasJsonProperty $incoming 'status') -and $incoming.status) {
+    $statusText = ([string]$incoming.status).Trim()
+    if ($statusText) { $status = $statusText }
+  }
+
+  $historyList = New-Object System.Collections.Generic.List[object]
+  if (Test-HasJsonProperty $card 'researchConclusionHistory') {
+    foreach ($item in @(Get-AsArray $card.researchConclusionHistory)) {
+      if ($null -ne $item) { [void]$historyList.Add($item) }
+    }
+  }
+
+  $currentText = Get-ResearchConclusionText $card.researchConclusion
+  if ($currentText -and $historyList.Count -eq 0) {
+    $old = $card.researchConclusion
+    $oldAsOf = $today
+    if (Test-IsJsonObject $old -and $old.asOf) { $oldAsOf = [string]$old.asOf }
+    $oldStatus = 'uncertain'
+    if (Test-IsJsonObject $old -and $old.status) { $oldStatus = [string]$old.status }
+    [void]$historyList.Add([PSCustomObject]@{
+      asOf = $oldAsOf
+      status = $oldStatus
+      conclusion = $currentText
+      type = 'initial'
+      reason = $null
+    })
+  }
+
+  $type = if ($historyList.Count -eq 0) { 'initial' } else { 're-research' }
+  $incomingReason = $null
+  if (Test-IsJsonObject $incoming -and (Test-HasJsonProperty $incoming 'reason') -and $incoming.reason) {
+    $incomingReason = ([string]$incoming.reason).Trim()
+    if (-not $incomingReason) { $incomingReason = $null }
+  }
+  $reason = $null
+  if ($type -eq 're-research') {
+    $reason = $incomingReason
+    if (-not $reason) { $reason = Get-LatestReResearchReasonFromNotes $rootPath $researchId }
+  }
+
+  $entry = [PSCustomObject]@{
+    asOf = $asOf
+    status = $status
+    conclusion = $conclusionText
+    type = $type
+    reason = $reason
+  }
+
+  $dup = $false
+  if ($historyList.Count -gt 0) {
+    $last = $historyList[$historyList.Count - 1]
+    if ((Get-ResearchConclusionText $last) -eq $conclusionText -and [string]$last.asOf -eq [string]$asOf) {
+      $dup = $true
+    }
+  }
+  if (-not $dup) { [void]$historyList.Add($entry) }
+
+  $current = [PSCustomObject]@{
+    conclusion = $conclusionText
+    status = $status
+    asOf = $asOf
+  }
+  $card | Add-Member -NotePropertyName researchConclusion -NotePropertyValue $current -Force
+  $card | Add-Member -NotePropertyName researchConclusionHistory -NotePropertyValue @($historyList.ToArray()) -Force
+  $card.updated = $today
+  $questions = @()
+  if (Test-HasJsonProperty $card 'questions') {
+    $questions = @(Get-AsArray $card.questions)
+  }
+  Write-ResearchCardJson $cardPath $card $questions
+  return @{
+    ok = $true
+    asOf = $asOf
+    historyCount = $historyList.Count
+  }
+}
+
 function Invoke-MonitoringTriggerRequest($rootPath, $response, $body) {
   $trigger = $body.monitoringTrigger
   if (-not (Test-IsJsonObject $trigger)) {
@@ -1145,10 +1269,8 @@ function Invoke-MonitoringTriggerRequest($rootPath, $response, $body) {
 
   try {
     $queueResult = Ensure-QueueItem $rootPath $researchId 'Monitoring'
-    if (-not $queueResult.added) {
-      $noteText = 'needs re-research: ' + $text
-      Add-ResearchNoteAndQuestion $rootPath $researchId $noteText $text
-    }
+    $noteText = 'needs re-research: ' + $text
+    Add-ResearchNoteAndQuestion $rootPath $researchId $noteText $text | Out-Null
     Send-Json $response @{
       updated = $true
       id = $researchId
@@ -1634,8 +1756,28 @@ while ($listener.IsListening) {
           if ($hasThesisId) {
             $incomingThesisId = if ($null -eq $body.thesisId) { '' } else { ([string]$body.thesisId).Trim() }
           }
+          $hasConclusion = $body -and (Test-HasJsonProperty $body 'researchConclusion')
 
-          if ($hasThesisId -and $noteText) {
+          if ($hasConclusion -and ($hasThesisId -or $noteText)) {
+            Send-Json $response @{ error = 'invalid_payload'; message = 'send researchConclusion or appendNote/thesisId, not both' } 400
+          } elseif ($hasConclusion) {
+            try {
+              $saved = Save-ResearchConclusion $root $id $body.researchConclusion
+              if (-not $saved.ok) {
+                Send-Json $response @{ error = $saved.error; message = $saved.message } 400
+              } else {
+                Send-Json $response @{
+                  created = $false
+                  updated = $true
+                  id = $id
+                  asOf = $saved.asOf
+                  historyCount = $saved.historyCount
+                }
+              }
+            } catch {
+              Send-Json $response @{ error = 'persistence_failure'; message = $_.Exception.Message } 500
+            }
+          } elseif ($hasThesisId -and $noteText) {
             Send-Json $response @{ error = 'invalid_payload'; message = 'send thesisId or appendNote, not both' } 400
           } elseif ($hasThesisId) {
             if (-not (Test-ValidThesisId $incomingThesisId)) {
