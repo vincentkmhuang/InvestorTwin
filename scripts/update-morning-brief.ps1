@@ -179,10 +179,22 @@ function Invoke-ChildScript($file, $argSplat) {
   if (-not (Test-Path -LiteralPath $pwsh)) {
     throw "Windows PowerShell not found: $pwsh"
   }
+  $named = @{}
+  $flags = New-Object System.Collections.Generic.List[string]
+  foreach ($key in @($argSplat.Keys)) {
+    $val = $argSplat[$key]
+    if ($val -is [switch]) {
+      if ($val.IsPresent) { [void]$flags.Add('-' + $key) }
+    } elseif ($val -is [bool]) {
+      if ($val) { [void]$flags.Add('-' + $key) }
+    } elseif ($null -ne $val -and [string]$val -ne '') {
+      $named[$key] = [string]$val
+    }
+  }
   $prev = $ErrorActionPreference
   $ErrorActionPreference = 'Continue'
   try {
-    $out = & $pwsh -NoProfile -ExecutionPolicy Bypass -File $file @argSplat 2>&1
+    $out = & $pwsh -NoProfile -ExecutionPolicy Bypass -File $file @named @($flags.ToArray()) 2>&1
     return @{ ExitCode = [int]$LASTEXITCODE; Text = (($out | ForEach-Object { "$_" }) -join "`n") }
   } finally {
     $ErrorActionPreference = $prev

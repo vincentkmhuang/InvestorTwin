@@ -74,6 +74,17 @@ function Write-Evidence($root, $instrument, $asOf, $value, $unit, $sourceId, $st
   Write-JsonFile (Join-Path $histDir ($asOf + '.json')) $row
 }
 
+function Write-Run($root, $runId, $expectedAsOf) {
+  $dir = Join-Path $root ("data\evidence\runs\" + $runId)
+  New-Item -ItemType Directory -Path $dir -Force | Out-Null
+  Write-JsonFile (Join-Path $dir 'run.json') ([ordered]@{
+    runId = $runId
+    capturedAt = ($expectedAsOf + 'T00:00:00Z')
+    expectedAsOf = $expectedAsOf
+    writesBrief = $false
+  })
+}
+
 function New-GenRoot($name) {
   $path = Join-Path $script:TempRoot $name
   New-Item -ItemType Directory -Path (Join-Path $path 'data\morning-brief') -Force | Out-Null
@@ -141,6 +152,7 @@ try {
   Write-Evidence $genRoot 'Nasdaq' '2026-08-21' 26180.46 'index' 'us-index-nasdaq' 'fresh'
   Write-Evidence $genRoot 'ORPHAN_NEWS' '2026-08-21' 1 'index' 'orphan-source' 'fresh'
   Write-Evidence $genRoot 'TW_DEALER_NET' '2026-08-21' 0.1 'TWD_hundred_million' 'twse-institutional' 'fresh'
+  Write-Run $genRoot 'run-20260821T000000Z' '2026-08-21'
   $queueBefore = (Get-FileHash -Path (Join-Path $genRoot 'data\research-queue.json') -Algorithm SHA256).Hash
   $casesBefore = (Get-FileHash -Path (Join-Path $genRoot 'data\investment-cases.json') -Algorithm SHA256).Hash
   $cardCountBefore = @(Get-ChildItem -Path (Join-Path $genRoot 'research') -Recurse -Filter 'card.json').Count
@@ -236,6 +248,7 @@ try {
 
   $sparseRoot = New-GenRoot 'sparse'
   Write-Evidence $sparseRoot 'US10Y' '2026-08-21' 4.69 'percent' 'fred-dgs10' 'fresh'
+  Write-Run $sparseRoot 'run-20260821T000000Z' '2026-08-21'
   $sparseGen = Invoke-Generate $sparseRoot
   $sparse = Read-JsonFile (Join-Path $sparseRoot 'data\morning-brief.json')
   $fail9 = New-Object System.Collections.Generic.List[string]

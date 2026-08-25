@@ -76,6 +76,17 @@ function Write-Evidence($root, $instrument, $asOf, $value, $unit, $sourceId, $st
   Write-JsonFile (Join-Path $histDir ($asOf + '.json')) $row
 }
 
+function Write-Run($root, $runId, $expectedAsOf) {
+  $dir = Join-Path $root ("data\evidence\runs\" + $runId)
+  New-Item -ItemType Directory -Path $dir -Force | Out-Null
+  Write-JsonFile (Join-Path $dir 'run.json') ([ordered]@{
+    runId = $runId
+    capturedAt = ($expectedAsOf + 'T00:00:00Z')
+    expectedAsOf = $expectedAsOf
+    writesBrief = $false
+  })
+}
+
 function New-SeedBriefRoot($path) {
   New-Item -ItemType Directory -Path (Join-Path $path 'data\morning-brief') -Force | Out-Null
   Copy-Item $ProdBriefPath (Join-Path $path 'data\morning-brief.json')
@@ -173,6 +184,7 @@ try {
   Write-Evidence $genRoot 'TAIEX' '2026-08-21' 45224.29 'index' 'twse-taiex' 'fresh'
   Write-Evidence $genRoot 'SOX' '2026-08-21' 11740.4 'index' 'us-index-sox' 'fresh'
   Write-Evidence $genRoot 'ORPHAN_NEWS' '2026-08-21' 1 'index' 'orphan-source' 'fresh'
+  Write-Run $genRoot 'run-20260821T000000Z' '2026-08-21'
   $oldDate = (Read-JsonFile (Join-Path $genRoot 'data\morning-brief.json')).date
   $gen = Invoke-Generate $genRoot
   $written = Read-JsonFile (Join-Path $genRoot 'data\morning-brief.json')
@@ -185,7 +197,7 @@ try {
   $fail4 = New-Object System.Collections.Generic.List[string]
   if (-not $written.date) { $fail4.Add('generated brief missing date') }
   elseif ([string]$written.date -eq [string]$oldDate) { $fail4.Add("brief date was copied from old brief: $oldDate") }
-  if ([string]$written.date -ne '2026-08-21') { $fail4.Add("date=$($written.date) expected max Evidence asOf 2026-08-21") }
+  if ([string]$written.date -ne '2026-08-21') { $fail4.Add("date=$($written.date) expected runDate 2026-08-21") }
   if (-not $written.executiveSummary) { $fail4.Add('executiveSummary missing') }
   if (-not $written.today3Things) { $fail4.Add('today3Things missing') }
   if ($written.executiveSummary -notlike '*Evidence*') { $fail4.Add('executiveSummary was not generated from Evidence') }

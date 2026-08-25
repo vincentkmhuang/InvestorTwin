@@ -508,11 +508,35 @@ def build_today_things(selected):
     return things[:MAX_TODAY_THINGS]
 
 
+def load_latest_run_meta(root):
+    run_dir = latest_run_dir(root)
+    if not run_dir:
+        return None
+    path = os.path.join(run_dir, "run.json")
+    if not os.path.isfile(path):
+        return None
+    try:
+        raw = load_json(path)
+    except Exception:
+        return None
+    return raw if isinstance(raw, dict) else None
+
+
+def resolve_run_date(root):
+    meta = load_latest_run_meta(root)
+    if not meta:
+        fail("no Evidence run found; Brief date must come from this run, not max Evidence asOf")
+    expected = meta.get("expectedAsOf")
+    if isinstance(expected, str) and DATE_RE.match(expected.strip()):
+        return expected.strip()
+    fail("Evidence run missing expectedAsOf")
+
+
 def build_brief(root, evidence, previous):
-    valued_dates = [item.get("asOf") for item in evidence.values() if is_valued(item)]
-    if not valued_dates:
+    date = resolve_run_date(root)
+    valued = [item for item in evidence.values() if is_valued(item)]
+    if not valued:
         fail("no valued Evidence asOf found")
-    date = sorted(valued_dates)[-1]
     selected, excluded = select_evidence(root, evidence, date)
     by_id = selected_map(selected)
 
@@ -640,6 +664,7 @@ def main(argv):
     write_json(dest, brief)
     print("BRIEF_GEN_OK")
     print("date=" + brief["date"])
+    print("runDate=" + brief["date"])
     print("dest=" + dest)
     print("instruments=" + ",".join(sorted(evidence.keys())))
     print("selected=" + ",".join(selection.get("selected") or []))
