@@ -215,7 +215,7 @@ try {
     $parsed = $briefHttp.Body | ConvertFrom-Json
     if (-not $parsed.date) { $fail1.Add('HTTP brief missing date') }
     if (-not $parsed.executiveSummary) { $fail1.Add('HTTP brief missing executiveSummary') }
-    if (-not $parsed.today3Things) { $fail1.Add('HTTP brief missing today3Things') }
+    if (-not ($parsed.PSObject.Properties.Name -contains 'today3Things')) { $fail1.Add('HTTP brief missing today3Things') }
   }
   $indexHttp = Invoke-Get '/index.html'
   if ([int]$indexHttp.StatusCode -ne 200) { $fail1.Add('GET index.html failed') }

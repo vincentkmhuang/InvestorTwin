@@ -1,0 +1,18 @@
+{
+  "runDate": "2026-08-25",
+  "priorAsOf": "2026-08-24",
+  "staleYieldAsOf": "2026-08-21",
+  "canonicalFields": [
+    "date",
+    "executiveSummary",
+    "macroDecisionLens",
+    "marketTemperature",
+    "globalMarketAndNews",
+    "taiwanMarketAndNews",
+    "aiIndustryHighlights",
+    "upcomingEvents",
+    "today3Things",
+    "opportunityRadar",
+    "opportunityRadarException"
+  ]
+}

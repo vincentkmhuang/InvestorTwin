@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 $env:PYTHONIOENCODING = 'utf-8'
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
-$FixturePath = Join-Path $PSScriptRoot 'fixtures\031-h-morning-brief-date-freshness.json'
+$FixturePath = Join-Path $PSScriptRoot 'fixtures\031-j-latest-valid-evidence.json'
 $GenerateScript = Join-Path $RepoRoot 'scripts\generate-morning-brief.ps1'
 $GeneratePy = Join-Path $RepoRoot 'scripts\generate-morning-brief.py'
 $CollectPy = Join-Path $RepoRoot 'scripts\collect-evidence.py'
@@ -37,7 +37,7 @@ $ProdHashBefore = @{
 $Contract = [System.IO.File]::ReadAllText($FixturePath, $Utf8) | ConvertFrom-Json
 $NotLatestLabel = [System.Text.Encoding]::UTF8.GetString([byte[]](0xE9, 0x9D, 0x9E, 0xE6, 0x9C, 0x80, 0xE6, 0x96, 0xB0))
 $script:Results = New-Object System.Collections.Generic.List[object]
-$script:TempRoot = Join-Path $env:TEMP ('InvestorTwin-031H-' + [guid]::NewGuid().ToString('N'))
+$script:TempRoot = Join-Path $env:TEMP ('InvestorTwin-031J-' + [guid]::NewGuid().ToString('N'))
 
 function Add-TestResult($id, $passed, $details) {
   $status = if ($passed) { 'PASS' } else { 'FAIL' }
@@ -91,7 +91,7 @@ function New-GenRoot($name) {
   return $path
 }
 
-function Write-History($root, $instrument, $asOf, $value, $unit, $sourceId, $status) {
+function Write-History($root, $instrument, $asOf, $value, $unit, $sourceId) {
   $histDir = Join-Path $root ("data\evidence\history\" + $instrument)
   New-Item -ItemType Directory -Path $histDir -Force | Out-Null
   Write-JsonFile (Join-Path $histDir ($asOf + '.json')) ([ordered]@{
@@ -101,7 +101,17 @@ function Write-History($root, $instrument, $asOf, $value, $unit, $sourceId, $sta
     asOf = $asOf
     asOfKind = 'close'
     sourceId = $sourceId
-    status = $status
+  })
+}
+
+function Write-Run($root, $runId, $expectedAsOf) {
+  $runDir = Join-Path $root ("data\evidence\runs\" + $runId)
+  New-Item -ItemType Directory -Path (Join-Path $runDir 'normalized') -Force | Out-Null
+  Write-JsonFile (Join-Path $runDir 'run.json') ([ordered]@{
+    runId = $runId
+    capturedAt = '2026-08-25T00:00:00Z'
+    expectedAsOf = $expectedAsOf
+    writesBrief = $false
   })
 }
 
@@ -111,138 +121,184 @@ function Write-Normalized($root, $runId, $row) {
   Write-JsonFile (Join-Path $dir ($row.instrument + '.json')) $row
 }
 
+function Write-Unavailable($root, $runId, $instrument, $unit, $sourceId) {
+  Write-Normalized $root $runId ([ordered]@{
+    instrument = $instrument
+    value = $null
+    unit = $unit
+    asOf = $null
+    asOfKind = 'close'
+    expectedAsOf = [string]$Contract.runDate
+    sourceId = $sourceId
+    status = 'unavailable'
+  })
+}
+
+function Get-TodayBlob($brief) {
+  return ((@($brief.today3Things) | ForEach-Object {
+    @([string]$_.title, [string]$_.text, (@($_.evidence) -join ',')) -join ' '
+  }) -join ' | ')
+}
+
 try {
   New-Item -ItemType Directory -Path $script:TempRoot | Out-Null
   $generateSrc = [System.IO.File]::ReadAllText($GeneratePy, $Utf8)
   $collectSrc = [System.IO.File]::ReadAllText($CollectPy, $Utf8)
 
   $fail0 = New-Object System.Collections.Generic.List[string]
-  if ($generateSrc -like '*date = sorted(valued_dates)*') { $fail0.Add('Brief date is still max Evidence asOf') }
-  if ($generateSrc -notlike '*resolve_run_date*') { $fail0.Add('resolve_run_date missing') }
-  if ($generateSrc -notlike '*expectedAsOf*') { $fail0.Add('generator does not read run expectedAsOf') }
-  if ($collectSrc -notlike '*Never writes Morning Brief*') { $fail0.Add('collector comment changed') }
+  if ($generateSrc -notlike '*def is_latest*') { $fail0.Add('is_latest missing') }
+  if ($generateSrc -notlike '*status == "stale"*') { $fail0.Add('is_latest no longer treats stale as not latest') }
+  if ($generateSrc -notlike '*item.get("asOf") == brief_date*') { $fail0.Add('is_latest no longer requires asOf == runDate') }
+  if ($generateSrc -like '*dated_macro*') { $fail0.Add('dated evidence is still limited to macro sections') }
+  if ($generateSrc -notlike '*theme_items(selected, "taiwan", latest_only=True)*') {
+    $fail0.Add('executiveSummary taiwan is no longer latest-only')
+  }
+  if ($generateSrc -notlike '*theme_items(selected, "macro", latest_only=True)*') {
+    $fail0.Add('today3Things macro is no longer latest-only')
+  }
+  if ($collectSrc -like '*brent*' -or $collectSrc -like '*DCOIL*' -or $collectSrc -like '*VIXCLS*') {
+    $fail0.Add('collector catalog added oil/VIX sources')
+  }
   Add-TestResult 'TEST 0' ($fail0.Count -eq 0) ($fail0 -join "`n")
 
-  $noRunRoot = New-GenRoot 'no-run'
-  Write-History $noRunRoot 'TAIEX' '2026-08-24' 44762.32 'index' 'twse-taiex' 'fresh'
-  $noRunBriefBefore = (Get-FileHash -Path (Join-Path $noRunRoot 'data\morning-brief.json') -Algorithm SHA256).Hash
-  $noRun = Invoke-Generate $noRunRoot
-  $fail1 = New-Object System.Collections.Generic.List[string]
-  if ($noRun.ExitCode -eq 0) { $fail1.Add('generator succeeded without an Evidence run') }
-  if ($noRun.Text -notlike '*no Evidence run found*') { $fail1.Add('generator did not require a runDate') }
-  $noRunBriefAfter = (Get-FileHash -Path (Join-Path $noRunRoot 'data\morning-brief.json') -Algorithm SHA256).Hash
-  if ($noRunBriefAfter -ne $noRunBriefBefore) { $fail1.Add('missing run overwrote the previous Brief') }
-  Add-TestResult 'TEST 1' ($fail1.Count -eq 0) ($fail1 -join "`n")
-
-  $root = New-GenRoot 'run-date'
-  $oldBrief = Read-JsonFile (Join-Path $root 'data\morning-brief.json')
+  $root = New-GenRoot 'dated-valid'
   $queueBefore = (Get-FileHash -Path (Join-Path $root 'data\research-queue.json') -Algorithm SHA256).Hash
   $casesBefore = (Get-FileHash -Path (Join-Path $root 'data\investment-cases.json') -Algorithm SHA256).Hash
   $hbmBefore = (Get-FileHash -Path (Join-Path $root 'research\hbm\card.json') -Algorithm SHA256).Hash
   $cardCountBefore = @(Get-ChildItem -Path (Join-Path $root 'research') -Recurse -Filter 'card.json').Count
   $latestBefore = (Get-FileHash -Path (Join-Path $root 'data\morning-brief\latest.json') -Algorithm SHA256).Hash
 
-  Write-History $root 'TAIEX' ([string]$Contract.priorTaiexAsOf) 44762.32 'index' 'twse-taiex' 'fresh'
-  Write-History $root 'US10Y' ([string]$Contract.staleYieldAsOf) 4.74 'percent' 'fred-dgs10' 'stale'
+  $prior = [string]$Contract.priorAsOf
+  $runDate = [string]$Contract.runDate
+  $staleAsOf = [string]$Contract.staleYieldAsOf
+  Write-History $root 'TAIEX' $prior 44762.32 'index' 'twse-taiex'
+  Write-History $root 'TW_FOREIGN_NET' $prior -157.361313 'TWD_hundred_million' 'twse-institutional'
+  Write-History $root 'TW_TRUST_NET' $prior 30.548166 'TWD_hundred_million' 'twse-institutional'
+  Write-History $root 'TW_DEALER_NET' $prior -0.147009 'TWD_hundred_million' 'twse-institutional'
+  Write-History $root 'US10Y' $staleAsOf 4.74 'percent' 'fred-dgs10'
   $runId = 'run-20260825T000000Z'
-  $runDir = Join-Path $root ("data\evidence\runs\" + $runId)
-  New-Item -ItemType Directory -Path (Join-Path $runDir 'normalized') -Force | Out-Null
-  Write-JsonFile (Join-Path $runDir 'run.json') ([ordered]@{
-    runId = $runId
-    capturedAt = '2026-08-25T00:00:00Z'
-    expectedAsOf = [string]$Contract.runDate
-    writesBrief = $false
-  })
-  Write-Normalized $root $runId ([ordered]@{
-    instrument = 'TAIEX'
-    value = $null
-    unit = 'index'
-    asOf = $null
-    asOfKind = 'close'
-    expectedAsOf = [string]$Contract.runDate
-    sourceId = 'twse-taiex'
-    status = 'unavailable'
-  })
+  Write-Run $root $runId $runDate
+  Write-Unavailable $root $runId 'TAIEX' 'index' 'twse-taiex'
+  Write-Unavailable $root $runId 'TW_FOREIGN_NET' 'TWD_hundred_million' 'twse-institutional'
+  Write-Unavailable $root $runId 'Nasdaq' 'index' 'us-index-nasdaq'
+  Write-Unavailable $root $runId 'SPX' 'index' 'us-index-spx'
+  Write-Unavailable $root $runId 'DJI' 'index' 'us-index-dji'
+  Write-Unavailable $root $runId 'SOX' 'index' 'us-index-sox'
   Write-Normalized $root $runId ([ordered]@{
     instrument = 'US10Y'
     value = 4.74
     unit = 'percent'
-    asOf = [string]$Contract.staleYieldAsOf
+    asOf = $staleAsOf
     asOfKind = 'close'
-    expectedAsOf = [string]$Contract.runDate
+    expectedAsOf = $runDate
     sourceId = 'fred-dgs10'
     status = 'stale'
   })
 
   $gen = Invoke-Generate $root
   $written = Read-JsonFile (Join-Path $root 'data\morning-brief.json')
+  $taiwanTitles = @($written.taiwanMarketAndNews.items | ForEach-Object { [string]$_.title })
+  $taiwanBlob = ($taiwanTitles -join ' ')
+  $taiwanSummary = [string]$written.taiwanMarketAndNews.summary
+  $lensText = (@($written.macroDecisionLens) -join ' ')
+  $todayBlob = Get-TodayBlob $written
+  $tempKeys = @($written.marketTemperature.PSObject.Properties.Name)
+  $briefJson = ($written | ConvertTo-Json -Depth 20)
+
+  $fail1 = New-Object System.Collections.Generic.List[string]
+  if ($gen.ExitCode -ne 0) { $fail1.Add("generator failed: $($gen.Text)") }
+  if ([string]$written.date -ne $runDate) { $fail1.Add("date=$($written.date) expected runDate $runDate") }
+  if ([string]$written.date -eq $prior) { $fail1.Add('Brief date rolled back to prior TAIEX asOf') }
+  Add-TestResult 'TEST 1' ($fail1.Count -eq 0) ($fail1 -join "`n")
+
   $fail2 = New-Object System.Collections.Generic.List[string]
-  if ($gen.ExitCode -ne 0) { $fail2.Add("generator failed: $($gen.Text)") }
-  if ([string]$written.date -ne [string]$Contract.runDate) {
-    $fail2.Add("date=$($written.date) expected runDate $($Contract.runDate)")
-  }
-  if ([string]$written.date -eq [string]$Contract.priorTaiexAsOf) { $fail2.Add('partial unavailable rolled Brief date to prior TAIEX asOf') }
-  if ([string]$written.date -eq [string]$oldBrief.date) { $fail2.Add('Brief date was copied from the previous Brief') }
+  if (-not ($taiwanTitles | Where-Object { $_ -like '*TAIEX*' })) { $fail2.Add('TAIEX did not enter taiwanMarketAndNews') }
+  if ($taiwanBlob -notlike '*44762.32*' -and $taiwanBlob -notlike '*44,762.32*') { $fail2.Add('TAIEX value was not the 2026-08-24 history close') }
+  if ($taiwanBlob -notlike ('*' + $prior + '*')) { $fail2.Add('TAIEX asOf was not 2026-08-24') }
+  if ($taiwanBlob -notlike ('*' + $NotLatestLabel + '*')) { $fail2.Add('TAIEX was not labeled as not-latest') }
+  if ($taiwanBlob -like ('*' + $runDate + '*')) { $fail2.Add('TAIEX asOf was rewritten to runDate') }
+  if ($taiwanSummary -like ('*' + $runDate + '*')) { $fail2.Add('taiwan summary rewrote TAIEX asOf to runDate') }
+  if ($lensText -notlike '*TAIEX*') { $fail2.Add('dated TAIEX did not enter macroDecisionLens') }
+  if ($lensText -notlike ('*' + $prior + '*')) { $fail2.Add('TAIEX lens asOf was not preserved') }
   Add-TestResult 'TEST 2' ($fail2.Count -eq 0) ($fail2 -join "`n")
 
   $fail3 = New-Object System.Collections.Generic.List[string]
-  $taiwanTitles = @($written.taiwanMarketAndNews.items | ForEach-Object { [string]$_.title })
-  $taiwanBlob = ($taiwanTitles -join ' ')
-  if (-not ($taiwanTitles | Where-Object { $_ -like '*TAIEX*' })) {
-    $fail3.Add('prior TAIEX was not selected as latest-valid taiwan news')
+  if ($taiwanBlob -notlike '*TW_FOREIGN_NET*' -and $taiwanSummary -notlike '*TW_FOREIGN_NET*') {
+    $fail3.Add('TW_FOREIGN_NET did not enter taiwanMarketAndNews')
   }
-  if ($taiwanBlob -notlike ('*' + [string]$Contract.priorTaiexAsOf + '*')) {
-    $fail3.Add('prior TAIEX asOf was not preserved')
+  if (($taiwanBlob + ' ' + $taiwanSummary) -notlike ('*' + $prior + '*')) {
+    $fail3.Add('TW_FOREIGN_NET asOf was not preserved')
   }
-  if ($taiwanBlob -notlike ('*' + $NotLatestLabel + '*')) { $fail3.Add('prior TAIEX was not labeled as not-latest') }
-  if ($taiwanBlob -like ('*' + [string]$Contract.runDate + '*')) {
-    $fail3.Add('prior TAIEX asOf was rewritten to runDate')
-  }
-  $tempKeys = @($written.marketTemperature.PSObject.Properties.Name)
-  if ($tempKeys -contains 'TAIEX') { $fail3.Add('TAIEX was written as marketTemperature latest') }
-  $summary = [string]$written.executiveSummary
-  if ($summary -like '*TAIEX*') {
-    $fail3.Add('executiveSummary treated prior TAIEX as a latest taiwan signal')
-  }
-  $todayBlob = (@($written.today3Things | ForEach-Object {
-    @([string]$_.title, [string]$_.text, (@($_.evidence) -join ' ')) -join ' '
-  }) -join ' ')
-  if ($todayBlob -like '*TAIEX*') { $fail3.Add('today3Things was polluted by dated TAIEX') }
+  if ($briefJson -like '*TW_TRUST_NET*') { $fail3.Add('noise TW_TRUST_NET was selected') }
+  if ($briefJson -like '*TW_DEALER_NET*') { $fail3.Add('noise TW_DEALER_NET was selected') }
   Add-TestResult 'TEST 3' ($fail3.Count -eq 0) ($fail3 -join "`n")
 
   $fail4 = New-Object System.Collections.Generic.List[string]
-  $macroText = @($written.macroDecisionLens) -join ' '
-  if ($macroText -notlike '*US10Y*') { $fail4.Add('stale US10Y was dropped from macroDecisionLens') }
-  if ($macroText -notlike ('*' + [string]$Contract.staleYieldAsOf + '*')) { $fail4.Add('stale US10Y asOf was not preserved') }
-  if ($macroText -like ('*' + [string]$Contract.runDate + '*')) { $fail4.Add('stale US10Y asOf was rewritten to runDate') }
+  foreach ($name in @('Nasdaq', "S&P 500", 'Dow', 'SOX')) {
+    if ($tempKeys -contains $name) { $fail4.Add("$name was invented into marketTemperature") }
+  }
+  if ($briefJson -like '*26,180*' -or $briefJson -like '*26180*') { $fail4.Add('Nasdaq value was invented from old Brief') }
+  if ($briefJson -like '*Brent*' -or $briefJson -like '*WTI*' -or $briefJson -like '*VIX*' -or $briefJson -like '*Jackson Hole*') {
+    $fail4.Add('oil/VIX/Jackson Hole was invented')
+  }
   Add-TestResult 'TEST 4' ($fail4.Count -eq 0) ($fail4 -join "`n")
 
   $fail5 = New-Object System.Collections.Generic.List[string]
-  foreach ($key in @($Contract.canonicalFields)) {
-    if (-not ($written.PSObject.Properties.Name -contains $key)) { $fail5.Add("canonical field missing: $key") }
-  }
-  $extra = @($written.PSObject.Properties.Name | Where-Object { @($Contract.canonicalFields) -notcontains $_ -and $_ -ne '_selection' })
-  if ($extra.Count -gt 0) { $fail5.Add('new Brief schema keys: ' + ($extra -join ',')) }
+  if ($todayBlob -like '*TAIEX*') { $fail5.Add('today3Things was polluted by dated TAIEX') }
+  if ($todayBlob -like '*TW_FOREIGN_NET*') { $fail5.Add('today3Things was polluted by dated TW_FOREIGN_NET') }
+  if ($todayBlob -like '*US10Y*') { $fail5.Add('today3Things was polluted by stale US10Y') }
+  $summary = [string]$written.executiveSummary
+  if ($summary -like '*TAIEX*') { $fail5.Add('executiveSummary created a new latest taiwan signal from dated TAIEX') }
+  if ($summary -like '*TW_FOREIGN_NET*') { $fail5.Add('executiveSummary created a new latest taiwan signal from dated TW_FOREIGN_NET') }
+  if ($lensText -notlike '*US10Y*') { $fail5.Add('stale US10Y was dropped from macroDecisionLens') }
+  if ($lensText -notlike ('*' + $staleAsOf + '*')) { $fail5.Add('stale US10Y asOf was not preserved') }
+  if ($lensText -like ('*US10Y*' + $runDate + '*')) { $fail5.Add('stale US10Y asOf was rewritten to runDate') }
   Add-TestResult 'TEST 5' ($fail5.Count -eq 0) ($fail5 -join "`n")
 
+  $freshRoot = New-GenRoot 'same-day-latest'
+  Write-History $freshRoot 'TAIEX' $runDate 45000.00 'index' 'twse-taiex'
+  Write-Run $freshRoot 'run-20260825T010000Z' $runDate
+  Write-Normalized $freshRoot 'run-20260825T010000Z' ([ordered]@{
+    instrument = 'TAIEX'
+    value = 45000.00
+    unit = 'index'
+    asOf = $runDate
+    asOfKind = 'close'
+    expectedAsOf = $runDate
+    sourceId = 'twse-taiex'
+    status = 'fresh'
+  })
+  $freshGen = Invoke-Generate $freshRoot
+  $freshBrief = Read-JsonFile (Join-Path $freshRoot 'data\morning-brief.json')
+  $freshTaiwan = (@($freshBrief.taiwanMarketAndNews.items | ForEach-Object { [string]$_.title }) -join ' ')
+  $freshToday = Get-TodayBlob $freshBrief
   $fail6 = New-Object System.Collections.Generic.List[string]
+  if ($freshGen.ExitCode -ne 0) { $fail6.Add("same-day generator failed: $($freshGen.Text)") }
+  if ($freshTaiwan -like ('*' + $NotLatestLabel + '*')) { $fail6.Add('same-day TAIEX was labeled as not-latest') }
+  if ($freshToday -notlike '*TAIEX*') { $fail6.Add('same-day TAIEX was missing from today3Things') }
+  Add-TestResult 'TEST 6' ($fail6.Count -eq 0) ($fail6 -join "`n")
+
+  $fail7 = New-Object System.Collections.Generic.List[string]
+  foreach ($key in @($Contract.canonicalFields)) {
+    if (-not ($written.PSObject.Properties.Name -contains $key)) { $fail7.Add("canonical field missing: $key") }
+  }
+  $extra = @($written.PSObject.Properties.Name | Where-Object { @($Contract.canonicalFields) -notcontains $_ -and $_ -ne '_selection' })
+  if ($extra.Count -gt 0) { $fail7.Add('new Brief schema keys: ' + ($extra -join ',')) }
   $cardCountAfter = @(Get-ChildItem -Path (Join-Path $root 'research') -Recurse -Filter 'card.json').Count
-  if ($cardCountAfter -ne $cardCountBefore) { $fail6.Add('generator created or deleted a Research Card') }
+  if ($cardCountAfter -ne $cardCountBefore) { $fail7.Add('generator created or deleted a Research Card') }
   if ((Get-FileHash -Path (Join-Path $root 'data\research-queue.json') -Algorithm SHA256).Hash -ne $queueBefore) {
-    $fail6.Add('generator wrote Queue')
+    $fail7.Add('generator wrote Queue')
   }
   if ((Get-FileHash -Path (Join-Path $root 'data\investment-cases.json') -Algorithm SHA256).Hash -ne $casesBefore) {
-    $fail6.Add('generator wrote Case / Decision / Playbook')
+    $fail7.Add('generator wrote Case / Decision / Playbook')
   }
   if ((Get-FileHash -Path (Join-Path $root 'research\hbm\card.json') -Algorithm SHA256).Hash -ne $hbmBefore) {
-    $fail6.Add('generator wrote Research Card')
+    $fail7.Add('generator wrote Research Card')
   }
   if ((Get-FileHash -Path (Join-Path $root 'data\morning-brief\latest.json') -Algorithm SHA256).Hash -ne $latestBefore) {
-    $fail6.Add('generator wrote latest.json as a second canonical Brief')
+    $fail7.Add('generator wrote latest.json as a second canonical Brief')
   }
-  $canonical = @(Get-ChildItem -Path (Join-Path $root 'data') -Filter 'morning-brief.json' -File)
-  if ($canonical.Count -ne 1) { $fail6.Add('expected one canonical Brief') }
-  Add-TestResult 'TEST 6' ($fail6.Count -eq 0) ($fail6 -join "`n")
+  Add-TestResult 'TEST 7' ($fail7.Count -eq 0) ($fail7 -join "`n")
 }
 catch {
   Add-TestResult 'SETUP' $false $_.Exception.Message
@@ -286,7 +342,7 @@ foreach ($rel in @(
     '031-f-windows-task-scheduler.ps1'
   )) {
   $reg = Invoke-SiblingTest $rel
-  if ($reg.ExitCode -ne 0) { $failReg.Add($reg.Text) }
+  if ($reg.ExitCode -ne 0) { $failReg.Add($rel + "`n" + $reg.Text) }
 }
 Add-TestResult 'REGRESSION' ($failReg.Count -eq 0) ($failReg -join "`n")
 
@@ -296,7 +352,7 @@ if (Test-Path $script:TempRoot) {
 
 $failed = @($script:Results | Where-Object { $_.Status -ne 'PASS' })
 Write-Output ''
-Write-Output '=== 031-H SUMMARY ==='
+Write-Output '=== 031-J SUMMARY ==='
 foreach ($row in $script:Results) {
   Write-Output ("{0}: {1}" -f $row.Id, $row.Status)
   if ($row.Status -ne 'PASS' -and $row.Details) { Write-Output $row.Details }

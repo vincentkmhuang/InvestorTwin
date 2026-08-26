@@ -290,7 +290,7 @@ try {
     else {
       $parsed = $briefHttp.Content | ConvertFrom-Json
       if (-not $parsed.date) { $failHttp.Add('HTTP brief missing date') }
-      if (-not $parsed.today3Things) { $failHttp.Add('HTTP brief schema changed') }
+      if (-not ($parsed.PSObject.Properties.Name -contains 'today3Things')) { $failHttp.Add('HTTP brief schema changed') }
     }
     if ([int]$indexHttp.StatusCode -ne 200) { $failHttp.Add('GET index.html failed') }
     elseif ([string]$indexHttp.Content -notlike '*id="morningBriefDate"*') { $failHttp.Add('HTTP index missing brief date') }

@@ -357,22 +357,13 @@ def classify_evidence(root, instrument, row, brief_date):
         return decision
 
     latest = is_latest(row, brief_date)
-    sections = list(mapping["sections"])
-    if not latest:
-        sections = [name for name in sections if name in ("macroDecisionLens", "globalMarketAndNews") and mapping["theme"] == "macro"]
-        if not sections:
-            decision["reason"] = "not_latest"
-            return decision
-        decision["reason"] = "dated_macro"
-    else:
-        decision["reason"] = "selected"
-
     decision["selected"] = True
     decision["priority"] = mapping["priority"]
-    decision["sections"] = sections
+    decision["sections"] = list(mapping["sections"])
     decision["theme"] = mapping["theme"]
     decision["researchId"] = resolve_research_id(root, mapping.get("researchId"))
     decision["latest"] = latest
+    decision["reason"] = "selected" if latest else "dated"
     return decision
 
 
@@ -417,10 +408,15 @@ def format_group(items, unit_fallback="index"):
         if number is None:
             continue
         label = item["instrument"]
-        as_of = row.get("asOf")
-        suffix = "" if item.get("latest") else "，非最新"
-        bits.append(f"{label} {number}（asOf {as_of}{suffix}）")
+        bits.append(f"{label} {number}（{as_of_stamp(item)}）")
     return bits
+
+
+def as_of_stamp(item):
+    as_of = item["row"].get("asOf")
+    if item.get("latest"):
+        return f"asOf {as_of}"
+    return f"asOf {as_of}，非最新"
 
 
 def today_item(title, why, source, evidence_ids, research_id):
@@ -543,13 +539,16 @@ def build_brief(root, evidence, previous):
     temperature = {}
     for instrument, label in TEMPERATURE_KEYS.items():
         hit = by_id.get(instrument)
-        if hit and hit.get("latest") and in_section(hit, "marketTemperature"):
+        if hit and in_section(hit, "marketTemperature"):
             number = fmt_number(hit["row"].get("value"), hit["row"].get("unit") or "index")
             if number is None:
                 continue
+            as_of = item_as_of(hit["row"])
+            if not hit.get("latest"):
+                as_of = as_of + "，非最新"
             temperature[label] = {
                 "value": number,
-                "asOf": item_as_of(hit["row"]),
+                "asOf": as_of,
             }
 
     lens = []
@@ -571,22 +570,22 @@ def build_brief(root, evidence, previous):
     global_summary = "；".join(global_bits) if global_bits else "全球市場沒有可選入 Brief 的最新 Evidence。"
     global_items = []
     macro_hits = [item for item in global_hits if item.get("theme") == "macro"]
-    equity_hits = [item for item in global_hits if item.get("theme") == "global" and item.get("latest")]
+    equity_hits = [item for item in global_hits if item.get("theme") == "global"]
     if macro_hits:
         global_items.append(news_item("美債：" + "、".join(format_group(macro_hits, "percent")), "Global", None))
     if equity_hits:
         global_items.append(news_item("美股指數：" + "、".join(format_group(equity_hits, "index")), "Global", None))
 
-    taiwan_hits = [item for item in selected if in_section(item, "taiwanMarketAndNews") and item.get("latest")]
+    taiwan_hits = [item for item in selected if in_section(item, "taiwanMarketAndNews")]
     taiwan_bits = format_group(taiwan_hits, "index")
-    taiwan_summary = "；".join(taiwan_bits) if taiwan_bits else "台股沒有可選入 Brief 的最新 Evidence。"
+    taiwan_summary = "；".join(taiwan_bits) if taiwan_bits else "台股沒有可選入 Brief 的 Evidence。"
     taiwan_items = []
     taiex = by_id.get("TAIEX")
-    if taiex and taiex.get("latest"):
+    if taiex and in_section(taiex, "taiwanMarketAndNews"):
         number = fmt_number(taiex["row"].get("value"), "index")
         if number is not None:
             taiwan_items.append(news_item(
-                f"TAIEX {number}（{taiex['row'].get('asOf')}）",
+                f"TAIEX {number}（{as_of_stamp(taiex)}）",
                 "台股",
                 None,
             ))
@@ -600,11 +599,11 @@ def build_brief(root, evidence, previous):
 
     sox = by_id.get("SOX")
     ai_items = []
-    if sox and sox.get("latest") and in_section(sox, "aiIndustryHighlights"):
+    if sox and in_section(sox, "aiIndustryHighlights"):
         number = fmt_number(sox["row"].get("value"), "index")
         if number is not None:
             ai_items.append({
-                "title": f"SOX {number}（{sox['row'].get('asOf')}）",
+                "title": f"SOX {number}（{as_of_stamp(sox)}）",
                 "researchId": sox.get("researchId"),
             })
 
