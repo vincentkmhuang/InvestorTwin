@@ -1,0 +1,39 @@
+{
+  "sprint": "031-m2a",
+  "layer": "evidence",
+  "capturedAt": "2026-08-25T18:00:00Z",
+  "expectedAsOf": "2026-08-25",
+  "note": "Fixture-only FRED observations. Not production closes.",
+  "raw": [
+    {
+      "sourceId": "fred-brent",
+      "status": "ok",
+      "payload": {
+        "observations": [
+          { "observation_date": "2026-08-22", "value": 89.10 },
+          { "observation_date": "2026-08-25", "value": 90.25 }
+        ]
+      }
+    },
+    {
+      "sourceId": "fred-wti",
+      "status": "ok",
+      "payload": {
+        "observations": [
+          { "observation_date": "2026-08-22", "value": 84.00 },
+          { "observation_date": "2026-08-25", "value": 85.40 }
+        ]
+      }
+    },
+    {
+      "sourceId": "fred-vix",
+      "status": "ok",
+      "payload": {
+        "observations": [
+          { "observation_date": "2026-08-22", "value": 16.10 },
+          { "observation_date": "2026-08-25", "value": 15.80 }
+        ]
+      }
+    }
+  ]
+}

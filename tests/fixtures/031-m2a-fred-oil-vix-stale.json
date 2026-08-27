@@ -1,0 +1,36 @@
+{
+  "sprint": "031-m2a",
+  "layer": "evidence",
+  "capturedAt": "2026-08-25T18:00:00Z",
+  "expectedAsOf": "2026-08-25",
+  "note": "FRED observations older than expectedAsOf. Must classify stale.",
+  "raw": [
+    {
+      "sourceId": "fred-brent",
+      "status": "ok",
+      "payload": {
+        "observations": [
+          { "observation_date": "2026-08-21", "value": 88.00 }
+        ]
+      }
+    },
+    {
+      "sourceId": "fred-wti",
+      "status": "ok",
+      "payload": {
+        "observations": [
+          { "observation_date": "2026-08-21", "value": 83.50 }
+        ]
+      }
+    },
+    {
+      "sourceId": "fred-vix",
+      "status": "ok",
+      "payload": {
+        "observations": [
+          { "observation_date": "2026-08-21", "value": 17.20 }
+        ]
+      }
+    }
+  ]
+}

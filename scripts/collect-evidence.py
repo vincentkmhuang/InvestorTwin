@@ -1,5 +1,6 @@
-# Investor Twin 014 — Evidence collector (Live + fixture).
+# Investor Twin 014 / 031-M-2A — Evidence collector (Live + fixture).
 # Writes Raw + Normalized evidence only. Never writes Morning Brief files.
+# Brent / WTI / VIX: existing live_fred series (DCOILBRENTEU / DCOILWTICO / VIXCLS).
 import csv
 import datetime
 import io
@@ -34,6 +35,27 @@ SOURCE_CATALOG = {
         "unit": "percent",
         "asOfKind": "close",
         "fredId": "DGS30",
+    },
+    "fred-brent": {
+        "source": "fred",
+        "instrument": "Brent",
+        "unit": "USD_per_barrel",
+        "asOfKind": "close",
+        "fredId": "DCOILBRENTEU",
+    },
+    "fred-wti": {
+        "source": "fred",
+        "instrument": "WTI",
+        "unit": "USD_per_barrel",
+        "asOfKind": "close",
+        "fredId": "DCOILWTICO",
+    },
+    "fred-vix": {
+        "source": "fred",
+        "instrument": "VIX",
+        "unit": "index",
+        "asOfKind": "close",
+        "fredId": "VIXCLS",
     },
     "us-index-nasdaq": {
         "source": "us-index",

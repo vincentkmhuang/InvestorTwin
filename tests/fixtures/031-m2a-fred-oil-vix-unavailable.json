@@ -1,0 +1,27 @@
+{
+  "sprint": "031-m2a",
+  "layer": "evidence",
+  "capturedAt": "2026-08-25T18:00:00Z",
+  "expectedAsOf": "2026-08-25",
+  "note": "FRED unreachable. Do not invent closes from Brief or tmp.",
+  "raw": [
+    {
+      "sourceId": "fred-brent",
+      "status": "unavailable",
+      "payload": null,
+      "error": "fred unavailable"
+    },
+    {
+      "sourceId": "fred-wti",
+      "status": "unavailable",
+      "payload": null,
+      "error": "fred unavailable"
+    },
+    {
+      "sourceId": "fred-vix",
+      "status": "unavailable",
+      "payload": null,
+      "error": "fred unavailable"
+    }
+  ]
+}
