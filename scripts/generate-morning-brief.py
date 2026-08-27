@@ -63,6 +63,24 @@ INSTRUMENT_MAP = {
         "theme": "global",
         "researchId": None,
     },
+    "Brent": {
+        "sections": ["globalMarketAndNews"],
+        "priority": 58,
+        "theme": "commodity",
+        "researchId": None,
+    },
+    "WTI": {
+        "sections": ["globalMarketAndNews"],
+        "priority": 57,
+        "theme": "commodity",
+        "researchId": None,
+    },
+    "VIX": {
+        "sections": ["globalMarketAndNews"],
+        "priority": 56,
+        "theme": "commodity",
+        "researchId": None,
+    },
     "SOX": {
         "sections": ["marketTemperature", "aiIndustryHighlights"],
         "priority": 90,
@@ -269,6 +287,8 @@ def fmt_number(value, unit):
         return f"{number:.2f}%"
     if unit == "TWD_hundred_million":
         return f"{number:.1f}億"
+    if unit == "USD_per_barrel":
+        return f"{number:.2f}"
     if number >= 100:
         return f"{number:,.2f}"
     return f"{number:.2f}"
@@ -575,6 +595,13 @@ def build_brief(root, evidence, previous):
         global_items.append(news_item("美債：" + "、".join(format_group(macro_hits, "percent")), "Global", None))
     if equity_hits:
         global_items.append(news_item("美股指數：" + "、".join(format_group(equity_hits, "index")), "Global", None))
+    commodity_hits = [item for item in global_hits if item.get("theme") == "commodity"]
+    if commodity_hits:
+        global_items.append(news_item(
+            "油價／VIX：" + "、".join(format_group(commodity_hits, "index")),
+            "Global",
+            None,
+        ))
 
     taiwan_hits = [item for item in selected if in_section(item, "taiwanMarketAndNews")]
     taiwan_bits = format_group(taiwan_hits, "index")
