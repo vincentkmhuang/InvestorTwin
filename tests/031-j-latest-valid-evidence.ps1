@@ -150,14 +150,8 @@ try {
   if ($generateSrc -notlike '*status == "stale"*') { $fail0.Add('is_latest no longer treats stale as not latest') }
   if ($generateSrc -notlike '*item.get("asOf") == brief_date*') { $fail0.Add('is_latest no longer requires asOf == runDate') }
   if ($generateSrc -like '*dated_macro*') { $fail0.Add('dated evidence is still limited to macro sections') }
-  if ($generateSrc -notlike '*theme_items(selected, "taiwan", latest_only=True)*') {
-    $fail0.Add('executiveSummary taiwan is no longer latest-only')
-  }
-  if ($generateSrc -notlike '*theme_items(selected, "macro", latest_only=True)*') {
-    $fail0.Add('today3Things macro is no longer latest-only')
-  }
-  if ($collectSrc -like '*brent*' -or $collectSrc -like '*DCOIL*' -or $collectSrc -like '*VIXCLS*') {
-    $fail0.Add('collector catalog added oil/VIX sources')
+  if ($generateSrc -like '*latest_only=True*') {
+    $fail0.Add('Today 3 Things / executiveSummary still gate selected Evidence with latest_only')
   }
   Add-TestResult 'TEST 0' ($fail0.Count -eq 0) ($fail0 -join "`n")
 
@@ -244,12 +238,19 @@ try {
   Add-TestResult 'TEST 4' ($fail4.Count -eq 0) ($fail4 -join "`n")
 
   $fail5 = New-Object System.Collections.Generic.List[string]
-  if ($todayBlob -like '*TAIEX*') { $fail5.Add('today3Things was polluted by dated TAIEX') }
-  if ($todayBlob -like '*TW_FOREIGN_NET*') { $fail5.Add('today3Things was polluted by dated TW_FOREIGN_NET') }
-  if ($todayBlob -like '*US10Y*') { $fail5.Add('today3Things was polluted by stale US10Y') }
+  if ($todayBlob -notlike '*US10Y*') { $fail5.Add('dated US10Y missing from today3Things') }
+  if ($todayBlob -notlike '*TAIEX*') { $fail5.Add('dated TAIEX missing from today3Things') }
+  if ($todayBlob -notlike ('*' + $staleAsOf + '*')) { $fail5.Add('today3Things dropped stale US10Y asOf') }
+  if ($todayBlob -notlike ('*' + $prior + '*')) { $fail5.Add('today3Things dropped dated TAIEX asOf') }
+  if ($todayBlob -notlike ('*' + $NotLatestLabel + '*')) { $fail5.Add('today3Things missing not-latest label') }
+  if ($todayBlob -like ('*asOf ' + $runDate + '*')) { $fail5.Add('today3Things rewrote asOf to runDate') }
   $summary = [string]$written.executiveSummary
-  if ($summary -like '*TAIEX*') { $fail5.Add('executiveSummary created a new latest taiwan signal from dated TAIEX') }
-  if ($summary -like '*TW_FOREIGN_NET*') { $fail5.Add('executiveSummary created a new latest taiwan signal from dated TW_FOREIGN_NET') }
+  if ($summary -notlike '*US10Y*') { $fail5.Add('dated US10Y missing from executiveSummary') }
+  if ($summary -notlike '*TAIEX*') { $fail5.Add('dated TAIEX missing from executiveSummary') }
+  if ($summary -notlike ('*' + $staleAsOf + '*')) { $fail5.Add('executiveSummary dropped stale US10Y asOf') }
+  if ($summary -notlike ('*' + $prior + '*')) { $fail5.Add('executiveSummary dropped dated TAIEX asOf') }
+  if ($summary -notlike ('*' + $NotLatestLabel + '*')) { $fail5.Add('executiveSummary missing not-latest label') }
+  if ($summary -like ('*asOf ' + $runDate + '*')) { $fail5.Add('executiveSummary rewrote asOf to runDate') }
   if ($lensText -notlike '*US10Y*') { $fail5.Add('stale US10Y was dropped from macroDecisionLens') }
   if ($lensText -notlike ('*' + $staleAsOf + '*')) { $fail5.Add('stale US10Y asOf was not preserved') }
   if ($lensText -like ('*US10Y*' + $runDate + '*')) { $fail5.Add('stale US10Y asOf was rewritten to runDate') }

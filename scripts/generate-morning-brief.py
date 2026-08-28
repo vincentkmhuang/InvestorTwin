@@ -456,9 +456,9 @@ def today_item(title, why, source, evidence_ids, research_id):
 def build_executive_summary(selected):
     signals = []
     macro = theme_items(selected, "macro")
-    taiwan = theme_items(selected, "taiwan", latest_only=True)
-    ai = theme_items(selected, "ai", latest_only=True)
-    global_eq = theme_items(selected, "global", latest_only=True)
+    taiwan = theme_items(selected, "taiwan")
+    ai = theme_items(selected, "ai")
+    global_eq = theme_items(selected, "global")
 
     if macro:
         bits = format_group(macro, "percent")
@@ -489,10 +489,10 @@ def build_executive_summary(selected):
 def build_today_things(selected):
     things = []
     groups = [
-        ("macro", theme_items(selected, "macro", latest_only=True), "percent"),
-        ("taiwan", theme_items(selected, "taiwan", latest_only=True), None),
-        ("ai", theme_items(selected, "ai", latest_only=True), "index"),
-        ("global", theme_items(selected, "global", latest_only=True), "index"),
+        ("macro", theme_items(selected, "macro"), "percent"),
+        ("taiwan", theme_items(selected, "taiwan"), None),
+        ("ai", theme_items(selected, "ai"), "index"),
+        ("global", theme_items(selected, "global"), "index"),
     ]
     for theme, items, unit in groups:
         if len(things) >= MAX_TODAY_THINGS:

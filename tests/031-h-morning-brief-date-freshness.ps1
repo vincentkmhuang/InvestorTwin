@@ -201,13 +201,25 @@ try {
   $tempKeys = @($written.marketTemperature.PSObject.Properties.Name)
   if ($tempKeys -contains 'TAIEX') { $fail3.Add('TAIEX was written as marketTemperature latest') }
   $summary = [string]$written.executiveSummary
-  if ($summary -like '*TAIEX*') {
-    $fail3.Add('executiveSummary treated prior TAIEX as a latest taiwan signal')
+  if ($summary -notlike '*TAIEX*') { $fail3.Add('dated TAIEX missing from executiveSummary') }
+  if ($summary -notlike ('*' + [string]$Contract.priorTaiexAsOf + '*')) {
+    $fail3.Add('executiveSummary dropped prior TAIEX asOf')
+  }
+  if ($summary -notlike ('*' + $NotLatestLabel + '*')) { $fail3.Add('executiveSummary missing not-latest label') }
+  if ($summary -like ('*asOf ' + [string]$Contract.runDate + '*')) {
+    $fail3.Add('executiveSummary rewrote TAIEX asOf to runDate')
   }
   $todayBlob = (@($written.today3Things | ForEach-Object {
     @([string]$_.title, [string]$_.text, (@($_.evidence) -join ' ')) -join ' '
   }) -join ' ')
-  if ($todayBlob -like '*TAIEX*') { $fail3.Add('today3Things was polluted by dated TAIEX') }
+  if ($todayBlob -notlike '*TAIEX*') { $fail3.Add('dated TAIEX missing from today3Things') }
+  if ($todayBlob -notlike ('*' + [string]$Contract.priorTaiexAsOf + '*')) {
+    $fail3.Add('today3Things dropped prior TAIEX asOf')
+  }
+  if ($todayBlob -notlike ('*' + $NotLatestLabel + '*')) { $fail3.Add('today3Things missing not-latest label') }
+  if ($todayBlob -like ('*asOf ' + [string]$Contract.runDate + '*')) {
+    $fail3.Add('today3Things rewrote TAIEX asOf to runDate')
+  }
   Add-TestResult 'TEST 3' ($fail3.Count -eq 0) ($fail3 -join "`n")
 
   $fail4 = New-Object System.Collections.Generic.List[string]
