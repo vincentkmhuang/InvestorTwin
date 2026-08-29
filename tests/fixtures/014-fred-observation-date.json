@@ -2,7 +2,7 @@
   "sprint": "014",
   "layer": "evidence",
   "capturedAt": "2026-08-23T06:20:52Z",
-  "note": "Sunday capture. No expectedAsOf so Live rule last_weekday(capturedAt) applies. FRED-native observation_date only.",
+  "note": "Sunday capture. No expectedAsOf: expectedAsOf is capturedAt calendar date, not last_weekday. FRED-native observation_date only.",
   "raw": [
     {
       "sourceId": "fred-dgs10",

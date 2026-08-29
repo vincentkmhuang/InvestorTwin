@@ -1,0 +1,26 @@
+{
+  "sprint": "031-m5",
+  "layer": "evidence",
+  "capturedAt": "2026-08-28T00:00:11Z",
+  "note": "Friday Daily Update. No expectedAsOf: calendar date stays 2026-08-28, not rolled to Thursday.",
+  "raw": [
+    {
+      "sourceId": "twse-taiex",
+      "status": "ok",
+      "payload": {
+        "stat": "OK",
+        "date": "20260828",
+        "tables": [
+          {
+            "title": "價格指數(臺灣證券交易所)",
+            "data": [
+              ["寶島股價指數", "50,000.00"],
+              ["發行量加權股價指數", "46,331.45"],
+              ["臺灣50指數", "41,000.00"]
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

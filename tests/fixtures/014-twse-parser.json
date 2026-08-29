@@ -1,7 +1,7 @@
 {
   "sprint": "014",
   "capturedAt": "2026-08-23T06:20:52Z",
-  "note": "Replay of TWSE TAIEX + institutional parsers. No expectedAsOf: last_weekday(Sunday)=Friday.",
+  "note": "Replay of TWSE TAIEX + institutional parsers. No expectedAsOf: capturedAt Sunday calendar date, asOf stays Friday.",
   "raw": [
     {
       "sourceId": "twse-taiex",

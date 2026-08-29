@@ -1,5 +1,6 @@
-# Investor Twin 014 / 031-M-2A — Evidence collector (Live + fixture).
+# Investor Twin 014 / 031-M-2A / 031-M-5 — Evidence collector (Live + fixture).
 # Writes Raw + Normalized evidence only. Never writes Morning Brief files.
+# Live default expectedAsOf is capturedAt's calendar date, not last_weekday.
 # Brent / WTI / VIX: existing live_fred series (DCOILBRENTEU / DCOILWTICO / VIXCLS).
 import csv
 import datetime
@@ -150,6 +151,10 @@ def last_weekday(day):
     while current.weekday() >= 5:
         current = current - datetime.timedelta(days=1)
     return current
+
+
+def default_expected_as_of(captured_dt):
+    return captured_dt.date().isoformat()
 
 
 def parse_captured_at(value):
@@ -742,14 +747,14 @@ def main(argv):
         if captured_dt is None:
             fail("capturedAt is required so market asOf is never taken from the clock")
         if expected_as_of is None:
-            expected_as_of = last_weekday(captured_dt.date()).isoformat()
+            expected_as_of = default_expected_as_of(captured_dt)
     else:
         captured_dt = parse_captured_at(captured_raw)
         if captured_dt is None:
             captured_dt = datetime.datetime.now(datetime.timezone.utc)
             captured_raw = captured_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
         if expected_as_of is None:
-            expected_as_of = last_weekday(captured_dt.date()).isoformat()
+            expected_as_of = default_expected_as_of(captured_dt)
         items = collect_live(expected_as_of)
 
     run_id = run_id_from_captured(captured_dt)

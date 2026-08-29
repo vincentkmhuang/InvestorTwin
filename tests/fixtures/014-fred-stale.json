@@ -2,7 +2,7 @@
   "sprint": "014",
   "layer": "evidence",
   "capturedAt": "2026-08-23T06:20:52Z",
-  "note": "Sunday capture. Latest FRED observation_date is Thursday 2026-08-20 vs expected Friday 2026-08-21.",
+  "note": "Sunday capture. Latest FRED observation_date is Thursday 2026-08-20 vs capturedAt calendar date 2026-08-23.",
   "raw": [
     {
       "sourceId": "fred-dgs10",

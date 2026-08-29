@@ -158,12 +158,12 @@ try {
   if ($datePack.Run) {
     $summary = Read-Json (Join-Path $datePack.Run 'run.json')
     $norm = Read-Json (Join-Path $datePack.Run 'normalized\US10Y.json')
-    if ($summary.expectedAsOf -ne '2026-08-21') { $fail2.Add("expectedAsOf=$($summary.expectedAsOf) expected 2026-08-21") }
+    if ($summary.expectedAsOf -ne '2026-08-23') { $fail2.Add("expectedAsOf=$($summary.expectedAsOf) expected Sunday capturedAt calendar date 2026-08-23") }
     if ($summary.runId -ne 'run-20260823T062052Z') { $fail2.Add("runId=$($summary.runId) must come from capturedAt") }
     if ($summary.writesBrief -ne $false) { $fail2.Add('writesBrief must be false') }
     if ($norm.asOf -ne '2026-08-21') { $fail2.Add("asOf=$($norm.asOf) expected 2026-08-21 from observation_date") }
     if ($norm.asOf -eq '2026-08-23') { $fail2.Add('weekend capturedAt overwrote asOf') }
-    if ($norm.status -ne 'fresh') { $fail2.Add("status=$($norm.status) expected fresh") }
+    if ($norm.status -ne 'stale') { $fail2.Add("status=$($norm.status) expected stale vs Sunday expectedAsOf") }
     if ([double]$norm.value -ne 4.73) { $fail2.Add("value=$($norm.value) expected 4.73") }
     if ([double]$norm.changeDoD -ne 0.03) { $fail2.Add("changeDoD=$($norm.changeDoD) expected 0.03") }
     if ([double]$norm.changeWoW -ne 0.13) { $fail2.Add("changeWoW=$($norm.changeWoW) expected 0.13") }
@@ -179,7 +179,7 @@ try {
   if ($stalePack.Run) {
     $stale = Read-Json (Join-Path $stalePack.Run 'normalized\US10Y.json')
     $staleRun = Read-Json (Join-Path $stalePack.Run 'run.json')
-    if ($staleRun.expectedAsOf -ne '2026-08-21') { $fail3.Add('stale run expectedAsOf should stay Friday') }
+    if ($staleRun.expectedAsOf -ne '2026-08-23') { $fail3.Add('stale run expectedAsOf should be Sunday capturedAt calendar date') }
     if ($stale.status -ne 'stale') { $fail3.Add("expected stale, got $($stale.status)") }
     if ($stale.asOf -ne '2026-08-20') { $fail3.Add("stale asOf=$($stale.asOf) must stay 2026-08-20") }
     if ($stale.asOf -eq '2026-08-21') { $fail3.Add('stale asOf must not be rewritten to expectedAsOf') }
@@ -196,7 +196,7 @@ try {
     $taiex = Read-Json (Join-Path $twsePack.Run 'normalized\TAIEX.json')
     if ([double]$taiex.value -ne 45224.29) { $fail4.Add("TAIEX=$($taiex.value) expected 45224.29") }
     if ($taiex.asOf -ne '2026-08-21') { $fail4.Add("TAIEX asOf=$($taiex.asOf)") }
-    if ($taiex.status -ne 'fresh') { $fail4.Add("TAIEX status=$($taiex.status)") }
+    if ($taiex.status -ne 'stale') { $fail4.Add("TAIEX status=$($taiex.status) expected stale vs Sunday expectedAsOf") }
     if ([double]$taiex.value -eq 104381.91) { $fail4.Add('TAIEX used return index') }
   } else {
     $fail4.Add('twse run missing')
