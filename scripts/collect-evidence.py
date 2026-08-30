@@ -594,6 +594,177 @@ def write_history(root, instrument, record):
     }, root=root)
 
 
+def is_valued_record(record):
+    if not isinstance(record, dict):
+        return False
+    if record.get("status") in ("missing", "unavailable"):
+        return False
+    return record.get("value") is not None and iso_date(record.get("asOf")) is not None
+
+
+def load_theses(root):
+    folder = os.path.join(root, "data", "theses")
+    out = []
+    if not os.path.isdir(folder):
+        return out
+    for name in os.listdir(folder):
+        if not name.endswith(".json"):
+            continue
+        try:
+            item = load_json(os.path.join(folder, name))
+        except Exception:
+            continue
+        if isinstance(item, dict) and item.get("thesisId"):
+            out.append(item)
+    return out
+
+
+def load_research_cards(root):
+    folder = os.path.join(root, "research")
+    out = []
+    if not os.path.isdir(folder):
+        return out
+    for name in os.listdir(folder):
+        path = os.path.join(folder, name, "card.json")
+        if not os.path.isfile(path):
+            continue
+        try:
+            card = load_json(path)
+        except Exception:
+            continue
+        if not isinstance(card, dict):
+            continue
+        if not card.get("id"):
+            card = dict(card)
+            card["id"] = name
+        out.append(card)
+    return out
+
+
+def load_research_notes(root, research_id):
+    path = os.path.join(root, "research", research_id, "notes.json")
+    if not os.path.isfile(path):
+        return []
+    try:
+        data = load_json(path)
+    except Exception:
+        return []
+    if isinstance(data, dict) and isinstance(data.get("notes"), list):
+        return data["notes"]
+    if isinstance(data, list):
+        return data
+    return []
+
+
+def thesis_instrument_relation(thesis, instrument):
+    supporting = thesis.get("supportingEvidence") if isinstance(thesis.get("supportingEvidence"), list) else []
+    contradicting = thesis.get("contradictingEvidence") if isinstance(thesis.get("contradictingEvidence"), list) else []
+
+    def has_instrument(refs):
+        for ref in refs:
+            if isinstance(ref, dict) and str(ref.get("instrument") or "").strip() == instrument:
+                return True
+        return False
+
+    in_contradicting = has_instrument(contradicting)
+    in_supporting = has_instrument(supporting)
+    if in_contradicting:
+        return "contradicting"
+    if in_supporting:
+        return "supporting"
+    return None
+
+
+def thesis_research_ids(thesis, cards):
+    ids = []
+    linked = thesis.get("linkedResearch") if isinstance(thesis.get("linkedResearch"), list) else []
+    for ref in linked:
+        if not isinstance(ref, dict):
+            continue
+        research_id = str(ref.get("researchId") or "").strip()
+        if research_id and research_id not in ids:
+            ids.append(research_id)
+    thesis_id = str(thesis.get("thesisId") or "").strip()
+    if thesis_id:
+        for card in cards:
+            research_id = str(card.get("id") or "").strip()
+            if research_id and str(card.get("thesisId") or "").strip() == thesis_id and research_id not in ids:
+                ids.append(research_id)
+    return ids
+
+
+def research_anchor_as_of(card, notes):
+    conclusion = card.get("researchConclusion") if isinstance(card.get("researchConclusion"), dict) else None
+    if conclusion:
+        as_of = iso_date(conclusion.get("asOf"))
+        if as_of:
+            return as_of, "researchConclusion"
+    dates = []
+    for entry in notes:
+        if isinstance(entry, dict):
+            as_of = iso_date(entry.get("date"))
+            if as_of:
+                dates.append(as_of)
+    if dates:
+        return max(dates), "notes"
+    return None, None
+
+
+def recheck_research(root, normalized_rows, run_id):
+    valued = [row for row in normalized_rows if is_valued_record(row)]
+    theses = load_theses(root)
+    cards = load_research_cards(root)
+    card_by_id = {}
+    for card in cards:
+        research_id = str(card.get("id") or "").strip()
+        if research_id:
+            card_by_id[research_id] = card
+    items = []
+    seen = set()
+    for row in valued:
+        instrument = str(row.get("instrument") or "").strip()
+        evidence_as_of = iso_date(row.get("asOf"))
+        if not instrument or not evidence_as_of:
+            continue
+        for thesis in theses:
+            relation = thesis_instrument_relation(thesis, instrument)
+            if not relation:
+                continue
+            for research_id in thesis_research_ids(thesis, cards):
+                key = (research_id, instrument, evidence_as_of)
+                if key in seen:
+                    continue
+                card = card_by_id.get(research_id)
+                if not card:
+                    continue
+                notes = load_research_notes(root, research_id)
+                anchor_as_of, anchor_kind = research_anchor_as_of(card, notes)
+                if not anchor_as_of or evidence_as_of <= anchor_as_of:
+                    continue
+                seen.add(key)
+                conclusion = card.get("researchConclusion") if isinstance(card.get("researchConclusion"), dict) else None
+                items.append({
+                    "researchId": research_id,
+                    "thesisId": thesis.get("thesisId"),
+                    "instrument": instrument,
+                    "evidenceAsOf": evidence_as_of,
+                    "evidenceStatus": row.get("status"),
+                    "relation": relation,
+                    "anchorKind": anchor_kind,
+                    "anchorAsOf": anchor_as_of,
+                    "conclusionAsOf": iso_date(conclusion.get("asOf")) if conclusion else None,
+                    "conclusionImpact": "UNKNOWN",
+                    "needsReview": True,
+                })
+    items.sort(key=lambda item: (item["researchId"], item["instrument"]))
+    return {
+        "runId": run_id,
+        "writesBrief": False,
+        "writesResearch": False,
+        "items": items,
+    }
+
+
 def instruments_for_source(source_id, raw_item, catalog):
     if source_id == "twse-institutional" or raw_item.get("instrument") == "TW_INSTITUTIONAL":
         return catalog.get("instruments") or [
@@ -779,6 +950,8 @@ def main(argv):
         "statuses": {row["instrument"]: row["status"] for row in normalized_rows},
     }
     write_json(os.path.join(run_dir, "run.json"), summary, root=root)
+    recheck = recheck_research(root, normalized_rows, run_id)
+    write_json(os.path.join(run_dir, "recheck.json"), recheck, root=root)
     print("EVIDENCE_OK")
     print("runId=" + run_id)
     print("expectedAsOf=" + expected_as_of)

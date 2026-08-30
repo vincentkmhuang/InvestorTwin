@@ -1,0 +1,29 @@
+{
+  "sprint": "007-1",
+  "layer": "evidence",
+  "capturedAt": "2026-08-25T18:00:00Z",
+  "expectedAsOf": "2026-08-25",
+  "conclusionAsOf": "2026-08-20",
+  "notesAsOf": "2026-08-19",
+  "newerAsOf": "2026-08-25",
+  "olderAsOf": "2026-08-18",
+  "researchId": "hbm-recheck",
+  "notesOnlyId": "notes-only-recheck",
+  "unlinkedId": "unlinked-recheck",
+  "thesisId": "ai-dram-recheck",
+  "emptyThesisId": "empty-evidence-recheck",
+  "counterThesisId": "counter-recheck",
+  "conclusionImpact": "UNKNOWN",
+  "raw": [
+    {
+      "sourceId": "us-index-sox",
+      "status": "ok",
+      "payload": {
+        "observations": [
+          { "date": "2026-08-24", "value": 5100.00 },
+          { "date": "2026-08-25", "value": 5164.75 }
+        ]
+      }
+    }
+  ]
+}
