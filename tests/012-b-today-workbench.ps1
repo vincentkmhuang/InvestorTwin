@@ -88,48 +88,33 @@ render_fn = extract_fn(app_src, "render")
 show_page = extract_fn(app_src, "showPage")
 
 if mode == "markup":
-    for key in ("todayQueueId", "todayQueueSectionId"):
-        needle = 'id="' + contract[key] + '"'
-        if needle not in index_src:
-            fail.append("index.html missing " + needle)
     today_block = index_src[index_src.find('id="today"'):index_src.find('id="queue"')]
-    if contract["todayQueueId"] not in today_block:
-        fail.append("todayQueue is not inside #today")
-    if contract["todayQueueHeading"] not in today_block:
-        fail.append("today queue heading missing")
+    queue_page = index_src[index_src.find('id="queue"'):index_src.find('id="cards"')]
+    if 'id="todayQueue"' in today_block or contract["forbiddenTodayQueueHeading"] in today_block:
+        fail.append("Today Workspace must not display Research Queue as 今日佇列")
+    if 'id="queueList"' not in queue_page:
+        fail.append("queue page list missing")
     if contract["todayPageTitle"] not in index_src:
         fail.append("today page title missing in index.html")
-    if "app.js?v=012b1" not in index_src:
-        fail.append("app.js cache token is not 012b1")
-    if "style.css?v=012b1" not in index_src:
-        fail.append("style.css cache token is not 012b1")
+    if "today-workspace" not in today_block:
+        fail.append("today-workspace skeleton class missing")
+    if "app.js?v=0051" not in index_src:
+        fail.append("app.js cache token is not 0051")
+    if "style.css?v=0051" not in index_src:
+        fail.append("style.css cache token is not 0051")
     if "data-engine.js?v=012c1" not in index_src:
         fail.append("012-C data-engine cache token missing")
 
 elif mode == "preview":
-    if not preview:
-        fail.append("renderTodayQueue missing")
-    if "getQueueIds()" not in preview:
-        fail.append("preview does not read getQueueIds()")
-    if "todayQueue" not in preview:
-        fail.append("preview does not bind #todayQueue")
+    if "renderTodayQueue" in app_src:
+        fail.append("Today Workspace still renders a queue preview")
+    if "getQueueIds()" not in render_fn:
+        fail.append("queue page render no longer reads getQueueIds()")
     for banned in contract["forbiddenInPreview"]:
-        if banned in preview:
-            fail.append("preview calls " + banned)
-    if "ensureInQueue" in preview:
-        fail.append("preview mutates queue")
-    if "renderTodayQueue()" not in render_fn:
-        fail.append("render() does not call renderTodayQueue")
-    if "today-queue-empty" not in preview or contract["emptyPreview"] not in preview:
-        fail.append("empty queue preview is missing")
-    if "today-queue-empty" not in style_src:
-        fail.append("today-queue-empty style missing")
+        if banned in render_fn:
+            fail.append("render() calls " + banned)
 
 elif mode == "click":
-    if "openResearchCard" not in preview:
-        fail.append("preview click does not open Research Card")
-    if "fromPage: 'today'" not in preview and 'fromPage: "today"' not in preview:
-        fail.append("preview click does not use fromPage today")
     if "fromPage: 'queue'" not in render_fn:
         fail.append("queue page click path was changed")
     if contract["todayPageTitle"] not in show_page:
@@ -245,7 +230,7 @@ try {
     if ([int]$indexHttp.StatusCode -ne 200) { $fail6.Add('GET index.html failed') }
     else {
       $body = [string]$indexHttp.Content
-      if ($body -notlike '*id="todayQueue"*') { $fail6.Add('HTTP index missing todayQueue') }
+      if ($body -like '*id="todayQueue"*') { $fail6.Add('HTTP index still has todayQueue on Today Workspace') }
       if ($body -notlike '*id="morningExecutiveSummary"*') { $fail6.Add('HTTP index missing Morning Brief') }
       if ($body -notlike '*id="queue"*') { $fail6.Add('HTTP index missing queue page') }
     }

@@ -413,32 +413,6 @@ async function selectKnowledgeTag(tag) {
   }
 }
 
-function renderTodayQueue() {
-  const listEl = document.getElementById('todayQueue');
-  if (!listEl) return;
-  listEl.innerHTML = '';
-  const ids = WorkflowEngine.getQueueIds();
-  if (!ids.length) {
-    const li = document.createElement('li');
-    li.className = 'today-queue-empty';
-    li.textContent = '--';
-    listEl.appendChild(li);
-    return;
-  }
-  ids.forEach(q => {
-    const li = document.createElement('li');
-    li.textContent = WorkflowEngine.cardTitle(q);
-    li.onclick = () => {
-      showPage('cards');
-      openResearchCard(q, document.getElementById('card'), {
-        resetPath: true,
-        fromPage: 'today'
-      });
-    };
-    listEl.appendChild(li);
-  });
-}
-
 function render() {
   queueList.innerHTML = '';
   cardList.innerHTML = '';
@@ -462,7 +436,6 @@ function render() {
   if (radarEl) {
     DataEngine.renderOpportunityRadar(radarEl, openFromOpportunityRadar);
   }
-  renderTodayQueue();
   renderCaseList();
 }
 

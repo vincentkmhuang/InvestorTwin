@@ -58,10 +58,10 @@ if ($mediaCss -like '*grid-template-columns: 1fr 1fr;*#cards*' -or $mediaCss -li
 Add-TestResult 'TEST 4' ($fail4.Count -eq 0) ($fail4 -join "`n")
 
 $fail5 = New-Object System.Collections.Generic.List[string]
-foreach ($id in @('today', 'todayQueue', 'morningExecutiveSummary', 'queue', 'cards', 'card', 'cases', 'caseView')) {
+foreach ($id in @('today', 'morningExecutiveSummary', 'queue', 'cards', 'card', 'cases', 'caseView')) {
   if ($index -notlike ('*id="' + $id + '"*')) { $fail5.Add("index.html missing $id") }
 }
-if ($index -notlike '*style.css?v=012b1*') { $fail5.Add('012-B style cache token was changed; phone cache bump was deferred to keep index.html unchanged') }
+if ($index -notlike '*style.css?v=0051*') { $fail5.Add('style cache token is not 0051') }
 Add-TestResult 'TEST 5' ($fail5.Count -eq 0) ($fail5 -join "`n")
 
 $fail6 = New-Object System.Collections.Generic.List[string]
@@ -70,7 +70,7 @@ $engine = [System.IO.File]::ReadAllText($EnginePath, $Utf8)
 $workflow = [System.IO.File]::ReadAllText($WorkflowPath, $Utf8)
 $serve = [System.IO.File]::ReadAllText($ServePath, $Utf8)
 $brief = [System.IO.File]::ReadAllText($BriefPath, $Utf8)
-if ($app -notlike '*function renderTodayQueue()*') { $fail6.Add('app.js workbench render missing') }
+if ($app -notlike '*renderMorningBrief(openMorningBriefResearch)*') { $fail6.Add('app.js Morning Brief render missing') }
 if ($engine -notlike '*normalizeMorningBrief(*') { $fail6.Add('morning brief normalizer missing') }
 if ($workflow -notlike '*this.queue.items.push({ id, addedFrom: source })*') { $fail6.Add('queue schema missing') }
 if ($serve -notlike '*http://localhost:$port/*') { $fail6.Add('serve.ps1 localhost bind missing') }

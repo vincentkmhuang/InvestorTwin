@@ -1,0 +1,41 @@
+{
+  "sprint": "005-1",
+  "todayClass": "today-workspace",
+  "todayPageTitle": "今日工作台",
+  "forbiddenTodayHeadings": [
+    "今日佇列",
+    "AI / 台灣 AI Highlights"
+  ],
+  "sectionOrder": [
+    "執行摘要",
+    "市場溫度",
+    "全球市場與新聞",
+    "台灣市場與新聞",
+    "即將事件",
+    "今日三件事"
+  ],
+  "requiredIds": [
+    "today",
+    "morningBriefDate",
+    "morningExecutiveSummary",
+    "morningTopThings",
+    "morningMarketTemperature",
+    "morningGlobalMarket",
+    "morningGlobalNews",
+    "morningTaiwanMarket",
+    "morningTaiwanNews",
+    "morningUpcomingEvents",
+    "morningTodaysThreeThings",
+    "morningRadarSection",
+    "morningOpportunityRadar",
+    "morningAiHighlights"
+  ],
+  "queuePageIds": ["queue", "queueList"],
+  "dataSources": [
+    "data/morning-brief.json",
+    "data/opportunity-radar.json",
+    "data/research-queue.json",
+    "data/knowledge-index.json",
+    "data/version.json"
+  ]
+}

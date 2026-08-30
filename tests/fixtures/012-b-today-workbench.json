@@ -1,11 +1,8 @@
 {
   "sprint": "012-B",
-  "todayQueueId": "todayQueue",
-  "todayQueueSectionId": "todayQueueSection",
-  "todayQueueHeading": "今日佇列",
+  "forbiddenTodayQueueHeading": "今日佇列",
   "todayPageTitle": "今日工作台",
   "queueItemKeys": ["id", "addedFrom"],
-  "emptyPreview": "--",
   "homepageBriefIds": [
     "today",
     "morningExecutiveSummary",

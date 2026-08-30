@@ -1,7 +1,7 @@
 <!doctype html><html lang="zh-Hant"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Investor Twin v0.5</title>
-<link rel="stylesheet" href="style.css?v=012b1"></head>
+<link rel="stylesheet" href="style.css?v=0051"></head>
 <body>
 <aside>
 <h2>投資雙胞胎</h2>
@@ -22,47 +22,37 @@
 <main>
 <h1 id="title">今日工作台</h1>
 
-<div id="today" class="page morning-brief">
-<section class="box">
+<div id="today" class="page morning-brief today-workspace">
+<section class="box" id="todayExecutiveSummary">
 <h2>執行摘要</h2>
 <p class="morning-brief-date">Brief 日期：<span id="morningBriefDate">--</span></p>
 <p id="morningExecutiveSummary"></p>
 <ol id="morningTopThings"></ol>
 </section>
 
-<section class="box" id="todayQueueSection">
-<h2>今日佇列</h2>
-<ul id="todayQueue"></ul>
-</section>
-
-<section class="box">
+<section class="box" id="todayMarketTemperature">
 <h2>市場溫度</h2>
 <div id="morningMarketTemperature"></div>
 </section>
 
-<section class="box">
+<section class="box" id="todayGlobalMarket">
 <h2>全球市場與新聞</h2>
 <p id="morningGlobalMarket"></p>
 <ul id="morningGlobalNews"></ul>
 </section>
 
-<section class="box">
+<section class="box" id="todayTaiwanMarket">
 <h2>台灣市場與新聞</h2>
 <p id="morningTaiwanMarket"></p>
 <ul id="morningTaiwanNews"></ul>
 </section>
 
-<section class="box">
-<h2>AI / 台灣 AI Highlights</h2>
-<ul id="morningAiHighlights"></ul>
-</section>
-
-<section class="box">
+<section class="box" id="todayUpcomingEvents">
 <h2>即將事件</h2>
 <ul id="morningUpcomingEvents"></ul>
 </section>
 
-<section class="box">
+<section class="box" id="todayThreeThings">
 <h2>今日三件事</h2>
 <ul id="morningTodaysThreeThings"></ul>
 </section>
@@ -71,6 +61,7 @@
 <h2 id="morningRadarTitle">Opportunity Radar｜上週機會變化</h2>
 <ul id="morningOpportunityRadar"></ul>
 </section>
+<ul id="morningAiHighlights" hidden></ul>
 </div>
 
 <div id="queue" class="page" style="display:none">
@@ -145,5 +136,5 @@
 <script src="js/data-engine.js?v=012c1"></script>
 <script src="js/workflow-engine.js?v=029a1"></script>
 <script src="js/knowledge-engine.js?v=005c5"></script>
-<script src="app.js?v=012b1"></script>
+<script src="app.js?v=0051"></script>
 </main></body></html>

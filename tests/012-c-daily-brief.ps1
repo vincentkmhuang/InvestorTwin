@@ -132,8 +132,8 @@ elif mode == "render":
             fail.append("homepage missing id " + hid)
     if "renderMorningBrief(openMorningBriefResearch)" not in app_src:
         fail.append("Morning Brief render path missing")
-    if "id=\"todayQueue\"" not in index_src:
-        fail.append("today queue preview missing")
+    if "id=\"todayQueue\"" in index_src:
+        fail.append("Today Workspace must not display Research Queue")
 
 elif mode == "research":
     ids = collect_ids(brief)
