@@ -319,7 +319,7 @@ const WorkflowEngine = {
 
   renderResearchConclusionHistory(history) {
     const list = Array.isArray(history) ? history : [];
-    if (!list.length) return '<p data-research-history>--</p>';
+    if (!list.length) return '';
     let reCount = 0;
     const items = list.map(entry => {
       const type = entry?.type === 're-research' ? 're-research' : 'initial';
@@ -562,8 +562,13 @@ const WorkflowEngine = {
     } else {
       html += '<p data-current-conclusion>--</p>';
     }
-    html += '<p><b>Research History</b></p>';
-    html += this.renderResearchConclusionHistory(card.researchConclusionHistory);
+    const historyList = Array.isArray(card.researchConclusionHistory)
+      ? card.researchConclusionHistory
+      : [];
+    if (historyList.length) {
+      html += '<p><b>Research History</b></p>';
+      html += this.renderResearchConclusionHistory(historyList);
+    }
     html += '<p><b>Save Research Conclusion</b></p>';
     html += '<textarea data-conclusion-text rows="4" style="width:100%;box-sizing:border-box"></textarea>';
     html += '<p><button type="button" data-conclusion-save>Save Research Conclusion</button></p>';

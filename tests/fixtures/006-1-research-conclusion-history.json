@@ -1,0 +1,10 @@
+{
+  "researchId": "sprint-006-1",
+  "thesisId": "sprint-006-1-thesis",
+  "conclusion1": "006-1 first conclusion: initial research on the same card.",
+  "conclusion2": "006-1 second conclusion: updated after new evidence.",
+  "status": "uncertain",
+  "asOf1": "2026-08-23",
+  "asOf2": "2026-08-24",
+  "productionCardIds": ["glass-bridge", "cpo", "fau", "hbm"]
+}
