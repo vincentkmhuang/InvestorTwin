@@ -9,6 +9,7 @@ function Update-KnowledgeIndex {
   )
 
   $tagMap = @{}
+  $cardIds = [System.Collections.Generic.HashSet[string]]::new([string[]]@(), [System.StringComparer]::Ordinal)
   $researchPath = Join-Path $RootPath 'research'
 
   if (-not (Test-Path $researchPath)) {
@@ -22,6 +23,9 @@ function Update-KnowledgeIndex {
 
     $card = Get-Content $cardPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $id = if ($card.id) { [string]$card.id } else { $_.Name }
+    if (-not [string]::IsNullOrWhiteSpace($id)) {
+      [void]$cardIds.Add($id)
+    }
 
     if (-not $card.tags -or @($card.tags).Count -eq 0) { return }
 
@@ -46,6 +50,7 @@ function Update-KnowledgeIndex {
   $index = [ordered]@{
     generatedAt = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
     tags = $sortedTags
+    cardIds = @($cardIds | Sort-Object)
   }
 
   $indexPath = Join-Path $RootPath 'data\knowledge-index.json'

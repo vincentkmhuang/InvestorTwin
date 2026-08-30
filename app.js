@@ -6,6 +6,9 @@ let navigationState = {
 };
 let navigationContainer = null;
 let researchHistory = [];
+let explorerCardIds = [];
+let applyingHistory = false;
+let skipNextViewHash = false;
 
 async function init() {
   await DataEngine.init();
@@ -18,11 +21,17 @@ async function init() {
   }
 
   await bindTodayWorkspaceFromMorningBrief();
+  await loadExplorerCardIds();
   renderKnowledgeExplorer();
   renderRecentResearch();
   render();
   renderCaseList();
-  await restoreViewFromHash();
+  applyingHistory = true;
+  try {
+    await restoreViewFromHash();
+  } finally {
+    applyingHistory = false;
+  }
 }
 
 async function bindTodayWorkspaceFromMorningBrief() {
@@ -52,13 +61,23 @@ async function loadVersionInfo() {
   }
 }
 
-function showPage(id) {
+function showPage(id, options) {
   document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
   document.getElementById(id).style.display = 'block';
   document.getElementById('title').textContent = id === 'today'
     ? '今日工作台'
     : document.querySelector('[onclick="showPage(\'' + id + '\')"]').textContent.trim();
-  setViewHash(id);
+  const skipHash = options?.skipHash === true || skipNextViewHash;
+  skipNextViewHash = false;
+  if (skipHash) return;
+  if (id !== 'cards' && id !== 'knowledge' && !options?.replay) {
+    navigationState.currentId = null;
+  }
+  if (options?.replay || applyingHistory) {
+    setViewHash(id);
+    return;
+  }
+  pushViewHash(id);
 }
 
 function hashPath() {
@@ -73,19 +92,55 @@ function decodeHashSegment(value) {
   }
 }
 
-function setViewHash(page, contentId) {
+function navSnapshot() {
+  return {
+    currentId: navigationState.currentId,
+    breadcrumb: navigationState.breadcrumb.slice(),
+    backStack: JSON.parse(JSON.stringify(navigationState.backStack)),
+    forwardStack: JSON.parse(JSON.stringify(navigationState.forwardStack))
+  };
+}
+
+function applyNavSnapshot(snap) {
+  if (!snap || typeof snap !== 'object') return;
+  navigationState.currentId = snap.currentId == null ? null : snap.currentId;
+  navigationState.breadcrumb = Array.isArray(snap.breadcrumb) ? snap.breadcrumb.slice() : [];
+  navigationState.backStack = Array.isArray(snap.backStack) ? JSON.parse(JSON.stringify(snap.backStack)) : [];
+  navigationState.forwardStack = Array.isArray(snap.forwardStack) ? JSON.parse(JSON.stringify(snap.forwardStack)) : [];
+}
+
+function buildViewHash(page, contentId) {
   const currentPage = (page || '').trim();
-  if (!currentPage) return;
+  if (!currentPage) return '';
   const content = (contentId || '').trim();
-  let next = '#' + currentPage;
   if (currentPage === 'cases' && content) {
-    next = '#case/' + encodeURIComponent(content);
-  } else if (content) {
-    next = '#' + currentPage + '/' + encodeURIComponent(content);
+    return '#case/' + encodeURIComponent(content);
   }
-  if (window.location.hash !== next) {
-    history.replaceState(null, '', next);
+  if (content) {
+    return '#' + currentPage + '/' + encodeURIComponent(content);
   }
+  return '#' + currentPage;
+}
+
+function setViewHash(page, contentId) {
+  const next = buildViewHash(page, contentId);
+  if (!next) return;
+  history.replaceState({ nav: navSnapshot() }, '', next);
+}
+
+function pushViewHash(page, contentId) {
+  if (applyingHistory) {
+    setViewHash(page, contentId);
+    return;
+  }
+  const next = buildViewHash(page, contentId);
+  if (!next) return;
+  const state = { nav: navSnapshot() };
+  if (window.location.hash === next) {
+    history.replaceState(state, '', next);
+    return;
+  }
+  history.pushState(state, '', next);
 }
 
 function parseViewHash() {
@@ -108,31 +163,61 @@ function parseViewHash() {
 }
 
 async function restoreViewFromHash() {
-  const view = parseViewHash();
-  if (view.caseId) {
-    if (DataEngine.getCase(view.caseId)) {
-      await openInvestmentCase(view.caseId);
+  const resume = applyingHistory;
+  applyingHistory = true;
+  try {
+    const view = parseViewHash();
+    if (view.caseId) {
+      if (DataEngine.getCase(view.caseId)) {
+        await openInvestmentCase(view.caseId, { replay: true });
+        return;
+      }
+      showPage('cases');
       return;
     }
-    showPage('cases');
-    return;
-  }
-  if (view.page === 'cards' && view.researchId) {
-    showPage('cards');
-    await openResearchCard(view.researchId, document.getElementById('card'), { resetPath: true });
-    return;
-  }
-  if (view.page === 'knowledge' && view.knowledgeKey) {
-    showPage('knowledge');
-    if (isKnowledgeTag(view.knowledgeKey)) {
-      await selectKnowledgeTag(view.knowledgeKey);
+    if (view.page === 'cards' && view.researchId) {
+      showPage('cards', { skipHash: true });
+      await openResearchCard(view.researchId, document.getElementById('card'), {
+        resetPath: true,
+        fromNavigation: true
+      });
       return;
     }
-    await openResearchCard(view.knowledgeKey, document.getElementById('knowledgeExplorerCard'), { resetPath: true });
-    return;
+    if (view.page === 'knowledge' && view.knowledgeKey) {
+      showPage('knowledge', { skipHash: true });
+      if (isKnowledgeTag(view.knowledgeKey)) {
+        await selectKnowledgeTag(view.knowledgeKey);
+        return;
+      }
+      await openResearchCard(view.knowledgeKey, document.getElementById('knowledgeExplorerCard'), {
+        resetPath: true,
+        fromNavigation: true
+      });
+      return;
+    }
+    showPage(view.page || 'today');
+    if (view.page === 'cards' && !view.researchId) {
+      const cardEl = document.getElementById('card');
+      if (cardEl) cardEl.textContent = '請選擇研究卡';
+    }
+    if (!(view.page === 'cards' && view.researchId) && view.page !== 'knowledge') {
+      navigationState.currentId = null;
+    }
+  } finally {
+    applyingHistory = resume;
   }
-  showPage(view.page || 'today');
 }
+
+window.addEventListener('popstate', async (event) => {
+  if (applyingHistory) return;
+  applyingHistory = true;
+  try {
+    if (event.state && event.state.nav) applyNavSnapshot(event.state.nav);
+    await restoreViewFromHash();
+  } finally {
+    applyingHistory = false;
+  }
+});
 
 function isKnowledgeTag(value) {
   return KnowledgeEngine.getTags().includes(value);
@@ -143,6 +228,7 @@ async function openMorningBriefResearch(id) {
   const added = await WorkflowEngine.ensureInQueue(researchId, 'Morning Brief');
   if (added) render();
 
+  skipNextViewHash = true;
   showPage('cards');
   openResearchCard(id, document.getElementById('card'), {
     resetPath: true,
@@ -155,7 +241,7 @@ async function openFromOpportunityRadar(id, fromPage) {
   const added = await WorkflowEngine.ensureInQueue(researchId, 'Opportunity Radar');
   if (added) render();
 
-  showPage('cards');
+  showPage('cards', { skipHash: true });
   openResearchCard(id, document.getElementById('card'), {
     resetPath: true,
     fromPage: fromPage || 'queue'
@@ -176,13 +262,13 @@ async function openResearchCard(id, container, options) {
   navigationContainer = target;
 
   if (!fromNavigation) {
-    if (options?.fromPage) {
-      navigationState.backStack = [{ type: 'page', pageId: options.fromPage }];
-    } else if (navigationState.currentId != null) {
+    if (navigationState.currentId != null && navigationState.currentId !== researchId) {
       navigationState.backStack.push({
         id: navigationState.currentId,
         breadcrumb: [...navigationState.breadcrumb]
       });
+    } else if (navigationState.currentId == null && options?.fromPage) {
+      navigationState.backStack = [{ type: 'page', pageId: options.fromPage }];
     }
     navigationState.forwardStack = [];
 
@@ -200,13 +286,17 @@ async function openResearchCard(id, container, options) {
   await WorkflowEngine.renderResearch(bundle, target);
   renderResearchNavigation(target);
 
+  const replayHash = fromNavigation || applyingHistory;
   if (target && target.id === 'knowledgeExplorerCard') {
     const graph = await KnowledgeEngine.getGraph(researchId);
     renderKnowledgeConnections(graph);
     renderKnowledgeMap(graph);
-    setViewHash('knowledge', researchId);
-  } else {
+    if (replayHash) setViewHash('knowledge', researchId);
+    else pushViewHash('knowledge', researchId);
+  } else if (replayHash) {
     setViewHash('cards', researchId);
+  } else {
+    pushViewHash('cards', researchId);
   }
 }
 
@@ -214,9 +304,23 @@ function navigationBack() {
   if (!navigationState.backStack.length) return;
 
   const top = navigationState.backStack[navigationState.backStack.length - 1];
+  if (history.state && history.state.nav) {
+    history.back();
+    return;
+  }
   if (top?.type === 'page') {
     navigationState.backStack.pop();
-    showPage(top.pageId);
+    navigationState.currentId = null;
+    if (top.pageId === 'cards') {
+      const cardEl = document.getElementById('card');
+      if (cardEl) cardEl.textContent = '請選擇研究卡';
+    }
+    applyingHistory = true;
+    try {
+      showPage(top.pageId);
+    } finally {
+      applyingHistory = false;
+    }
     return;
   }
 
@@ -231,6 +335,10 @@ function navigationBack() {
 }
 
 function navigationForward() {
+  if (history.state && history.state.nav) {
+    history.forward();
+    return;
+  }
   if (!navigationState.forwardStack.length) return;
 
   navigationState.backStack.push({
@@ -417,25 +525,51 @@ async function selectKnowledgeTag(tag) {
   }
 }
 
-function render() {
+async function loadExplorerCardIds() {
+  try {
+    const index = await fetch('data/knowledge-index.json?t=' + Date.now()).then(r => r.ok ? r.json() : null);
+    explorerCardIds = Array.isArray(index?.cardIds)
+      ? index.cardIds.map(id => String(id || '').trim()).filter(Boolean)
+      : [];
+  } catch (_) {
+    explorerCardIds = [];
+  }
+}
+
+async function researchCardFileExists(id) {
+  try {
+    const res = await fetch('research/' + encodeURIComponent(id) + '/card.json');
+    return res.ok;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function render() {
   queueList.innerHTML = '';
   cardList.innerHTML = '';
   WorkflowEngine.getQueueIds().forEach(q => {
     let li = document.createElement('li');
     li.textContent = WorkflowEngine.cardTitle(q);
     li.onclick = () => {
-      showPage('cards');
+      showPage('cards', { skipHash: true });
       openResearchCard(q, document.getElementById('card'), {
         resetPath: true,
         fromPage: 'queue'
       });
     };
     queueList.appendChild(li);
-    let li2 = document.createElement('li');
-    li2.textContent = WorkflowEngine.cardTitle(q);
-    li2.onclick = () => openResearchCard(q, undefined, { resetPath: true });
-    cardList.appendChild(li2);
   });
+  for (const id of explorerCardIds) {
+    if (!(await researchCardFileExists(id))) continue;
+    const li2 = document.createElement('li');
+    li2.textContent = WorkflowEngine.cardTitle(id);
+    li2.onclick = () => openResearchCard(id, undefined, {
+      resetPath: true,
+      fromPage: 'cards'
+    });
+    cardList.appendChild(li2);
+  }
   const radarEl = document.getElementById('queueOpportunityRadar');
   if (radarEl) {
     DataEngine.renderOpportunityRadar(radarEl, openFromOpportunityRadar);
@@ -455,9 +589,10 @@ function renderCaseList() {
   });
 }
 
-async function openInvestmentCase(id) {
-  showPage('cases');
-  setViewHash('cases', id);
+async function openInvestmentCase(id, options) {
+  showPage('cases', { skipHash: true });
+  if (options?.replay || applyingHistory) setViewHash('cases', id);
+  else pushViewHash('cases', id);
   const container = document.getElementById('caseView');
   await WorkflowEngine.renderInvestmentCase(DataEngine.getCase(id), container);
 }

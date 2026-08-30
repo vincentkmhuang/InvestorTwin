@@ -1,0 +1,9 @@
+{
+  "expectedCardIds": ["cpo", "fau", "glass-bridge", "hbm"],
+  "queueOnlyIds": ["glass-bridge", "fau"],
+  "openFunction": "openResearchCard",
+  "radarFunction": "openFromOpportunityRadar",
+  "todayFunction": "openMorningBriefResearch",
+  "taggedCardId": "glass-bridge",
+  "taggedCardTag": "Glass Bridge"
+}
