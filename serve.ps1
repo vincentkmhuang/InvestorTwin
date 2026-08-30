@@ -134,12 +134,26 @@ function Get-PersistedDecision($raw) {
   if (-not (Test-IsJsonObject $raw)) { return $null }
   $stance = ''
   if ($raw.PSObject.Properties['stance'] -and $raw.stance) { $stance = [string]$raw.stance }
-  if ((Get-AllowedDecisionStances) -notcontains $stance) { return $null }
+  $validStance = (Get-AllowedDecisionStances) -contains $stance
+  if (-not $validStance) { $stance = '' }
+
+  $decisionText = ''
+  if ((Test-HasJsonProperty $raw 'decision') -and $raw.decision -and -not (Test-IsJsonObject $raw.decision)) {
+    $decisionText = ([string]$raw.decision).Trim()
+  }
+  if (-not $decisionText -and (Test-HasJsonProperty $raw 'decisionText') -and $raw.decisionText) {
+    $decisionText = ([string]$raw.decisionText).Trim()
+  }
+  if (-not $validStance -and -not $decisionText) { return $null }
 
   $asOf = ''
   if ($raw.PSObject.Properties['asOf'] -and $null -ne $raw.asOf) { $asOf = [string]$raw.asOf }
   $reason = ''
   if ($raw.PSObject.Properties['reason'] -and $null -ne $raw.reason) { $reason = [string]$raw.reason }
+  $status = $null
+  if ((Test-HasJsonProperty $raw 'status') -and $raw.status) {
+    $status = [string]$raw.status
+  }
 
   $researchIds = @()
   $supportingCount = $null
@@ -164,8 +178,10 @@ function Get-PersistedDecision($raw) {
 
   return [PSCustomObject]@{
     stance = $stance
+    decisionText = $decisionText
     asOf = $asOf
     reason = $reason
+    status = $status
     basedOn = [PSCustomObject]@{
       researchIds = $researchIds
       supportingCount = $supportingCount
@@ -179,13 +195,23 @@ function ConvertTo-DecisionJson($raw) {
   $decision = Get-PersistedDecision $raw
   if ($null -eq $decision) { return 'null' }
   $basedOn = $decision.basedOn
-  return ('{"stance":' + (Get-JsonString $decision.stance) +
-    ',"asOf":' + (Get-JsonString $decision.asOf) +
-    ',"reason":' + (Get-JsonString $decision.reason) +
-    ',"basedOn":{"researchIds":' + (ConvertTo-JsonArrayText (Get-AsArray $basedOn.researchIds)) +
+  $parts = New-Object System.Collections.Generic.List[string]
+  if ($decision.stance) {
+    [void]$parts.Add('"stance":' + (Get-JsonString $decision.stance))
+  }
+  if ($decision.decisionText) {
+    [void]$parts.Add('"decision":' + (Get-JsonString $decision.decisionText))
+  }
+  [void]$parts.Add('"asOf":' + (Get-JsonString $decision.asOf))
+  [void]$parts.Add('"reason":' + (Get-JsonString $decision.reason))
+  if ($decision.status) {
+    [void]$parts.Add('"status":' + (Get-JsonString $decision.status))
+  }
+  [void]$parts.Add('"basedOn":{"researchIds":' + (ConvertTo-JsonArrayText (Get-AsArray $basedOn.researchIds)) +
     ',"supportingCount":' + (Get-JsonNullOrNumber $basedOn.supportingCount) +
     ',"counterCount":' + (Get-JsonNullOrNumber $basedOn.counterCount) +
-    ',"thesisStatus":' + (Get-JsonNullOrString $basedOn.thesisStatus) + '}}')
+    ',"thesisStatus":' + (Get-JsonNullOrString $basedOn.thesisStatus) + '}')
+  return '{' + ($parts -join ',') + '}'
 }
 
 function ConvertTo-DecisionHistoryJson($raw) {
@@ -1727,11 +1753,16 @@ while ($listener.IsListening) {
         $target = @($store.cases | Where-Object { $_.id -eq $id } | Select-Object -First 1)
         $incoming = $body.decision
         $stance = if ((Test-IsJsonObject $incoming) -and $incoming.stance) { [string]$incoming.stance } else { '' }
+        $decisionText = ''
+        if ((Test-IsJsonObject $incoming) -and (Test-HasJsonProperty $incoming 'decision') -and $incoming.decision -and -not (Test-IsJsonObject $incoming.decision)) {
+          $decisionText = ([string]$incoming.decision).Trim()
+        }
         $reason = if ((Test-IsJsonObject $incoming) -and $null -ne $incoming.reason) { ([string]$incoming.reason).Trim() } else { '' }
+        $validStance = (Get-AllowedDecisionStances) -contains $stance
         if ($target.Count -eq 0) {
           Send-Json $response @{ error = 'not_found'; message = 'Investment Case not found' } 404
-        } elseif ((Get-AllowedDecisionStances) -notcontains $stance) {
-          Send-Json $response @{ error = 'invalid_payload'; message = 'decision.stance is invalid' } 400
+        } elseif (-not $validStance -and -not $decisionText) {
+          Send-Json $response @{ error = 'invalid_payload'; message = $(if ($stance) { 'decision.stance is invalid' } else { 'decision is invalid' }) } 400
         } elseif ([string]::IsNullOrWhiteSpace($reason)) {
           Send-Json $response @{ error = 'invalid_payload'; message = 'decision.reason is required' } 400
         } else {

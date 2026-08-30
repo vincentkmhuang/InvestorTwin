@@ -1,0 +1,11 @@
+{
+  "sprint": "008-1",
+  "caseId": "3363-glass-bridge",
+  "researchId": "glass-bridge",
+  "thesisId": "cpo-glass-bridge",
+  "ticker": "3363",
+  "decision": "暫不建立部位",
+  "reason": "目前研究結論尚不足以形成明確投資決策。",
+  "status": "active",
+  "emptyLabel": "尚未建立 Decision"
+}

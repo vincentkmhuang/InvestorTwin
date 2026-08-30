@@ -356,7 +356,7 @@ const WorkflowEngine = {
     const decisionLine = linkedCases.some(item => this.isPersistedDecision(item.decision))
       ? linkedCases
         .filter(item => this.isPersistedDecision(item.decision))
-        .map(item => `${item.id}: ${item.decision.stance}`)
+        .map(item => `${item.id}: ${this.decisionJudgment(item.decision)}`)
         .join('、')
       : '尚未建立（需在 Case 上手動建立）';
     let html = '<p><b>Research → Thesis → Case → Decision</b></p>';
@@ -1874,9 +1874,15 @@ const WorkflowEngine = {
   },
 
   isPersistedDecision(decision) {
-    return !!decision
-      && typeof decision === 'object'
-      && this.allowedDecisionStances().includes(String(decision.stance || ''));
+    if (!decision || typeof decision !== 'object') return false;
+    if (String(decision.decision || '').trim()) return true;
+    return this.allowedDecisionStances().includes(String(decision.stance || ''));
+  },
+
+  decisionJudgment(decision) {
+    const text = String(decision?.decision || '').trim();
+    if (text) return text;
+    return String(decision?.stance || '').trim();
   },
 
   decisionBasedOnSnapshot(caseObj) {
@@ -1892,13 +1898,17 @@ const WorkflowEngine = {
     };
   },
 
-  buildDecision(caseObj, stance, reason) {
-    return {
-      stance,
+  buildDecision(caseObj, decisionText, reason, status) {
+    const judgment = String(decisionText || '').trim();
+    const next = {
+      decision: judgment,
       asOf: this.today(),
       reason: String(reason || '').trim(),
+      status: String(status || '').trim() || 'active',
       basedOn: this.decisionBasedOnSnapshot(caseObj)
     };
+    if (this.allowedDecisionStances().includes(judgment)) next.stance = judgment;
+    return next;
   },
 
   applyDecisionLocally(caseObj, next) {
@@ -1927,10 +1937,11 @@ const WorkflowEngine = {
 
   renderDecisionRecord(decision) {
     if (!this.isPersistedDecision(decision)) return '';
-    let html = `<p>Stance: ${this.escapeHtml(decision.stance)}</p>`;
-    html += `<p>As of: ${this.escapeHtml(decision.asOf || '--')}</p>`;
+    const status = String(decision.status || '').trim();
+    let html = `<p>Decision: ${this.escapeHtml(this.decisionJudgment(decision))}</p>`;
     html += `<p>Reason: ${this.escapeHtml(decision.reason || '--')}</p>`;
-    html += `<p>Based on: ${this.escapeHtml(this.formatDecisionBasedOn(decision.basedOn))}</p>`;
+    html += `<p>Status: ${this.escapeHtml(status || '--')}</p>`;
+    html += `<p>As of: ${this.escapeHtml(decision.asOf || '--')}</p>`;
     return html;
   },
 
@@ -1945,19 +1956,16 @@ const WorkflowEngine = {
 
   renderDecisionSection(caseObj) {
     const hasDecision = this.isPersistedDecision(caseObj?.decision);
-    const actionLabel = hasDecision ? '更新 Decision' : '建立 Decision';
-    const options = ['<option value="">選擇 stance</option>']
-      .concat(this.allowedDecisionStances().map(stance => (
-        `<option value="${this.escapeHtml(stance)}">${this.escapeHtml(stance)}</option>`
-      )));
-
-    let html = '<p><b>Decision</b></p>';
-    html += hasDecision ? this.renderDecisionRecord(caseObj.decision) : '<p>尚無 Decision</p>';
-    html += `<p>Stance <select data-case-decision-stance>${options.join('')}</select></p>`;
+    let html = '<div data-investment-decision="1">';
+    html += '<p><b>Investment Decision</b></p>';
+    html += hasDecision
+      ? this.renderDecisionRecord(caseObj.decision)
+      : '<p data-decision-empty="1">尚未建立 Decision</p>';
+    html += '<p>Decision<br><input data-case-decision-text type="text" style="width:100%;max-width:36em"></p>';
     html += '<p>Reason<br><textarea data-case-decision-reason rows="3" style="width:100%;max-width:36em"></textarea></p>';
-    html += `<p><button type="button" data-case-decision-save>${actionLabel}</button></p>`;
-    html += '<p><b>Decision History</b></p>';
-    html += this.renderDecisionHistory(caseObj?.decisionHistory);
+    html += '<p>Status<br><input data-case-decision-status type="text" value="active" style="width:100%;max-width:36em"></p>';
+    html += '<p><button type="button" data-case-decision-save>Save Decision</button></p>';
+    html += '</div>';
     return html;
   },
 
@@ -2227,16 +2235,15 @@ const WorkflowEngine = {
     }
   },
 
-  async saveCaseDecision(caseId, stance, reason) {
+  async saveCaseDecision(caseId, decisionText, reason, status) {
     const current = DataEngine.getCase(caseId);
     if (!current) return { ok: false, message: 'Investment Case not found' };
-    if (!this.allowedDecisionStances().includes(stance)) {
-      return { ok: false, message: 'Invalid stance' };
-    }
+    const judgment = String(decisionText || '').trim();
+    if (!judgment) return { ok: false, message: 'Decision is required' };
     const trimmed = String(reason || '').trim();
     if (!trimmed) return { ok: false, message: 'Reason is required' };
 
-    const next = this.buildDecision(current, stance, trimmed);
+    const next = this.buildDecision(current, judgment, trimmed, status);
     try {
       const res = await fetch('/api/cases', {
         method: 'POST',
@@ -2316,6 +2323,8 @@ const WorkflowEngine = {
     html += `<p><b>Company</b></p><p>${this.escapeHtml(companyLine || '--')}</p>`;
     html += '<p><b>Research Cards</b></p>';
     html += researchItems.length ? `<ul>${researchItems.join('')}</ul>` : '<p>--</p>';
+    html += this.renderDecisionSection(caseObj);
+    html += '<p data-case-decision-error style="display:none"></p>';
     html += this.renderTraceChain(layerThesis, chainCases);
     html += this.renderIntegrityGate(gate);
     html += '<p><b>Investment Thesis</b></p>';
@@ -2366,8 +2375,6 @@ const WorkflowEngine = {
     html += `<p>Buy Under: ${this.escapeHtml(this.formatCaseLevelValue(valuation.buyUnder))}</p>`;
     html += `<p>Current Price: ${this.escapeHtml(this.formatNumber(valuation.currentPrice))}</p>`;
     html += `<p>Current Discount: ${this.escapeHtml(this.formatPercent(valuation.currentDiscount))}</p>`;
-    html += this.renderDecisionSection(caseObj);
-    html += '<p data-case-decision-error style="display:none"></p>';
     html += this.renderPositionPlaybook(caseObj.positionPlaybook);
 
     container.innerHTML = html;
@@ -2462,19 +2469,24 @@ const WorkflowEngine = {
     }
 
     const saveDecisionBtn = container.querySelector('[data-case-decision-save]');
-    const stanceSelect = container.querySelector('[data-case-decision-stance]');
+    const decisionInput = container.querySelector('[data-case-decision-text]');
     const reasonInput = container.querySelector('[data-case-decision-reason]');
+    const statusInput = container.querySelector('[data-case-decision-status]');
     const decisionError = container.querySelector('[data-case-decision-error]');
-    if (saveDecisionBtn && stanceSelect && reasonInput) {
+    if (saveDecisionBtn && decisionInput && reasonInput) {
       saveDecisionBtn.onclick = async () => {
-        const stance = stanceSelect.value;
+        const judgment = decisionInput.value;
         const reason = reasonInput.value;
+        const status = statusInput ? statusInput.value : 'active';
         if (decisionError) {
           decisionError.style.display = 'none';
           decisionError.textContent = '';
         }
-        if (!this.allowedDecisionStances().includes(stance)) {
-          window.alert('請選擇 stance');
+        if (!String(judgment || '').trim()) {
+          if (decisionError) {
+            decisionError.textContent = 'Decision 必填';
+            decisionError.style.display = '';
+          }
           return;
         }
         if (!String(reason || '').trim()) {
@@ -2484,15 +2496,14 @@ const WorkflowEngine = {
           }
           return;
         }
-        const actionLabel = this.isPersistedDecision(caseObj.decision) ? '更新' : '建立';
         const confirmed = window.confirm(
-          `確定${actionLabel} Decision 為 ${stance}？\n按「確定」後才會寫入 Investment Case。\n按「取消」則不會寫入。`
+          '確定儲存 Investment Decision？\n按「確定」後才會寫入 Investment Case。\n按「取消」則不會寫入。'
         );
         if (!confirmed) {
           window.alert('已取消，未寫入 Decision');
           return;
         }
-        const result = await this.saveCaseDecision(caseObj.id, stance, reason);
+        const result = await this.saveCaseDecision(caseObj.id, judgment, reason, status);
         if (!result.ok) {
           window.alert(result.message || 'Failed to save Decision');
           return;
