@@ -100,8 +100,8 @@ if mode == "markup":
         fail.append("today-workspace skeleton class missing")
     if "app.js?v=0052" not in index_src:
         fail.append("app.js cache token is not 0052")
-    if "style.css?v=0051" not in index_src:
-        fail.append("style.css cache token is not 0051")
+    if "style.css?v=0053" not in index_src:
+        fail.append("style.css cache token is not 0053")
     if "data-engine.js?v=012c1" not in index_src:
         fail.append("012-C data-engine cache token missing")
 

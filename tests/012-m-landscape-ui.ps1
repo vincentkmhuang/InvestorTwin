@@ -61,7 +61,7 @@ $fail5 = New-Object System.Collections.Generic.List[string]
 foreach ($id in @('today', 'morningExecutiveSummary', 'queue', 'cards', 'card', 'cases', 'caseView')) {
   if ($index -notlike ('*id="' + $id + '"*')) { $fail5.Add("index.html missing $id") }
 }
-if ($index -notlike '*style.css?v=0051*') { $fail5.Add('style cache token is not 0051') }
+if ($index -notlike '*style.css?v=0053*') { $fail5.Add('style cache token is not 0053') }
 Add-TestResult 'TEST 5' ($fail5.Count -eq 0) ($fail5 -join "`n")
 
 $fail6 = New-Object System.Collections.Generic.List[string]

@@ -22,7 +22,20 @@ main{flex:1;padding:20px}
 #today.morning-brief{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
 #today.morning-brief>.box{margin-bottom:0}
 #today.morning-brief>.box:first-child,
+#today.today-workspace #todayExecutiveSummary,
+#today.today-workspace #todayMarketTemperature,
+#today.today-workspace #todayThreeThings,
 #morningRadarSection{grid-column:1/-1}
+#today.today-workspace .today-primary h2,
+#today.today-workspace .today-glance h2,
+#today.today-workspace .today-decision h2{font-size:20px;color:#1f2937}
+#today.today-workspace .today-context h2{font-size:16px;color:#475569}
+#today.today-workspace .morning-brief-date{margin:0 0 8px;font-size:14px;color:#64748b}
+#today.today-workspace #morningExecutiveSummary,
+#today.today-workspace #morningGlobalMarket,
+#today.today-workspace #morningTaiwanMarket{margin:0 0 8px;font-size:13px;line-height:1.5;color:#64748b}
+#today.today-workspace #morningTopThings{margin-top:4px;font-weight:600}
+#today.today-workspace #morningTodaysThreeThings .morning-brief-title{font-size:15px}
 .morning-market{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 .morning-market-item{background:#f4f6fa;padding:12px;border-radius:8px}
 .morning-market-name{font-size:12px;color:#64748b}
@@ -57,6 +70,9 @@ li{cursor:pointer;margin:6px 0}
   }
   #today.morning-brief > .box { margin-bottom: 0; min-width: 0; }
   #today.morning-brief > .box:first-child,
+  #today.today-workspace #todayExecutiveSummary,
+  #today.today-workspace #todayMarketTemperature,
+  #today.today-workspace #todayThreeThings,
   #morningRadarSection { grid-column: 1 / -1; }
   .morning-market { grid-template-columns: repeat(2, 1fr); }
   #cards,

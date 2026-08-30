@@ -1,0 +1,27 @@
+{
+  "sprint": "005-3",
+  "todayClass": "today-workspace",
+  "hierarchyClasses": [
+    "today-primary",
+    "today-glance",
+    "today-context",
+    "today-decision"
+  ],
+  "primaryFullWidthIds": [
+    "todayExecutiveSummary",
+    "todayMarketTemperature",
+    "todayThreeThings"
+  ],
+  "sectionOrder": [
+    "執行摘要",
+    "市場溫度",
+    "全球市場與新聞",
+    "台灣市場與新聞",
+    "即將事件",
+    "今日三件事"
+  ],
+  "forbiddenTodayHeadings": [
+    "今日佇列",
+    "AI / 台灣 AI Highlights"
+  ]
+}
