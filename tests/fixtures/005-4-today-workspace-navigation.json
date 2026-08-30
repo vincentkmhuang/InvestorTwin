@@ -1,0 +1,13 @@
+{
+  "sprint": "005-4",
+  "fromPage": "today",
+  "openFunction": "openMorningBriefResearch",
+  "backFunction": "navigationBack",
+  "restoreFunction": "restoreViewFromHash",
+  "existingCardId": "hbm",
+  "queueSource": "Morning Brief",
+  "forbiddenTodayHeadings": [
+    "今日佇列",
+    "AI / 台灣 AI Highlights"
+  ]
+}
