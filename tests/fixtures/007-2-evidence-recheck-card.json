@@ -1,0 +1,13 @@
+{
+  "sprint": "007-2",
+  "researchId": "hbm",
+  "otherResearchId": "glass-bridge",
+  "thesisId": "ai-dram",
+  "instrument": "SOX",
+  "evidenceAsOf": "2026-08-25",
+  "conclusionImpact": "UNKNOWN",
+  "validRunId": "run-20260828T000000Z",
+  "newerCorruptRunId": "run-20260829T000000Z",
+  "newerMissingRunId": "run-20260828T120000Z",
+  "olderRunId": "run-20260820T000000Z"
+}

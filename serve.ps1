@@ -1076,6 +1076,74 @@ function Get-LatestEvidenceItems($rootPath) {
   return $items
 }
 
+function Get-LatestRecheck($rootPath) {
+  $empty = [PSCustomObject]@{
+    runId = $null
+    items = @()
+  }
+  $runsRoot = Join-Path $rootPath 'data\evidence\runs'
+  if (-not (Test-Path -LiteralPath $runsRoot)) { return $empty }
+
+  $runs = @(Get-ChildItem -LiteralPath $runsRoot -Directory -ErrorAction SilentlyContinue |
+    Sort-Object Name -Descending)
+  foreach ($run in $runs) {
+    $recheckPath = Join-Path $run.FullName 'recheck.json'
+    if (-not (Test-Path -LiteralPath $recheckPath -PathType Leaf)) { continue }
+    $obj = $null
+    try { $obj = Read-Utf8Json $recheckPath } catch { continue }
+    if (-not (Test-IsJsonObject $obj)) { continue }
+    if (-not (Test-HasJsonProperty $obj 'items')) { continue }
+
+    $mapped = @()
+    foreach ($item in @(Get-AsArray $obj.items)) {
+      if (-not (Test-IsJsonObject $item)) { continue }
+      $researchId = ''
+      if (Test-HasJsonProperty $item 'researchId' -and $item.researchId) {
+        $researchId = ([string]$item.researchId).Trim()
+      }
+      if (-not $researchId) { continue }
+      $needsReview = $false
+      if (Test-HasJsonProperty $item 'needsReview') {
+        $needsReview = [bool]$item.needsReview
+      }
+      $impact = 'UNKNOWN'
+      if (Test-HasJsonProperty $item 'conclusionImpact' -and $item.conclusionImpact) {
+        $impact = [string]$item.conclusionImpact
+      }
+      $thesisId = $null
+      if (Test-HasJsonProperty $item 'thesisId' -and $item.thesisId) {
+        $thesisId = [string]$item.thesisId
+      }
+      $instrument = ''
+      if (Test-HasJsonProperty $item 'instrument' -and $item.instrument) {
+        $instrument = [string]$item.instrument
+      }
+      $evidenceAsOf = ''
+      if (Test-HasJsonProperty $item 'evidenceAsOf' -and $item.evidenceAsOf) {
+        $evidenceAsOf = [string]$item.evidenceAsOf
+      }
+      $mapped += [PSCustomObject]@{
+        researchId = $researchId
+        thesisId = $thesisId
+        instrument = $instrument
+        needsReview = $needsReview
+        evidenceAsOf = $evidenceAsOf
+        conclusionImpact = $impact
+      }
+    }
+
+    $runId = $run.Name
+    if (Test-HasJsonProperty $obj 'runId' -and $obj.runId) {
+      $runId = [string]$obj.runId
+    }
+    return [PSCustomObject]@{
+      runId = $runId
+      items = $mapped
+    }
+  }
+  return $empty
+}
+
 function Ensure-QueueItem($rootPath, $id, $addedFrom) {
   $queue = Read-ResearchQueue $rootPath
   $added = $false
@@ -1308,9 +1376,11 @@ while ($listener.IsListening) {
     }
     elseif (($localPath -eq '/api/evidence' -or $localPath -eq '/api/evidence/latest') -and $method -eq 'GET') {
       $evidenceItems = @(Get-LatestEvidenceItems $root)
+      $recheck = Get-LatestRecheck $root
       $response.StatusCode = 200
       $response.ContentType = 'application/json; charset=utf-8'
-      $payload = '{"writesBrief":false,"layer":"evidence","items":' + (ConvertTo-JsonArrayText $evidenceItems) + '}'
+      $recheckText = '{"runId":' + (Get-JsonNullOrString $recheck.runId) + ',"items":' + (ConvertTo-JsonArrayText @($recheck.items)) + '}'
+      $payload = '{"writesBrief":false,"layer":"evidence","items":' + (ConvertTo-JsonArrayText $evidenceItems) + ',"recheck":' + $recheckText + '}'
       $bytes = [System.Text.Encoding]::UTF8.GetBytes($payload)
       $response.OutputStream.Write($bytes, 0, $bytes.Length)
     }

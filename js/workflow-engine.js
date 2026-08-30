@@ -402,17 +402,52 @@ const WorkflowEngine = {
   },
 
   async loadLatestEvidence() {
+    const emptyRecheck = { runId: null, items: [] };
     try {
       const res = await fetch('/api/evidence');
-      if (!res.ok) return { writesBrief: false, items: [] };
+      if (!res.ok) return { writesBrief: false, items: [], recheck: emptyRecheck };
       const data = await res.json();
       return {
         writesBrief: data && data.writesBrief === true,
-        items: Array.isArray(data?.items) ? data.items : []
+        items: Array.isArray(data?.items) ? data.items : [],
+        recheck: {
+          runId: data?.recheck?.runId || null,
+          items: Array.isArray(data?.recheck?.items) ? data.recheck.items : []
+        }
       };
     } catch (_) {
-      return { writesBrief: false, items: [] };
+      return { writesBrief: false, items: [], recheck: emptyRecheck };
     }
+  },
+
+  researchRecheckItems(researchId, recheck) {
+    const id = String(researchId || '').trim();
+    const items = Array.isArray(recheck?.items) ? recheck.items : [];
+    if (!id) return [];
+    return items.filter(item =>
+      item &&
+      String(item.researchId || '').trim() === id &&
+      item.needsReview === true
+    );
+  },
+
+  renderEvidenceRecheck(items) {
+    const list = Array.isArray(items) ? items.filter(item => item && item.needsReview === true) : [];
+    if (!list.length) return '';
+    let html = '<div data-evidence-recheck="1">';
+    html += '<p><b>Evidence Recheck</b></p>';
+    html += '<ul>' + list.map(item => {
+      const impact = this.escapeHtml(item.conclusionImpact || 'UNKNOWN');
+      const instrument = this.escapeHtml(item.instrument || '--');
+      const asOf = this.escapeHtml(item.evidenceAsOf || '--');
+      return `<li data-needs-review="true">` +
+        `<p>Needs Review</p>` +
+        `<p>Evidence As Of: ${asOf}</p>` +
+        `<p>Instrument: ${instrument}</p>` +
+        `<p>conclusionImpact: ${impact}</p>` +
+        `</li>`;
+    }).join('') + '</ul></div>';
+    return html;
   },
 
   renderResearchIntakeEvidence(matched, writesBrief) {
@@ -569,6 +604,8 @@ const WorkflowEngine = {
       html += '<p><b>Research History</b></p>';
       html += this.renderResearchConclusionHistory(historyList);
     }
+    const recheckItems = this.researchRecheckItems(card.id, evidenceLatest.recheck);
+    html += this.renderEvidenceRecheck(recheckItems);
     html += '<p><b>Save Research Conclusion</b></p>';
     html += '<textarea data-conclusion-text rows="4" style="width:100%;box-sizing:border-box"></textarea>';
     html += '<p><button type="button" data-conclusion-save>Save Research Conclusion</button></p>';
