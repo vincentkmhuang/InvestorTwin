@@ -1,0 +1,35 @@
+{
+  "sprint": "005-2",
+  "canonicalSource": "data/morning-brief.json",
+  "bindFunction": "bindTodayWorkspaceFromMorningBrief",
+  "forbiddenTodayHeadings": [
+    "今日佇列",
+    "AI / 台灣 AI Highlights"
+  ],
+  "fieldBindings": [
+    { "field": "date", "elementId": "morningBriefDate" },
+    { "field": "executiveSummary", "elementId": "morningExecutiveSummary" },
+    { "field": "macroDecisionLens", "elementId": "morningTopThings" },
+    { "field": "marketTemperature", "elementId": "morningMarketTemperature" },
+    { "field": "globalMarketAndNews.summary", "elementId": "morningGlobalMarket" },
+    { "field": "globalMarketAndNews.items", "elementId": "morningGlobalNews" },
+    { "field": "taiwanMarketAndNews.summary", "elementId": "morningTaiwanMarket" },
+    { "field": "taiwanMarketAndNews.items", "elementId": "morningTaiwanNews" },
+    { "field": "upcomingEvents", "elementId": "morningUpcomingEvents" },
+    { "field": "today3Things", "elementId": "morningTodaysThreeThings" }
+  ],
+  "engineNeedles": [
+    "setText('morningBriefDate', data.date || '--')",
+    "setText('morningExecutiveSummary', data.executiveSummary || data.summary)",
+    "setText('morningGlobalMarket', data.globalMarketAndNews && data.globalMarketAndNews.summary)",
+    "setText('morningTaiwanMarket', data.taiwanMarketAndNews && data.taiwanMarketAndNews.summary)",
+    "renderTextList('morningTopThings', data.macroDecisionLens)",
+    "renderMarketTemperature()",
+    "renderNews('morningGlobalNews', data.globalMarketAndNews && data.globalMarketAndNews.items)",
+    "renderNews('morningTaiwanNews', data.taiwanMarketAndNews && data.taiwanMarketAndNews.items)",
+    "renderEvents('morningUpcomingEvents', data.upcomingEvents)",
+    "renderThreeThings('morningTodaysThreeThings', data.today3Things)",
+    "emptyMorningBrief()",
+    "normalizeMorningBrief("
+  ]
+}

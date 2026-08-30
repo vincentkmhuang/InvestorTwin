@@ -17,13 +17,17 @@ async function init() {
     await WorkflowEngine.loadResearch(id);
   }
 
-  await DataEngine.loadMorningBrief();
-  await DataEngine.renderMorningBrief(openMorningBriefResearch);
+  await bindTodayWorkspaceFromMorningBrief();
   renderKnowledgeExplorer();
   renderRecentResearch();
   render();
   renderCaseList();
   await restoreViewFromHash();
+}
+
+async function bindTodayWorkspaceFromMorningBrief() {
+  await DataEngine.loadMorningBrief();
+  await DataEngine.renderMorningBrief(openMorningBriefResearch);
 }
 
 async function loadVersionInfo() {

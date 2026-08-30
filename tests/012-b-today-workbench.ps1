@@ -98,8 +98,8 @@ if mode == "markup":
         fail.append("today page title missing in index.html")
     if "today-workspace" not in today_block:
         fail.append("today-workspace skeleton class missing")
-    if "app.js?v=0051" not in index_src:
-        fail.append("app.js cache token is not 0051")
+    if "app.js?v=0052" not in index_src:
+        fail.append("app.js cache token is not 0052")
     if "style.css?v=0051" not in index_src:
         fail.append("style.css cache token is not 0051")
     if "data-engine.js?v=012c1" not in index_src:
