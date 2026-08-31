@@ -1,7 +1,7 @@
 <!doctype html><html lang="zh-Hant"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Investor Twin v0.5</title>
-<link rel="stylesheet" href="style.css?v=0053"></head>
+<link rel="stylesheet" href="style.css?v=0053&ui=005r1"></head>
 <body>
 <aside>
 <h2>投資雙胞胎</h2>
@@ -24,7 +24,7 @@
 
 <div id="today" class="page morning-brief today-workspace">
 <section class="box today-primary" id="todayExecutiveSummary">
-<h2>執行摘要</h2>
+<h2>昨日最重要 3 件事</h2>
 <p class="morning-brief-date">Brief 日期：<span id="morningBriefDate">--</span></p>
 <p id="morningExecutiveSummary"></p>
 <ol id="morningTopThings"></ol>
@@ -32,7 +32,7 @@
 
 <section class="box today-glance" id="todayMarketTemperature">
 <h2>市場溫度</h2>
-<div id="morningMarketTemperature"></div>
+<div id="morningMarketTemperature" class="morning-market"></div>
 </section>
 
 <section class="box today-context" id="todayGlobalMarket">
@@ -55,11 +55,6 @@
 <section class="box today-decision" id="todayThreeThings">
 <h2>今日三件事</h2>
 <ul id="morningTodaysThreeThings"></ul>
-</section>
-
-<section class="box" id="morningRadarSection" style="display:none">
-<h2 id="morningRadarTitle">Opportunity Radar｜上週機會變化</h2>
-<ul id="morningOpportunityRadar"></ul>
 </section>
 <ul id="morningAiHighlights" hidden></ul>
 </div>
@@ -133,7 +128,7 @@
 <div id="portfolio" class="page" style="display:none">
 <section class="box"><h2>投資組合（預留）</h2></section></div>
 
-<script src="js/data-engine.js?v=012c1"></script>
+<script src="js/data-engine.js?v=012c1&ui=005r3"></script>
 <script src="js/workflow-engine.js?v=029a1&ui=0081c"></script>
 <script src="js/knowledge-engine.js?v=005c5"></script>
 <script src="app.js?v=0052"></script>

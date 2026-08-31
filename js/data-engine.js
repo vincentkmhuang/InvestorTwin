@@ -210,13 +210,97 @@ const DataEngine = {
     return false;
   },
 
+  briefCleanText(value) {
+    if (value == null) return '';
+    let text = String(value);
+    const qty = '([0-9][0-9,.]*(?:%|億)?)';
+    const name = '([A-Za-z][A-Za-z0-9_./&+\\-]*)';
+    const day = '(\\d{4}-\\d{2}-\\d{2})';
+    text = text.replace(new RegExp(name + '\\s*｜\\s*' + qty + '\\s*：\\s*asOf\\s+' + day + '(?:\\s+close)?(?:，非最新)?(?:（Evidence [^）]*）)?。?', 'g'), '$1 $2｜$3');
+    text = text.replace(new RegExp(name + '\\s+' + qty + '\\s*（asOf\\s+' + day + '(?:\\s+close)?(?:，非最新)?）', 'g'), '$1 $2｜$3');
+    text = text.replace(/，非最新/g, '');
+    text = text.replace(/非最新/g, '');
+    text = text.replace(/（Evidence [^）]*）/g, '');
+    text = text.replace(/\s*Evidence [A-Za-z0-9_/+\-]+。/g, '');
+    text = text.replace(/\s*asOf\s+(\d{4}-\d{2}-\d{2})(?:\s+close)?/g, '｜$1');
+    return text.replace(/[ \t]{2,}/g, ' ').trim();
+  },
+
+  briefQuoteStamp(value, asOf) {
+    const date = (String(asOf || '').match(/\d{4}-\d{2}-\d{2}/) || ['--'])[0];
+    const text = value == null || !String(value).trim() ? '--' : String(value).trim();
+    return text + '｜' + date;
+  },
+
+  briefCanonName(name) {
+    const n = String(name || '');
+    if (n === 'S&P 500' || n === 'SPX') return 'SPX';
+    if (n === 'Dow' || n === 'DJI') return 'DJI';
+    return n;
+  },
+
+  briefQuotePattern() {
+    return /([A-Za-z][A-Za-z0-9_./&+\-]*)\s+([0-9][0-9,.]*(?:%|億)?)\s*｜\s*(\d{4}-\d{2}-\d{2})/g;
+  },
+
+  briefMarkShown(shown, name) {
+    if (!shown || !name) return;
+    shown[this.briefCanonName(name)] = true;
+  },
+
+  briefWasShown(shown, name) {
+    return !!(shown && shown[this.briefCanonName(name)]);
+  },
+
+  briefTidyDedup(text) {
+    return String(text || '')
+      .replace(/[ \t]{2,}/g, ' ')
+      .replace(/[、；]{2,}/g, '、')
+      .replace(/[：:]\s*(?=[、；。]|$)/g, '')
+      .replace(/[、；]\s*(?=[。]|$)/g, '')
+      .replace(/（\s*）/g, '')
+      .replace(/^\s*[、；。]+|[、；]+\s*$/g, '')
+      .replace(/\s+。/g, '。')
+      .trim();
+  },
+
+  briefIsMarketResidue(text) {
+    const leftover = String(text || '')
+      .replace(this.briefQuotePattern(), '')
+      .replace(/[A-Za-z][A-Za-z0-9_./&+\-]*/g, '')
+      .replace(/美債|美股指數|油價|台股|三大法人|半導體|美股|全球|台灣/g, '')
+      .replace(/[、；：:。.\s,，/／｜\d\-–—％%億()（）]+/g, '');
+    return !leftover.trim();
+  },
+
+  briefDedupText(value, shown, mode) {
+    let text = this.briefCleanText(value);
+    if (!text) return '';
+    text = text.replace(this.briefQuotePattern(), (full, name) => {
+      if (this.briefWasShown(shown, name)) return mode === 'news' ? '' : name;
+      this.briefMarkShown(shown, name);
+      return full;
+    });
+    return this.briefTidyDedup(text);
+  },
+
   async renderMorningBrief(onItemClick) {
     const data = this.morningBriefHome;
     if (!data) return;
+    const shown = {};
 
     const setText = (id, value) => {
       const el = document.getElementById(id);
-      if (el) el.textContent = value || '--';
+      if (!el) return;
+      if (id === 'morningBriefDate') {
+        el.textContent = value || '--';
+        return;
+      }
+      const mode = id === 'morningExecutiveSummary' ? 'judgment' : 'news';
+      const text = (id === 'morningExecutiveSummary' || id === 'morningGlobalMarket' || id === 'morningTaiwanMarket')
+        ? this.briefDedupText(value, shown, mode)
+        : this.briefCleanText(value);
+      el.textContent = text || '--';
     };
 
     const bindResearchClick = (el, researchId, clickFn) => {
@@ -246,12 +330,14 @@ const DataEngine = {
           ? value.trim()
           : String(value && value.text != null ? value.text : '').trim();
         if (!text) return;
+        const display = this.briefDedupText(text, shown, 'judgment');
+        if (!display || (listId === 'morningTopThings' && this.briefIsMarketResidue(display))) return;
         const li = document.createElement('li');
         li.className = 'morning-brief-static';
-        li.textContent = text;
+        li.textContent = display;
         listEl.appendChild(li);
       });
-      if (!listEl.children.length) renderEmpty(listEl);
+      if (!listEl.children.length && listId !== 'morningTopThings') renderEmpty(listEl);
     };
 
     const renderNews = (listId, items) => {
@@ -261,10 +347,12 @@ const DataEngine = {
       (items || []).forEach(item => {
         const title = (item?.title || '').trim();
         if (!title) return;
+        const display = this.briefDedupText(title, shown, 'news');
+        if (!display || this.briefIsMarketResidue(display)) return;
         const li = document.createElement('li');
         const titleEl = document.createElement('div');
         titleEl.className = 'morning-brief-title';
-        titleEl.textContent = title;
+        titleEl.textContent = display;
         li.appendChild(titleEl);
         const source = (item?.source || '').trim();
         if (source) {
@@ -286,8 +374,10 @@ const DataEngine = {
       (items || []).forEach(item => {
         const title = (item?.title || '').trim();
         if (!title) return;
+        const display = this.briefDedupText(title, shown, 'news');
+        if (!display || this.briefIsMarketResidue(display)) return;
         const li = document.createElement('li');
-        li.textContent = title;
+        li.textContent = display;
         bindResearchClick(li, this.researchLinkId(item));
         listEl.appendChild(li);
       });
@@ -304,7 +394,7 @@ const DataEngine = {
         const li = document.createElement('li');
         const titleEl = document.createElement('div');
         titleEl.className = 'morning-brief-title';
-        titleEl.textContent = title;
+        titleEl.textContent = this.briefCleanText(title);
         li.appendChild(titleEl);
         const when = (item?.when || '').trim();
         if (when) {
@@ -328,25 +418,30 @@ const DataEngine = {
         if (typeof item === 'string') {
           const text = item.trim();
           if (!text) return;
+          const display = this.briefDedupText(text, shown, 'judgment');
+          if (!display) return;
           const li = document.createElement('li');
           li.className = 'morning-brief-static';
-          li.textContent = text;
+          li.textContent = display;
           listEl.appendChild(li);
           return;
         }
         const title = String(item.title || item.text || '').trim();
-        if (!title) return;
+        const why = String(item.whyItMatters || '').trim();
+        if (!title && !why) return;
         const li = document.createElement('li');
         const titleEl = document.createElement('div');
         titleEl.className = 'morning-brief-title';
-        titleEl.textContent = title;
-        li.appendChild(titleEl);
-        const why = String(item.whyItMatters || '').trim();
         if (why) {
-          const whyEl = document.createElement('div');
-          whyEl.className = 'morning-brief-summary';
-          whyEl.textContent = why;
-          li.appendChild(whyEl);
+          titleEl.textContent = why;
+        } else {
+          const display = this.briefDedupText(title, shown, 'judgment');
+          if (!display) return;
+          titleEl.textContent = display;
+        }
+        li.appendChild(titleEl);
+        if (why) {
+          this.briefDedupText(title, shown, 'judgment');
         }
         const source = String(item.source || '').trim();
         const evidenceIds = Array.isArray(item.evidence)
@@ -366,6 +461,40 @@ const DataEngine = {
       });
       if (!listEl.children.length) renderEmpty(listEl);
     };
+
+    const renderMarketTemperature = () => {
+      const el = document.getElementById('morningMarketTemperature');
+      if (!el) return;
+      el.innerHTML = '';
+      const table = data.marketTemperature || {};
+      ['Nasdaq', 'S&P 500', 'Dow', 'SOX', 'Bitcoin', 'WTI', 'Brent', 'Gold', 'VIX'].forEach(name => {
+        const row = table[name] || {};
+        const item = document.createElement('div');
+        item.className = 'morning-market-item';
+        const nameEl = document.createElement('div');
+        nameEl.className = 'morning-market-name';
+        nameEl.textContent = name;
+        const valueEl = document.createElement('div');
+        valueEl.className = 'morning-market-value';
+        valueEl.textContent = this.briefQuoteStamp(row.value, row.asOf);
+        item.appendChild(nameEl);
+        item.appendChild(valueEl);
+        el.appendChild(item);
+        if (row.value && String(row.value).trim()) this.briefMarkShown(shown, name);
+      });
+    };
+
+    renderMarketTemperature();
+    setText('morningBriefDate', data.date || '--');
+    setText('morningExecutiveSummary', data.executiveSummary || data.summary);
+    setText('morningGlobalMarket', data.globalMarketAndNews && data.globalMarketAndNews.summary);
+    setText('morningTaiwanMarket', data.taiwanMarketAndNews && data.taiwanMarketAndNews.summary);
+    renderTextList('morningTopThings', data.macroDecisionLens);
+    renderNews('morningGlobalNews', data.globalMarketAndNews && data.globalMarketAndNews.items);
+    renderNews('morningTaiwanNews', data.taiwanMarketAndNews && data.taiwanMarketAndNews.items);
+    renderHighlights('morningAiHighlights', data.aiIndustryHighlights);
+    renderEvents('morningUpcomingEvents', data.upcomingEvents);
+    renderThreeThings('morningTodaysThreeThings', data.today3Things);
 
     const renderResearchIds = async (listId, ids) => {
       const listEl = document.getElementById(listId);
@@ -404,44 +533,6 @@ const DataEngine = {
       }
       if (!listEl.children.length) renderEmpty(listEl);
     };
-
-    const renderMarketTemperature = () => {
-      const el = document.getElementById('morningMarketTemperature');
-      if (!el) return;
-      el.innerHTML = '';
-      el.className = 'morning-market';
-      const table = data.marketTemperature || {};
-      ['Nasdaq', 'S&P 500', 'Dow', 'SOX'].forEach(name => {
-        const row = table[name] || {};
-        const item = document.createElement('div');
-        item.className = 'morning-market-item';
-        const nameEl = document.createElement('div');
-        nameEl.className = 'morning-market-name';
-        nameEl.textContent = name;
-        const valueEl = document.createElement('div');
-        valueEl.className = 'morning-market-value';
-        valueEl.textContent = row.value || '--';
-        const asOfEl = document.createElement('div');
-        asOfEl.className = 'morning-market-asof';
-        asOfEl.textContent = row.asOf || '--';
-        item.appendChild(nameEl);
-        item.appendChild(valueEl);
-        item.appendChild(asOfEl);
-        el.appendChild(item);
-      });
-    };
-
-    setText('morningBriefDate', data.date || '--');
-    setText('morningExecutiveSummary', data.executiveSummary || data.summary);
-    setText('morningGlobalMarket', data.globalMarketAndNews && data.globalMarketAndNews.summary);
-    setText('morningTaiwanMarket', data.taiwanMarketAndNews && data.taiwanMarketAndNews.summary);
-    renderTextList('morningTopThings', data.macroDecisionLens);
-    renderMarketTemperature();
-    renderNews('morningGlobalNews', data.globalMarketAndNews && data.globalMarketAndNews.items);
-    renderNews('morningTaiwanNews', data.taiwanMarketAndNews && data.taiwanMarketAndNews.items);
-    renderHighlights('morningAiHighlights', data.aiIndustryHighlights);
-    renderEvents('morningUpcomingEvents', data.upcomingEvents);
-    renderThreeThings('morningTodaysThreeThings', data.today3Things);
 
     const radarSection = document.getElementById('morningRadarSection');
     const radarTitle = document.getElementById('morningRadarTitle');
