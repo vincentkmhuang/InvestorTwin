@@ -12,8 +12,7 @@
     "morningTaiwanNews",
     "morningAiHighlights",
     "morningUpcomingEvents",
-    "morningTodaysThreeThings",
-    "morningOpportunityRadar"
+    "morningTodaysThreeThings"
   ],
   "forbiddenInPreview": ["/api/queue", "/api/research/", "monitoringTrigger"]
 }
