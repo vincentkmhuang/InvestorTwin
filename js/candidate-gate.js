@@ -76,8 +76,21 @@ const CandidateGate = {
     return { ok: true, data };
   },
 
+  async loadExistingCardIds() {
+    // Reuse Cards / Explorer discovery: data/knowledge-index.json -> cardIds
+    // Do not read Queue IDs; do not invent a separate Card registry.
+    try {
+      const index = await fetch('data/knowledge-index.json?t=' + Date.now()).then(r => r.ok ? r.json() : null);
+      return Array.isArray(index?.cardIds)
+        ? index.cardIds.map(id => String(id || '').trim()).filter(Boolean)
+        : [];
+    } catch (_) {
+      return [];
+    }
+  },
+
   async pickExistingCard() {
-    const ids = Array.isArray(window.explorerCardIds) ? window.explorerCardIds.slice() : [];
+    const ids = await this.loadExistingCardIds();
     if (!ids.length) {
       window.alert('目前沒有既有研究卡可選擇。');
       return null;

@@ -314,6 +314,15 @@ $researchRoot = Join-Path $script:TempRoot 'research'
 $dirsBefore = @(Get-ChildItem -LiteralPath $researchRoot -Directory | Select-Object -ExpandProperty Name)
 $link = Invoke-GatePost @{ action = 'link'; eventRef = $EventRef; cardId = 'glass-bridge' }
 $fail68 = New-Object System.Collections.Generic.List[string]
+if ($GateSrc -like '*window.explorerCardIds*') {
+  $fail68.Add('picker still reads window.explorerCardIds')
+}
+if ($GateSrc -notlike '*knowledge-index.json*') {
+  $fail68.Add('picker does not reuse knowledge-index.json discovery')
+}
+if ($GateSrc -like '*getQueueIds*' -or ($GateSrc -like '*research-queue.json*' -and $GateSrc -like '*pickExistingCard*')) {
+  $fail68.Add('picker incorrectly uses Queue as Card list')
+}
 if ($link.StatusCode -ne 200) { $fail68.Add("link status=$($link.StatusCode) $($link.Body.message)") }
 $dirsAfter = @(Get-ChildItem -LiteralPath $researchRoot -Directory | Select-Object -ExpandProperty Name)
 $newDirs = @($dirsAfter | Where-Object { $dirsBefore -notcontains $_ })
@@ -325,6 +334,8 @@ elseif ($links[0].eventRef -ne $EventRef) { $fail68.Add('eventRef not on candida
 $link2 = Invoke-GatePost @{ action = 'link'; eventRef = $EventRef; cardId = 'glass-bridge' }
 $card2 = Read-JsonFile (Join-Path $script:TempRoot 'research\glass-bridge\card.json')
 if (@($card2.candidateLinks).Count -ne @($card.candidateLinks).Count) { $fail68.Add('duplicate candidateLink created') }
+$queueAfterLink = Read-JsonFile (Join-Path $script:TempRoot 'data\research-queue.json')
+if (@($queueAfterLink.items).Count -ne 0) { $fail68.Add('Link alone wrote Queue items') }
 Add-TestResult 'TEST 68' ($fail68.Count -eq 0) ($fail68 -join "`n")
 
 Stop-TempServer
