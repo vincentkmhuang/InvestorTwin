@@ -1,0 +1,56 @@
+{
+  "id": "p2-001-case-a",
+  "sprint": "Phase 2 Sprint 001",
+  "case": "A",
+  "label": "NVIDIA × Hugging Face",
+  "news": {
+    "source": "NVIDIA Official / Reuters",
+    "title": "NVIDIA announces acquisition of Hugging Face",
+    "publishedTime": "2026-09-03",
+    "url": null,
+    "summary": "NVIDIA 宣布以約 129.3 億美元收購 Hugging Face。",
+    "subject": "NVIDIA / Hugging Face"
+  },
+  "event": {
+    "what": "NVIDIA 宣布以約 129.3 億美元收購 Hugging Face。",
+    "when": "2026-09-03",
+    "subject": "NVIDIA / Hugging Face",
+    "eventType": "Corporate Action / M&A"
+  },
+  "importance": 5,
+  "importanceStars": "★★★★★",
+  "relevance": "High",
+  "relevanceBasis": "與 NVIDIA、AI Developer / Model Platform、AI Infrastructure、AI 利潤池及既有 AI 研究方向高度相關。",
+  "impact": {
+    "target": "NVIDIA / AI developer ecosystem / AI software ecosystem",
+    "direction": "Mixed",
+    "strength": "High"
+  },
+  "evidenceSeparation": {
+    "FACT": [
+      "NVIDIA 宣布收購 Hugging Face",
+      "交易金額約 129.3 億美元",
+      "NVIDIA 表示 Hugging Face 將維持開放"
+    ],
+    "ESTIMATE": [],
+    "INFERENCE": [
+      "NVIDIA 可能由 AI Compute Platform 向 AI Developer / Model Platform 延伸",
+      "可能擴大 NVIDIA AI ecosystem 的控制力"
+    ],
+    "UNKNOWN": [
+      "實際營收貢獻",
+      "對 NVIDIA 長期獲利的實際影響",
+      "對其他 AI accelerator 的實際影響"
+    ]
+  },
+  "researchQuestion": "NVIDIA 收購 Hugging Face，是否代表 NVIDIA 正在從 AI Compute Platform 向 AI Developer / Model Platform 延伸？這是否會改變 AI 利潤池與 NVIDIA 長期競爭優勢？",
+  "expected": {
+    "researchCandidate": true,
+    "writesResearchQueue": false,
+    "createsResearchCard": false,
+    "createsDecision": false,
+    "createsPositionPlaybook": false,
+    "buySellRecommendation": null,
+    "investorActions": ["Ignore", "Watch", "加入既有 Research Card", "進入 Research Queue"]
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "id": "p2-001-case-d",
+  "sprint": "Phase 2 Sprint 001",
+  "case": "D",
+  "label": "Unconfirmed AI rumor",
+  "news": {
+    "source": "Unnamed market commentary",
+    "title": "Reportedly NVIDIA may delay next AI GPU, sources say",
+    "publishedTime": "2026-09-03",
+    "url": null,
+    "summary": "未確認傳聞：有人稱 NVIDIA 可能延後下一款 AI GPU，尚無官方說法。",
+    "subject": "NVIDIA / AI Infrastructure"
+  },
+  "event": {
+    "what": "未確認傳聞稱 NVIDIA 可能延後下一款 AI GPU。",
+    "when": "2026-09-03",
+    "subject": "NVIDIA / AI Infrastructure",
+    "eventType": "Industry"
+  },
+  "importance": 3,
+  "relevance": "High",
+  "relevanceBasis": "與 NVIDIA、AI Infrastructure 及既有 AI 研究方向高度相關。",
+  "impact": {
+    "target": "NVIDIA / AI Infrastructure",
+    "direction": "Unclear",
+    "strength": "Low"
+  },
+  "evidenceSeparation": {
+    "FACT": [],
+    "ESTIMATE": [],
+    "INFERENCE": [
+      "若延後屬實，可能影響 AI 供應節奏"
+    ],
+    "UNKNOWN": [
+      "是否真有延後",
+      "官方是否承認",
+      "時程與影響範圍"
+    ]
+  },
+  "researchQuestion": null,
+  "expected": {
+    "researchCandidate": false,
+    "stance": "Watch",
+    "writesResearchQueue": false,
+    "createsResearchCard": false,
+    "createsDecision": false,
+    "createsPositionPlaybook": false,
+    "buySellRecommendation": null
+  }
+}

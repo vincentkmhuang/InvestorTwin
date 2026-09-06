@@ -1,0 +1,43 @@
+{
+  "id": "p2-001-case-c",
+  "sprint": "Phase 2 Sprint 001",
+  "case": "C",
+  "label": "Nasdaq Price Move",
+  "news": {
+    "source": "Market Tape",
+    "title": "Nasdaq rises 2% on the day",
+    "publishedTime": "2026-09-03",
+    "url": null,
+    "summary": "Nasdaq 當日上漲 2%。",
+    "subject": "Nasdaq"
+  },
+  "event": {
+    "what": "Nasdaq 當日上漲 2%。",
+    "when": "2026-09-03",
+    "subject": "Nasdaq",
+    "eventType": "Price-move"
+  },
+  "importance": 3,
+  "relevance": "Medium",
+  "relevanceBasis": "與投資人觀察的市場溫度／風險偏好有關，但只是價格變化，沒有新的 Research Question。",
+  "impact": {
+    "target": "US equity risk appetite",
+    "direction": "Positive",
+    "strength": "Medium"
+  },
+  "evidenceSeparation": {
+    "FACT": ["Nasdaq 當日上漲 2%"],
+    "ESTIMATE": [],
+    "INFERENCE": [],
+    "UNKNOWN": []
+  },
+  "researchQuestion": null,
+  "expected": {
+    "researchCandidate": false,
+    "writesResearchQueue": false,
+    "createsResearchCard": false,
+    "createsDecision": false,
+    "createsPositionPlaybook": false,
+    "buySellRecommendation": null
+  }
+}

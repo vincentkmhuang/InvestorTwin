@@ -1,0 +1,43 @@
+{
+  "id": "p2-001-case-e",
+  "sprint": "Phase 2 Sprint 001",
+  "case": "E",
+  "label": "Ordinary low-impact news",
+  "news": {
+    "source": "Local business brief",
+    "title": "Spanish bakery chain opens two neighborhood shops",
+    "publishedTime": "2026-09-03",
+    "url": null,
+    "summary": "一家西班牙烘焙連鎖店新開兩家社區門市。",
+    "subject": "Local retail"
+  },
+  "event": {
+    "what": "一家西班牙烘焙連鎖店新開兩家社區門市。",
+    "when": "2026-09-03",
+    "subject": "Local retail",
+    "eventType": "Other"
+  },
+  "importance": 1,
+  "relevance": "Low",
+  "relevanceBasis": "普通地方商業消息，與 Investor DNA、既有 Research、Thesis 無關。",
+  "impact": {
+    "target": "Local retail",
+    "direction": "Unclear",
+    "strength": "Low"
+  },
+  "evidenceSeparation": {
+    "FACT": ["兩家社區門市開幕"],
+    "ESTIMATE": [],
+    "INFERENCE": [],
+    "UNKNOWN": []
+  },
+  "researchQuestion": null,
+  "expected": {
+    "researchCandidate": false,
+    "writesResearchQueue": false,
+    "createsResearchCard": false,
+    "createsDecision": false,
+    "createsPositionPlaybook": false,
+    "buySellRecommendation": null
+  }
+}

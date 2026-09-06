@@ -1,0 +1,59 @@
+{
+  "id": "p2-001-case-b",
+  "sprint": "Phase 2 Sprint 001",
+  "case": "B",
+  "label": "ECB September Rate Hike",
+  "news": {
+    "source": "Reuters",
+    "title": "ECB expected to raise rates by 25 bps in September",
+    "publishedTime": "2026-09-03",
+    "url": null,
+    "summary": "市場／經濟學家預期 ECB 於 2026-09-10 升息 25 bps。這是市場／經濟學家預期，不是 ECB 已正式宣布的事實。",
+    "subject": "ECB / Eurozone monetary policy"
+  },
+  "event": {
+    "what": "市場／經濟學家預期 ECB 於 2026-09-10 升息 25 bps。",
+    "when": "2026-09-10",
+    "subject": "ECB / Eurozone monetary policy",
+    "eventType": "Monetary Policy"
+  },
+  "importance": 4,
+  "importanceStars": "★★★★☆",
+  "relevance": "Low / Medium-Low",
+  "relevanceBasis": "與全球利率及風險資產有宏觀關聯，但目前沒有直接對應使用者既有 Research Card、Research Thesis 或明確投資問題。",
+  "impact": {
+    "target": "Eurozone financial conditions / Global bond & equity markets",
+    "direction": "Mixed",
+    "strength": "Medium"
+  },
+  "evidenceSeparation": {
+    "FACT": [
+      "Reuters 報導經濟學家調查結果",
+      "ECB 當時政策利率",
+      "當時歐元區通膨資料"
+    ],
+    "ESTIMATE": [
+      "9/10 升息 25 bps"
+    ],
+    "INFERENCE": [
+      "升息可能使金融條件收緊",
+      "可能影響全球風險資產估值"
+    ],
+    "UNKNOWN": [
+      "ECB 是否真的升息",
+      "後續政策路徑",
+      "對台股 AI valuation 的實際影響"
+    ]
+  },
+  "researchQuestion": null,
+  "candidateNoReason": "雖然 Importance 高，但目前沒有足夠 Relevance，也沒有明確新的 Research Question 值得投入研究時間。",
+  "expected": {
+    "researchCandidate": false,
+    "writesResearchQueue": false,
+    "createsResearchCard": false,
+    "createsDecision": false,
+    "createsPositionPlaybook": false,
+    "buySellRecommendation": null,
+    "investorActions": ["Ignore", "Watch"]
+  }
+}
