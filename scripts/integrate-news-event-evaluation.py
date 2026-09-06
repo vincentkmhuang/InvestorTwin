@@ -1,7 +1,9 @@
 # Investor Twin Phase 2 Sprint 005 — News → Event → Evaluation Integration.
 # Reuses link-news-events.py then evaluate-news-intelligence.py helpers.
 # Output: news[] / events[] / evaluations[] / researchCandidates[].
-# Writes no data/, research/, Brief, Queue, Card, or Decision files.
+# Default: stdout only — writes no data/, research/, Brief, Queue, Card, or Decision files.
+# Sprint 009 opt-in: --publish-handoff <path> merges stdout payload into research-candidates-handoff.json
+# via publish-research-candidates-handoff.py (never writes candidate-gate ledger / Cards / Queue).
 import importlib.util
 import json
 import os
@@ -240,6 +242,7 @@ def integrate(raw):
 
 def main(argv):
     raw = None
+    publish_handoff_path = None
     i = 1
     while i < len(argv):
         if argv[i] == "--input" and i + 1 < len(argv):
@@ -251,10 +254,21 @@ def main(argv):
                 raw = json.load(handle)
             i += 2
             continue
+        if argv[i] == "--publish-handoff" and i + 1 < len(argv):
+            # Explicit opt-in only (Sprint 009). Default remains stdout-only.
+            publish_handoff_path = os.path.abspath(argv[i + 1])
+            i += 2
+            continue
         fail("unknown argument: " + argv[i])
     if raw is None:
         raw = json.load(sys.stdin)
     result = integrate(raw)
+    if publish_handoff_path:
+        publisher = load_module(
+            "publish-research-candidates-handoff.py",
+            "publish_research_candidates_handoff",
+        )
+        publisher.publish_handoff(result, publish_handoff_path)
     json.dump(result, sys.stdout, ensure_ascii=False, indent=2)
     sys.stdout.write("\n")
     return 0
