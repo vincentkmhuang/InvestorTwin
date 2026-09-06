@@ -12,9 +12,12 @@ main{flex:1;padding:20px}
 .candidate-gate-empty,.candidate-gate-status,.muted{color:#64748b}
 .linked-candidate-card{border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin:8px 0 12px}
 .candidate-attention-card{border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin:8px 0 12px;cursor:pointer}
-.candidate-attention-question{font-size:16px;line-height:1.5;margin:0 0 8px;color:#1f2937}
-.candidate-attention-cta{margin:10px 0 0}
+.candidate-attention-question{font-size:16px;line-height:1.45;margin:0 0 6px;color:#1f2937;font-weight:600}
+.candidate-attention-meta,.candidate-attention-event{margin:0 0 4px;font-size:13px;line-height:1.4}
+.candidate-attention-evidence{margin:4px 0 0;padding-left:18px;font-size:12px}
+.candidate-attention-cta{margin:8px 0 0}
 .candidate-attention-cta button{cursor:pointer}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .brief{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .item{background:#f4f6fa;padding:12px;border-radius:8px;cursor:pointer}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
@@ -29,29 +32,40 @@ main{flex:1;padding:20px}
 .morning-brief .box li.morning-brief-static{cursor:default}
 .morning-brief .box li.morning-brief-linked{cursor:pointer}
 .morning-brief-evidence{margin-top:2px;font-size:12px;color:#94a3b8}
+.section-role{margin:0 0 8px !important;font-size:12px !important;line-height:1.4 !important}
+.today-primary-band{display:contents}
+.today-supporting-band{display:contents}
+.today-supporting-label{grid-column:1/-1;margin:8px 0 0;font-size:12px;letter-spacing:.02em}
+.morning-brief-residual{color:#64748b;font-weight:500}
 #today.morning-brief{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
 #today.morning-brief>.box{margin-bottom:0}
-#today.morning-brief>.box:first-child,
 #today.today-workspace #todayExecutiveSummary,
 #today.today-workspace #todayMarketTemperature,
-#today.today-workspace #todayCandidateAttention,
 #today.today-workspace #todayThreeThings,
+#today.today-workspace #todayCandidateAttention,
+#today.today-workspace .today-supporting-label,
 #morningRadarSection{grid-column:1/-1}
+#today.today-workspace .today-primary,
+#today.today-workspace .today-glance,
+#today.today-workspace .today-decision,
+#today.today-workspace .today-attention{border:1px solid #cbd5e1;box-shadow:0 1px 0 rgba(15,23,42,.04)}
+#today.today-workspace .today-context{opacity:.96}
 #today.today-workspace .today-primary h2,
 #today.today-workspace .today-glance h2,
-#today.today-workspace .today-decision h2{font-size:20px;color:#1f2937}
-#today.today-workspace .today-context h2{font-size:16px;color:#475569}
+#today.today-workspace .today-decision h2,
+#today.today-workspace .today-attention h2{font-size:20px;color:#1f2937}
+#today.today-workspace .today-context h2{font-size:15px;color:#64748b}
 #today.today-workspace .morning-brief-date{margin:0 0 8px;font-size:14px;color:#64748b}
-#today.today-workspace #morningExecutiveSummary,
+#today.today-workspace #morningExecutiveSummary{margin:0 0 8px;font-size:14px;line-height:1.55;color:#334155}
 #today.today-workspace #morningGlobalMarket,
-#today.today-workspace #morningTaiwanMarket{margin:0 0 8px;font-size:13px;line-height:1.5;color:#64748b}
-#today.today-workspace #morningTopThings{margin-top:4px;font-weight:600}
+#today.today-workspace #morningTaiwanMarket{margin:0 0 8px;font-size:12px;line-height:1.45;color:#64748b}
+#today.today-workspace #morningTopThings{margin-top:4px;font-weight:600;font-size:14px}
 #today.today-workspace #morningTodaysThreeThings .morning-brief-title{font-size:15px}
-.morning-market{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-.morning-market-item{background:#f4f6fa;padding:12px;border-radius:8px}
-.morning-market-name{font-size:12px;color:#64748b}
-.morning-market-value{font-size:20px;font-weight:600;margin:4px 0;color:#1f2937}
-.morning-market-asof{font-size:12px;color:#94a3b8}
+.morning-market{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.morning-market-item{background:#f4f6fa;padding:8px 10px;border-radius:8px}
+.morning-market-name{font-size:11px;color:#64748b}
+.morning-market-value{font-size:15px;font-weight:600;margin:2px 0;color:#1f2937}
+.morning-market-asof{font-size:11px;color:#94a3b8}
 li{cursor:pointer;margin:6px 0}
 
 @media (max-width: 900px) and (orientation: landscape) {
@@ -84,8 +98,10 @@ li{cursor:pointer;margin:6px 0}
   #today.today-workspace #todayExecutiveSummary,
   #today.today-workspace #todayMarketTemperature,
   #today.today-workspace #todayThreeThings,
+  #today.today-workspace #todayCandidateAttention,
+  #today.today-workspace .today-supporting-label,
   #morningRadarSection { grid-column: 1 / -1; }
-  .morning-market { grid-template-columns: repeat(2, 1fr); }
+  .morning-market { grid-template-columns: repeat(3, 1fr); }
   #cards,
   #cases {
     display: grid;

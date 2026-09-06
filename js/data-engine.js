@@ -284,22 +284,38 @@ const DataEngine = {
     return this.briefTidyDedup(text);
   },
 
+  // Sprint 010: shorten display for secondary sections without inventing data.
+  briefShortenDisplay(text, maxLen) {
+    const clean = this.briefCleanText(text);
+    if (!clean) return '';
+    const limit = maxLen || 110;
+    if (clean.length <= limit) return clean;
+    return clean.slice(0, Math.max(0, limit - 1)).trim() + '…';
+  },
+
   async renderMorningBrief(onItemClick) {
     const data = this.morningBriefHome;
     if (!data) return;
     const shown = {};
 
-    const setText = (id, value) => {
+    const setText = (id, value, options) => {
       const el = document.getElementById(id);
       if (!el) return;
       if (id === 'morningBriefDate') {
         el.textContent = value || '--';
         return;
       }
-      const mode = id === 'morningExecutiveSummary' ? 'judgment' : 'news';
-      const text = (id === 'morningExecutiveSummary' || id === 'morningGlobalMarket' || id === 'morningTaiwanMarket')
+      const opts = options || {};
+      const mode = opts.mode || (id === 'morningExecutiveSummary' ? 'judgment' : 'news');
+      let text = (id === 'morningExecutiveSummary' || id === 'morningGlobalMarket' || id === 'morningTaiwanMarket')
         ? this.briefDedupText(value, shown, mode)
         : this.briefCleanText(value);
+      // Dedup safety: do not leave supporting summaries empty solely because instruments
+      // were already marked by market temperature / primary sections.
+      if ((!text || this.briefIsMarketResidue(text)) && opts.keepResidual) {
+        text = this.briefShortenDisplay(value, opts.maxLen || 140);
+        if (text) el.classList.add('morning-brief-residual');
+      }
       el.textContent = text || '--';
     };
 
@@ -321,35 +337,60 @@ const DataEngine = {
       listEl.appendChild(li);
     };
 
-    const renderTextList = (listId, values) => {
+    const renderTextList = (listId, values, options) => {
       const listEl = document.getElementById(listId);
       if (!listEl) return;
       listEl.innerHTML = '';
+      const opts = options || {};
       (values || []).forEach(value => {
         const text = typeof value === 'string'
           ? value.trim()
           : String(value && value.text != null ? value.text : '').trim();
         if (!text) return;
-        const display = this.briefDedupText(text, shown, 'judgment');
-        if (!display || (listId === 'morningTopThings' && this.briefIsMarketResidue(display))) return;
+        let display = this.briefDedupText(text, shown, opts.mode || 'judgment');
+        let residual = false;
+        if ((!display || (listId === 'morningTopThings' && this.briefIsMarketResidue(display))) && opts.keepResidual) {
+          display = this.briefShortenDisplay(text, opts.maxLen || 120);
+          residual = !!display;
+        }
+        if (!display || (listId === 'morningTopThings' && this.briefIsMarketResidue(display) && !opts.keepResidual)) return;
         const li = document.createElement('li');
-        li.className = 'morning-brief-static';
+        li.className = 'morning-brief-static' + (residual ? ' morning-brief-residual' : '');
         li.textContent = display;
         listEl.appendChild(li);
       });
-      if (!listEl.children.length && listId !== 'morningTopThings') renderEmpty(listEl);
+      if (!listEl.children.length) {
+        if (listId === 'morningTopThings' && opts.keepResidual && (values || []).length) {
+          (values || []).slice(0, 3).forEach(value => {
+            const text = typeof value === 'string' ? value.trim() : String(value?.text || '').trim();
+            if (!text) return;
+            const li = document.createElement('li');
+            li.className = 'morning-brief-static morning-brief-residual';
+            li.textContent = this.briefShortenDisplay(text, 120);
+            listEl.appendChild(li);
+          });
+        }
+        if (!listEl.children.length) renderEmpty(listEl);
+      }
     };
 
-    const renderNews = (listId, items) => {
+    const renderNews = (listId, items, options) => {
       const listEl = document.getElementById(listId);
       if (!listEl) return;
       listEl.innerHTML = '';
+      const opts = options || {};
       (items || []).forEach(item => {
         const title = (item?.title || '').trim();
         if (!title) return;
-        const display = this.briefDedupText(title, shown, 'news');
-        if (!display || this.briefIsMarketResidue(display)) return;
+        let display = this.briefDedupText(title, shown, opts.mode || 'news');
+        let residual = false;
+        if ((!display || this.briefIsMarketResidue(display)) && opts.keepResidual) {
+          display = this.briefShortenDisplay(title, opts.maxLen || 110);
+          residual = !!display;
+        }
+        if (!display || (this.briefIsMarketResidue(display) && !opts.keepResidual)) return;
         const li = document.createElement('li');
+        if (residual) li.classList.add('morning-brief-residual');
         const titleEl = document.createElement('div');
         titleEl.className = 'morning-brief-title';
         titleEl.textContent = display;
@@ -371,16 +412,28 @@ const DataEngine = {
       const listEl = document.getElementById(listId);
       if (!listEl) return;
       listEl.innerHTML = '';
+      const section = document.getElementById('todayAiHighlights');
       (items || []).forEach(item => {
         const title = (item?.title || '').trim();
         if (!title) return;
-        const display = this.briefDedupText(title, shown, 'news');
-        if (!display || this.briefIsMarketResidue(display)) return;
+        let display = this.briefDedupText(title, shown, 'news');
+        let residual = false;
+        if (!display || this.briefIsMarketResidue(display)) {
+          // Prefer narrative leftovers; if residue-only quote, skip.
+          if (this.briefIsMarketResidue(this.briefCleanText(title))) return;
+          display = this.briefShortenDisplay(title, 140);
+          residual = true;
+        }
+        if (!display) return;
         const li = document.createElement('li');
+        if (residual) li.classList.add('morning-brief-residual');
         li.textContent = display;
         bindResearchClick(li, this.researchLinkId(item));
         listEl.appendChild(li);
       });
+      if (section) {
+        section.style.display = listEl.children.length ? '' : 'none';
+      }
       if (!listEl.children.length) renderEmpty(listEl);
     };
 
@@ -418,7 +471,7 @@ const DataEngine = {
         if (typeof item === 'string') {
           const text = item.trim();
           if (!text) return;
-          const display = this.briefDedupText(text, shown, 'judgment');
+          const display = this.briefDedupText(text, shown, 'judgment') || this.briefShortenDisplay(text, 140);
           if (!display) return;
           const li = document.createElement('li');
           li.className = 'morning-brief-static';
@@ -435,7 +488,7 @@ const DataEngine = {
         if (why) {
           titleEl.textContent = why;
         } else {
-          const display = this.briefDedupText(title, shown, 'judgment');
+          const display = this.briefDedupText(title, shown, 'judgment') || this.briefShortenDisplay(title, 140);
           if (!display) return;
           titleEl.textContent = display;
         }
@@ -484,17 +537,36 @@ const DataEngine = {
       });
     };
 
+    // Primary path first (display order matches DOM elevation).
     renderMarketTemperature();
     setText('morningBriefDate', data.date || '--');
     setText('morningExecutiveSummary', data.executiveSummary || data.summary);
-    setText('morningGlobalMarket', data.globalMarketAndNews && data.globalMarketAndNews.summary);
-    setText('morningTaiwanMarket', data.taiwanMarketAndNews && data.taiwanMarketAndNews.summary);
-    renderTextList('morningTopThings', data.macroDecisionLens);
-    renderNews('morningGlobalNews', data.globalMarketAndNews && data.globalMarketAndNews.items);
-    renderNews('morningTaiwanNews', data.taiwanMarketAndNews && data.taiwanMarketAndNews.items);
-    renderHighlights('morningAiHighlights', data.aiIndustryHighlights);
-    renderEvents('morningUpcomingEvents', data.upcomingEvents);
+    renderTextList('morningTopThings', data.macroDecisionLens, { keepResidual: true, mode: 'judgment' });
     renderThreeThings('morningTodaysThreeThings', data.today3Things);
+
+    // Supporting sections — keep residual so dedup does not empty the section.
+    setText('morningGlobalMarket', data.globalMarketAndNews && data.globalMarketAndNews.summary, {
+      keepResidual: true,
+      mode: 'news',
+      maxLen: 160
+    });
+    setText('morningTaiwanMarket', data.taiwanMarketAndNews && data.taiwanMarketAndNews.summary, {
+      keepResidual: true,
+      mode: 'news',
+      maxLen: 160
+    });
+    renderNews('morningGlobalNews', data.globalMarketAndNews && data.globalMarketAndNews.items, {
+      keepResidual: true,
+      mode: 'news',
+      maxLen: 110
+    });
+    renderNews('morningTaiwanNews', data.taiwanMarketAndNews && data.taiwanMarketAndNews.items, {
+      keepResidual: true,
+      mode: 'news',
+      maxLen: 110
+    });
+    renderEvents('morningUpcomingEvents', data.upcomingEvents);
+    renderHighlights('morningAiHighlights', data.aiIndustryHighlights);
 
     const renderResearchIds = async (listId, ids) => {
       const listEl = document.getElementById(listId);

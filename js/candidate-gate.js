@@ -152,6 +152,7 @@ const CandidateGate = {
   },
 
   // Display/attention only — never POST Gate actions from Brief/Today.
+  // Sprint 010: compact scan card — question primary; details secondary.
   async renderAttention(container) {
     if (!container) return;
     if (!this.candidates.length) {
@@ -166,24 +167,24 @@ const CandidateGate = {
       const status = candidate.status || 'Pending';
       const question = candidate.researchQuestion || '--';
       const evidence = this.evidenceLines(candidate)
-        .slice(0, 3)
+        .slice(0, 2)
         .map(item => `<li data-attention-source="${this.escapeHtml(item.source)}" data-attention-news-ref="${this.escapeHtml(item.newsRef || '')}">` +
           `${this.escapeHtml(item.source)}` +
           (item.newsRef ? ` <span class="muted">(${this.escapeHtml(item.newsRef)})</span>` : '') +
           `</li>`)
         .join('');
-      return `<article class="candidate-attention-card" data-attention-event-ref="${this.escapeHtml(candidate.eventRef || '')}" data-goto-queue="1">
-        <p class="candidate-attention-question" data-attention-research-question="${this.escapeHtml(question)}"><b>Research Question:</b> ${this.escapeHtml(question)}</p>
-        <p><b>Status:</b> ${this.escapeHtml(status)}</p>
-        <p><b>Importance:</b> ${this.escapeHtml(this.stars(candidate.importance))} (${this.escapeHtml(candidate.importance ?? '--')})</p>
-        <p><b>Relevance:</b> ${this.escapeHtml(candidate.relevance || '--')}</p>
-        <p><b>Impact:</b> ${this.escapeHtml(this.impactLabel(candidate.impact))}` +
-          (candidate.impact?.target ? ` · ${this.escapeHtml(candidate.impact.target)}` : '') +
-          `</p>
-        <p><b>eventRef:</b> <code data-attention-event-ref-text>${this.escapeHtml(candidate.eventRef || '--')}</code></p>
-        <p><b>Evidence / Sources:</b></p>
-        <ul data-attention-evidence>${evidence || '<li>--</li>'}</ul>
-        <p class="candidate-attention-cta"><button type="button" data-goto-queue="1">前往 Human Gate（研究佇列）</button></p>
+      const meta = [
+        `Status: ${this.escapeHtml(status)}`,
+        `Importance: ${this.escapeHtml(this.stars(candidate.importance))} (${this.escapeHtml(candidate.importance ?? '--')})`,
+        `Relevance: ${this.escapeHtml(candidate.relevance || '--')}`,
+        `Impact: ${this.escapeHtml(this.impactLabel(candidate.impact))}`
+      ].join(' · ');
+      return `<article class="candidate-attention-card candidate-attention-compact" data-attention-event-ref="${this.escapeHtml(candidate.eventRef || '')}" data-goto-queue="1">
+        <p class="candidate-attention-question" data-attention-research-question="${this.escapeHtml(question)}"><span class="sr-only">Research Question:</span>${this.escapeHtml(question)}</p>
+        <p class="candidate-attention-meta muted">${meta}</p>
+        <p class="candidate-attention-event muted">eventRef: <code data-attention-event-ref-text>${this.escapeHtml(candidate.eventRef || '--')}</code></p>
+        <ul class="candidate-attention-evidence muted" data-attention-evidence>${evidence || '<li>--</li>'}</ul>
+        <p class="candidate-attention-cta"><button type="button" data-goto-queue="1">前往 Human Gate</button></p>
       </article>`;
     }).join('');
 
