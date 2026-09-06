@@ -37,6 +37,11 @@ async function init() {
 async function bindTodayWorkspaceFromMorningBrief() {
   await DataEngine.loadMorningBrief();
   await DataEngine.renderMorningBrief(openMorningBriefResearch);
+  // Sprint 008: derived Candidate Attention from handoff + ledger (display only).
+  const attentionEl = document.getElementById('morningCandidateAttention');
+  if (attentionEl && typeof CandidateGate !== 'undefined') {
+    await CandidateGate.renderAttention(attentionEl);
+  }
 }
 
 async function loadVersionInfo() {

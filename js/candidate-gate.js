@@ -129,6 +129,73 @@ const CandidateGate = {
     return status === 'Pending' || status === 'Watching';
   },
 
+  // Sprint 008: Brief/Today Attention visibility (SPEC §4.2).
+  // Pending + Watching only. Do not invent a new status model.
+  isAttentionStatus(status) {
+    const value = status || 'Pending';
+    return value === 'Pending' || value === 'Watching';
+  },
+
+  attentionCandidates(list) {
+    const rows = Array.isArray(list) ? list : this.candidates;
+    return rows.filter(item => this.isAttentionStatus(item?.status || 'Pending'));
+  },
+
+  goToHumanGate() {
+    if (typeof showPage === 'function') {
+      showPage('queue');
+    }
+    const gate = document.getElementById('queueResearchCandidates');
+    if (gate && typeof gate.scrollIntoView === 'function') {
+      try { gate.scrollIntoView({ block: 'start' }); } catch (_) {}
+    }
+  },
+
+  // Display/attention only — never POST Gate actions from Brief/Today.
+  async renderAttention(container) {
+    if (!container) return;
+    if (!this.candidates.length) {
+      await this.load();
+    }
+    const items = this.attentionCandidates();
+    if (!items.length) {
+      container.innerHTML = '<p class="candidate-gate-empty" data-candidate-attention-empty="1">目前沒有待注意的 Research Candidate。</p>';
+      return;
+    }
+    container.innerHTML = items.map(candidate => {
+      const status = candidate.status || 'Pending';
+      const question = candidate.researchQuestion || '--';
+      const evidence = this.evidenceLines(candidate)
+        .slice(0, 3)
+        .map(item => `<li data-attention-source="${this.escapeHtml(item.source)}" data-attention-news-ref="${this.escapeHtml(item.newsRef || '')}">` +
+          `${this.escapeHtml(item.source)}` +
+          (item.newsRef ? ` <span class="muted">(${this.escapeHtml(item.newsRef)})</span>` : '') +
+          `</li>`)
+        .join('');
+      return `<article class="candidate-attention-card" data-attention-event-ref="${this.escapeHtml(candidate.eventRef || '')}" data-goto-queue="1">
+        <p class="candidate-attention-question" data-attention-research-question="${this.escapeHtml(question)}"><b>Research Question:</b> ${this.escapeHtml(question)}</p>
+        <p><b>Status:</b> ${this.escapeHtml(status)}</p>
+        <p><b>Importance:</b> ${this.escapeHtml(this.stars(candidate.importance))} (${this.escapeHtml(candidate.importance ?? '--')})</p>
+        <p><b>Relevance:</b> ${this.escapeHtml(candidate.relevance || '--')}</p>
+        <p><b>Impact:</b> ${this.escapeHtml(this.impactLabel(candidate.impact))}` +
+          (candidate.impact?.target ? ` · ${this.escapeHtml(candidate.impact.target)}` : '') +
+          `</p>
+        <p><b>eventRef:</b> <code data-attention-event-ref-text>${this.escapeHtml(candidate.eventRef || '--')}</code></p>
+        <p><b>Evidence / Sources:</b></p>
+        <ul data-attention-evidence>${evidence || '<li>--</li>'}</ul>
+        <p class="candidate-attention-cta"><button type="button" data-goto-queue="1">前往 Human Gate（研究佇列）</button></p>
+      </article>`;
+    }).join('');
+
+    container.querySelectorAll('[data-goto-queue]').forEach(el => {
+      el.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.goToHumanGate();
+      };
+    });
+  },
+
   async render(container) {
     if (!container) return;
     if (!this.candidates.length) {
@@ -189,6 +256,10 @@ const CandidateGate = {
           WorkflowEngine.queue = { items: result.data.queueItems };
         }
         await this.render(container);
+        const attentionEl = document.getElementById('morningCandidateAttention');
+        if (attentionEl) {
+          try { await this.renderAttention(attentionEl); } catch (_) {}
+        }
         if (typeof render === 'function') render();
       };
     });

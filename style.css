@@ -11,6 +11,10 @@ main{flex:1;padding:20px}
 .candidate-gate-actions button{cursor:pointer}
 .candidate-gate-empty,.candidate-gate-status,.muted{color:#64748b}
 .linked-candidate-card{border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin:8px 0 12px}
+.candidate-attention-card{border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin:8px 0 12px;cursor:pointer}
+.candidate-attention-question{font-size:16px;line-height:1.5;margin:0 0 8px;color:#1f2937}
+.candidate-attention-cta{margin:10px 0 0}
+.candidate-attention-cta button{cursor:pointer}
 .brief{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .item{background:#f4f6fa;padding:12px;border-radius:8px;cursor:pointer}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
@@ -30,6 +34,7 @@ main{flex:1;padding:20px}
 #today.morning-brief>.box:first-child,
 #today.today-workspace #todayExecutiveSummary,
 #today.today-workspace #todayMarketTemperature,
+#today.today-workspace #todayCandidateAttention,
 #today.today-workspace #todayThreeThings,
 #morningRadarSection{grid-column:1/-1}
 #today.today-workspace .today-primary h2,
