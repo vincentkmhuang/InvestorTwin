@@ -1,0 +1,34 @@
+{
+  "id": "p2-005-case-a",
+  "sprint": "Phase 2 Sprint 005",
+  "case": "A",
+  "label": "Same Event — NVIDIA Official + Reuters → one Evaluation / one Candidate",
+  "newsA": {
+    "id": "news-a",
+    "source": "NVIDIA Official Blog",
+    "title": "NVIDIA to Acquire Hugging Face",
+    "publishedTime": "2026-09-03",
+    "url": "https://blogs.nvidia.com/blog/nvidia-to-acquire-hugging-face/",
+    "summary": "NVIDIA has agreed to acquire Hugging Face. Together, we will scale Hugging Face’s platform, strengthen its infrastructure and expand access to AI for developers and institutions worldwide. Hugging Face will remain an open platform.",
+    "subject": "NVIDIA / Hugging Face"
+  },
+  "newsB": {
+    "id": "news-b",
+    "source": "Reuters",
+    "title": "NVIDIA to acquire Hugging Face",
+    "publishedTime": "2026-09-03",
+    "url": null,
+    "summary": "NVIDIA said it will acquire Hugging Face. The report describes the same announced acquisition as the NVIDIA official blog.",
+    "subject": "NVIDIA / Hugging Face"
+  },
+  "expected": {
+    "eventCount": 1,
+    "evaluationCount": 1,
+    "candidateCount": 1,
+    "importance": 5,
+    "relevance": "High",
+    "impactDirection": "Mixed",
+    "impactStrength": "High",
+    "candidateEligible": true
+  }
+}

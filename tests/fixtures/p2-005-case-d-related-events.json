@@ -1,0 +1,30 @@
+{
+  "id": "p2-005-case-d",
+  "sprint": "Phase 2 Sprint 005",
+  "case": "D",
+  "label": "Related Event — announce vs regulatory review → separate Evaluations",
+  "newsA": {
+    "id": "news-a",
+    "source": "NVIDIA Official Blog",
+    "title": "NVIDIA to Acquire Hugging Face",
+    "publishedTime": "2026-09-03",
+    "url": "https://blogs.nvidia.com/blog/nvidia-to-acquire-hugging-face/",
+    "summary": "NVIDIA has agreed to acquire Hugging Face.",
+    "subject": "NVIDIA / Hugging Face"
+  },
+  "newsB": {
+    "id": "news-b",
+    "source": "Acceptance Fixture",
+    "title": "Regulators begin reviewing NVIDIA / Hugging Face deal",
+    "publishedTime": "2026-09-10",
+    "url": null,
+    "summary": "Regulators have begun reviewing the NVIDIA agreement to acquire Hugging Face. This is a new process step, not a second report of the original announcement.",
+    "subject": "NVIDIA / Hugging Face"
+  },
+  "expected": {
+    "relation": "Related Event",
+    "eventCount": 2,
+    "evaluationCount": 2,
+    "mergesEvents": false
+  }
+}

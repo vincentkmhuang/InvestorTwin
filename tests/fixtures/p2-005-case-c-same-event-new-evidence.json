@@ -1,0 +1,33 @@
+{
+  "id": "p2-005-case-c",
+  "sprint": "Phase 2 Sprint 005",
+  "case": "C",
+  "label": "Same Event + new third-party evidence preserved",
+  "newsA": {
+    "id": "news-a",
+    "source": "NVIDIA Official Blog",
+    "title": "NVIDIA to Acquire Hugging Face",
+    "publishedTime": "2026-09-03",
+    "url": "https://blogs.nvidia.com/blog/nvidia-to-acquire-hugging-face/",
+    "summary": "NVIDIA has agreed to acquire Hugging Face. Hugging Face will remain an open platform for the entire AI ecosystem.",
+    "subject": "NVIDIA / Hugging Face"
+  },
+  "newsB": {
+    "id": "news-b",
+    "source": "Acceptance Fixture",
+    "title": "Market raises competitive concerns after NVIDIA Hugging Face deal",
+    "publishedTime": "2026-09-03",
+    "url": null,
+    "summary": "NVIDIA has agreed to acquire Hugging Face. Third-party reporting adds market concerns about competitive pressure on other AI platforms. The core fact remains the same announced acquisition.",
+    "subject": "NVIDIA / Hugging Face"
+  },
+  "expected": {
+    "eventCount": 1,
+    "evaluationCount": 1,
+    "candidateCountMax": 1,
+    "preserveNewsA": true,
+    "preserveNewsB": true,
+    "preserveEvidenceFromA": true,
+    "preserveEvidenceFromB": true
+  }
+}
