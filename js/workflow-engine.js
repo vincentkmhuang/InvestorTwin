@@ -336,6 +336,60 @@ const WorkflowEngine = {
     return `<ul data-research-history>${items.join('')}</ul>`;
   },
 
+  // Sprint 007: surface Sprint 006 candidateLinks[] on the existing Card.
+  // Display only — does not modify Conclusion / Thesis / Decision.
+  renderLinkedResearchCandidates(links) {
+    const list = Array.isArray(links) ? links : [];
+    if (!list.length) return '';
+    let html = '<div data-linked-research-candidates="1">';
+    html += '<p><b>Linked Research Candidates</b></p>';
+    html += '<p>已連結的研究候選（研究問題為主，不是新聞標題）</p>';
+    for (const link of list) {
+      const impact = link?.impact || {};
+      const impactLabel = [impact.direction, impact.strength].filter(Boolean).join(' / ') || '--';
+      const refs = Array.isArray(link?.evidenceRefs) ? link.evidenceRefs : [];
+      const seen = new Set();
+      const evidenceItems = [];
+      for (const ref of refs) {
+        const source = String(ref?.source || '').trim();
+        const newsRef = String(ref?.newsRef || '').trim();
+        const klass = String(ref?.class || '').trim();
+        const key = `${source}|${newsRef}|${klass}`;
+        if (!source && !newsRef) continue;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        evidenceItems.push(
+          `<li data-candidate-news-ref="${this.escapeHtml(newsRef)}" data-candidate-source="${this.escapeHtml(source)}">` +
+          `${this.escapeHtml(source || '--')}` +
+          (newsRef ? ` <span class="muted">(${this.escapeHtml(newsRef)})</span>` : '') +
+          (klass ? ` · ${this.escapeHtml(klass)}` : '') +
+          `</li>`
+        );
+      }
+      html += `<article class="linked-candidate-card" data-candidate-event-ref="${this.escapeHtml(link?.eventRef || '')}">`;
+      if (link?.status) {
+        html += `<p><b>Status:</b> ${this.escapeHtml(link.status)}</p>`;
+      }
+      html += `<p><b>Research Question:</b> ${this.escapeHtml(link?.researchQuestion || '--')}</p>`;
+      html += `<p><b>eventRef:</b> <code data-candidate-event-ref-text>${this.escapeHtml(link?.eventRef || '--')}</code></p>`;
+      html += `<p><b>Importance:</b> ${this.escapeHtml(link?.importance ?? '--')}</p>`;
+      html += `<p><b>Relevance:</b> ${this.escapeHtml(link?.relevance || '--')}</p>`;
+      html += `<p><b>Impact:</b> ${this.escapeHtml(impactLabel)}` +
+        (impact.target ? ` · ${this.escapeHtml(impact.target)}` : '') +
+        `</p>`;
+      html += '<p><b>Evidence / Sources:</b></p>';
+      html += evidenceItems.length
+        ? `<ul data-candidate-evidence-refs>${evidenceItems.join('')}</ul>`
+        : '<p>--</p>';
+      if (link?.linkedAt) {
+        html += `<p><b>linkedAt:</b> ${this.escapeHtml(link.linkedAt)}</p>`;
+      }
+      html += '</article>';
+    }
+    html += '</div>';
+    return html;
+  },
+
   renderIntegrityGate(gate) {
     const state = gate.ready ? 'ready' : 'blocked';
     let html = `<p data-integrity-gate="${state}"><b>Integrity Gate</b></p>`;
@@ -640,6 +694,7 @@ const WorkflowEngine = {
         html += '<button type="button" data-case-evidence="counter">反對投資假設</button></p>';
       }
     }
+    html += this.renderLinkedResearchCandidates(card.candidateLinks);
     html += '<p><b>Questions</b></p>';
     html += questions.length
       ? `<ul>${questions.map(q => `<li>${q}</li>`).join('')}</ul>`

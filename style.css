@@ -10,6 +10,7 @@ main{flex:1;padding:20px}
 .candidate-gate-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .candidate-gate-actions button{cursor:pointer}
 .candidate-gate-empty,.candidate-gate-status,.muted{color:#64748b}
+.linked-candidate-card{border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin:8px 0 12px}
 .brief{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .item{background:#f4f6fa;padding:12px;border-radius:8px;cursor:pointer}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
