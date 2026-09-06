@@ -548,9 +548,19 @@ async function researchCardFileExists(id) {
 async function render() {
   queueList.innerHTML = '';
   cardList.innerHTML = '';
-  WorkflowEngine.getQueueIds().forEach(q => {
+  for (const q of WorkflowEngine.getQueueIds()) {
+    if (!WorkflowEngine.researchCache[q]) {
+      try { await WorkflowEngine.loadResearch(q); } catch (_) {}
+    }
     let li = document.createElement('li');
-    li.textContent = WorkflowEngine.cardTitle(q);
+    const candidateLabel = typeof CandidateGate !== 'undefined'
+      ? CandidateGate.queueDisplayLabel(q)
+      : null;
+    const queueItem = WorkflowEngine.queue?.items?.find(item => item.id === q);
+    const fromCandidate = queueItem?.addedFrom === 'Research Candidate';
+    li.textContent = (fromCandidate && candidateLabel)
+      ? candidateLabel
+      : WorkflowEngine.cardTitle(q);
     li.onclick = () => {
       showPage('cards', { skipHash: true });
       openResearchCard(q, document.getElementById('card'), {
@@ -559,7 +569,7 @@ async function render() {
       });
     };
     queueList.appendChild(li);
-  });
+  }
   for (const id of explorerCardIds) {
     if (!(await researchCardFileExists(id))) continue;
     const li2 = document.createElement('li');
@@ -569,6 +579,10 @@ async function render() {
       fromPage: 'cards'
     });
     cardList.appendChild(li2);
+  }
+  const candidatesEl = document.getElementById('queueResearchCandidates');
+  if (candidatesEl && typeof CandidateGate !== 'undefined') {
+    await CandidateGate.render(candidatesEl);
   }
   const radarEl = document.getElementById('queueOpportunityRadar');
   if (radarEl) {

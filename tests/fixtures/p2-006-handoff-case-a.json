@@ -1,0 +1,237 @@
+{
+  "news": [
+    {
+      "id": "news-a",
+      "source": "NVIDIA Official Blog",
+      "title": "NVIDIA to Acquire Hugging Face",
+      "publishedTime": "2026-09-03",
+      "url": "https://blogs.nvidia.com/blog/nvidia-to-acquire-hugging-face/",
+      "summary": "NVIDIA has agreed to acquire Hugging Face. Together, we will scale Hugging Face’s platform, strengthen its infrastructure and expand access to AI for developers and institutions worldwide. Hugging Face will remain an open platform.",
+      "subject": "NVIDIA / Hugging Face",
+      "eventRef": "evt:corporate-action/hugging-face,nvidia/acquire"
+    },
+    {
+      "id": "news-b",
+      "source": "Reuters",
+      "title": "NVIDIA to acquire Hugging Face",
+      "publishedTime": "2026-09-03",
+      "url": null,
+      "summary": "NVIDIA said it will acquire Hugging Face. The report describes the same announced acquisition as the NVIDIA official blog.",
+      "subject": "NVIDIA / Hugging Face",
+      "eventRef": "evt:corporate-action/hugging-face,nvidia/acquire"
+    }
+  ],
+  "events": [
+    {
+      "eventId": "evt:corporate-action/hugging-face,nvidia/acquire",
+      "what": "acquire",
+      "when": "2026-09-03",
+      "subject": "hugging-face / nvidia",
+      "eventType": "Corporate Action",
+      "newsRefs": [
+        "news-a",
+        "news-b"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "newsA": "news-a",
+      "newsB": "news-b",
+      "relation": "Same Event",
+      "eventRefA": "evt:corporate-action/hugging-face,nvidia/acquire",
+      "eventRefB": "evt:corporate-action/hugging-face,nvidia/acquire",
+      "reason": {
+        "relation": "Same Event",
+        "subject": "shared hugging-face, nvidia",
+        "eventType": "Corporate Action / Corporate Action",
+        "eventTime": "2026-09-03 / 2026-09-03",
+        "coreFact": "acquire / acquire",
+        "newInformation": "same core fact; no new event state"
+      }
+    }
+  ],
+  "evaluations": [
+    {
+      "eventRef": "evt:corporate-action/hugging-face,nvidia/acquire",
+      "importance": 5,
+      "relevance": "High",
+      "relevanceBasis": "與 NVIDIA、AI Developer / Model Platform、AI Infrastructure、AI 利潤池及既有 AI 研究方向高度相關。",
+      "impact": {
+        "target": "NVIDIA / AI developer ecosystem / AI software ecosystem",
+        "direction": "Mixed",
+        "strength": "High",
+        "evidenceStatus": {
+          "FACT": [
+            {
+              "claim": "NVIDIA 宣布收購 Hugging Face",
+              "newsRef": "news-a",
+              "source": "NVIDIA Official Blog"
+            },
+            {
+              "claim": "NVIDIA 表示 Hugging Face 將維持開放",
+              "newsRef": "news-a",
+              "source": "NVIDIA Official Blog"
+            },
+            {
+              "claim": "NVIDIA 宣布收購 Hugging Face",
+              "newsRef": "news-b",
+              "source": "Reuters"
+            }
+          ],
+          "ESTIMATE": [],
+          "INFERENCE": [
+            {
+              "claim": "NVIDIA 可能由 AI Compute Platform 向 AI Developer / Model Platform 延伸",
+              "newsRef": "news-a",
+              "source": "NVIDIA Official Blog"
+            },
+            {
+              "claim": "可能擴大 NVIDIA AI ecosystem 的控制力",
+              "newsRef": "news-a",
+              "source": "NVIDIA Official Blog"
+            },
+            {
+              "claim": "NVIDIA 可能由 AI Compute Platform 向 AI Developer / Model Platform 延伸",
+              "newsRef": "news-b",
+              "source": "Reuters"
+            },
+            {
+              "claim": "可能擴大 NVIDIA AI ecosystem 的控制力",
+              "newsRef": "news-b",
+              "source": "Reuters"
+            }
+          ],
+          "UNKNOWN": [
+            {
+              "claim": "實際營收貢獻",
+              "newsRef": "news-a",
+              "source": "NVIDIA Official Blog"
+            },
+            {
+              "claim": "對 NVIDIA 長期獲利的實際影響",
+              "newsRef": "news-a",
+              "source": "NVIDIA Official Blog"
+            },
+            {
+              "claim": "對其他 AI accelerator 的實際影響",
+              "newsRef": "news-a",
+              "source": "NVIDIA Official Blog"
+            },
+            {
+              "claim": "實際營收貢獻",
+              "newsRef": "news-b",
+              "source": "Reuters"
+            },
+            {
+              "claim": "對 NVIDIA 長期獲利的實際影響",
+              "newsRef": "news-b",
+              "source": "Reuters"
+            },
+            {
+              "claim": "對其他 AI accelerator 的實際影響",
+              "newsRef": "news-b",
+              "source": "Reuters"
+            }
+          ]
+        }
+      },
+      "evidenceRefs": [
+        {
+          "newsRef": "news-a",
+          "source": "NVIDIA Official Blog",
+          "class": "FACT",
+          "claim": "NVIDIA 宣布收購 Hugging Face"
+        },
+        {
+          "newsRef": "news-a",
+          "source": "NVIDIA Official Blog",
+          "class": "FACT",
+          "claim": "NVIDIA 表示 Hugging Face 將維持開放"
+        },
+        {
+          "newsRef": "news-a",
+          "source": "NVIDIA Official Blog",
+          "class": "INFERENCE",
+          "claim": "NVIDIA 可能由 AI Compute Platform 向 AI Developer / Model Platform 延伸"
+        },
+        {
+          "newsRef": "news-a",
+          "source": "NVIDIA Official Blog",
+          "class": "INFERENCE",
+          "claim": "可能擴大 NVIDIA AI ecosystem 的控制力"
+        },
+        {
+          "newsRef": "news-a",
+          "source": "NVIDIA Official Blog",
+          "class": "UNKNOWN",
+          "claim": "實際營收貢獻"
+        },
+        {
+          "newsRef": "news-a",
+          "source": "NVIDIA Official Blog",
+          "class": "UNKNOWN",
+          "claim": "對 NVIDIA 長期獲利的實際影響"
+        },
+        {
+          "newsRef": "news-a",
+          "source": "NVIDIA Official Blog",
+          "class": "UNKNOWN",
+          "claim": "對其他 AI accelerator 的實際影響"
+        },
+        {
+          "newsRef": "news-b",
+          "source": "Reuters",
+          "class": "FACT",
+          "claim": "NVIDIA 宣布收購 Hugging Face"
+        },
+        {
+          "newsRef": "news-b",
+          "source": "Reuters",
+          "class": "INFERENCE",
+          "claim": "NVIDIA 可能由 AI Compute Platform 向 AI Developer / Model Platform 延伸"
+        },
+        {
+          "newsRef": "news-b",
+          "source": "Reuters",
+          "class": "INFERENCE",
+          "claim": "可能擴大 NVIDIA AI ecosystem 的控制力"
+        },
+        {
+          "newsRef": "news-b",
+          "source": "Reuters",
+          "class": "UNKNOWN",
+          "claim": "實際營收貢獻"
+        },
+        {
+          "newsRef": "news-b",
+          "source": "Reuters",
+          "class": "UNKNOWN",
+          "claim": "對 NVIDIA 長期獲利的實際影響"
+        },
+        {
+          "newsRef": "news-b",
+          "source": "Reuters",
+          "class": "UNKNOWN",
+          "claim": "對其他 AI accelerator 的實際影響"
+        }
+      ],
+      "researchCandidate": {
+        "eligible": true,
+        "reason": "Importance 與 Relevance 都支持投入研究時間，且存在尚未回答的 Research Question。",
+        "researchQuestion": "NVIDIA 收購 Hugging Face，是否代表 NVIDIA 正在從 AI Compute Platform 向 AI Developer / Model Platform 延伸？這是否會改變 AI 利潤池 與 NVIDIA 長期競爭優勢？",
+        "stance": null,
+        "eventRef": "evt:corporate-action/hugging-face,nvidia/acquire"
+      }
+    }
+  ],
+  "researchCandidates": [
+    {
+      "eventRef": "evt:corporate-action/hugging-face,nvidia/acquire",
+      "eligible": true,
+      "reason": "Importance 與 Relevance 都支持投入研究時間，且存在尚未回答的 Research Question。",
+      "researchQuestion": "NVIDIA 收購 Hugging Face，是否代表 NVIDIA 正在從 AI Compute Platform 向 AI Developer / Model Platform 延伸？這是否會改變 AI 利潤池 與 NVIDIA 長期競爭優勢？",
+      "stance": null
+    }
+  ]
+}

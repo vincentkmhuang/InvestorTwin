@@ -67,7 +67,7 @@ function ConvertTo-JsonArrayText($items) {
 }
 
 function Write-ResearchCardJson($cardPath, $cardObj, $questions) {
-  $arrayKeys = @('tags', 'related', 'researchConclusionHistory')
+  $arrayKeys = @('tags', 'related', 'researchConclusionHistory', 'candidateLinks')
   $parts = New-Object System.Collections.Generic.List[string]
   $wroteQuestions = $false
   foreach ($prop in $cardObj.PSObject.Properties) {
@@ -1005,6 +1005,312 @@ function Write-ResearchQueue($rootPath, $queue) {
   $queue | ConvertTo-Json -Depth 10 | Set-Content $queuePath -Encoding UTF8
 }
 
+function Get-CandidateGateLedgerPath($rootPath) {
+  return (Join-Path $rootPath 'data\candidate-gate.json')
+}
+
+function Get-CandidateHandoffPath($rootPath) {
+  return (Join-Path $rootPath 'data\research-candidates-handoff.json')
+}
+
+function Read-CandidateGateLedger($rootPath) {
+  $path = Get-CandidateGateLedgerPath $rootPath
+  if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+    return [PSCustomObject]@{ schemaVersion = '1.0'; dispositions = @() }
+  }
+  $ledger = Read-Utf8Json $path
+  if (-not $ledger) {
+    return [PSCustomObject]@{ schemaVersion = '1.0'; dispositions = @() }
+  }
+  if (-not (Test-HasJsonProperty $ledger 'dispositions')) {
+    $ledger | Add-Member -NotePropertyName dispositions -NotePropertyValue @() -Force
+  }
+  if (-not (Test-HasJsonProperty $ledger 'schemaVersion')) {
+    $ledger | Add-Member -NotePropertyName schemaVersion -NotePropertyValue '1.0' -Force
+  }
+  return $ledger
+}
+
+function Write-CandidateGateLedger($rootPath, $ledger) {
+  $path = Get-CandidateGateLedgerPath $rootPath
+  $dir = Split-Path -Parent $path
+  if (-not (Test-Path -LiteralPath $dir)) {
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+  }
+  $payload = [PSCustomObject]@{
+    schemaVersion = if ($ledger.schemaVersion) { [string]$ledger.schemaVersion } else { '1.0' }
+    dispositions = @(Get-AsArray $ledger.dispositions)
+  }
+  Write-Utf8Text $path ($payload | ConvertTo-Json -Depth 10)
+}
+
+function Read-CandidateHandoff($rootPath) {
+  $path = Get-CandidateHandoffPath $rootPath
+  if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+    return [PSCustomObject]@{
+      news = @()
+      events = @()
+      evaluations = @()
+      researchCandidates = @()
+    }
+  }
+  return Read-Utf8Json $path
+}
+
+function Get-CandidateDisposition($ledger, $eventRef) {
+  $key = [string]$eventRef
+  foreach ($item in @(Get-AsArray $ledger.dispositions)) {
+    if ([string]$item.eventRef -eq $key) { return $item }
+  }
+  return $null
+}
+
+function Set-CandidateDisposition($ledger, $eventRef, $status, $researchQuestion, $cardId) {
+  $key = [string]$eventRef
+  $updatedAt = Get-Date -Format 'yyyy-MM-ddTHH:mm:ssK'
+  $existing = Get-CandidateDisposition $ledger $key
+  if ($existing) {
+    $existing.status = $status
+    $existing.updatedAt = $updatedAt
+    if ($null -ne $researchQuestion -and $researchQuestion -ne '') {
+      $existing | Add-Member -NotePropertyName researchQuestion -NotePropertyValue ([string]$researchQuestion) -Force
+    }
+    if ($null -ne $cardId -and $cardId -ne '') {
+      $existing | Add-Member -NotePropertyName cardId -NotePropertyValue ([string]$cardId) -Force
+    }
+  } else {
+    $row = [PSCustomObject]@{
+      eventRef = $key
+      status = $status
+      updatedAt = $updatedAt
+    }
+    if ($null -ne $researchQuestion -and $researchQuestion -ne '') {
+      $row | Add-Member -NotePropertyName researchQuestion -NotePropertyValue ([string]$researchQuestion) -Force
+    }
+    if ($null -ne $cardId -and $cardId -ne '') {
+      $row | Add-Member -NotePropertyName cardId -NotePropertyValue ([string]$cardId) -Force
+    }
+    $ledger.dispositions = @(Get-AsArray $ledger.dispositions) + @($row)
+  }
+  return $ledger
+}
+
+function Build-CandidateGateView($rootPath) {
+  $handoff = Read-CandidateHandoff $rootPath
+  $ledger = Read-CandidateGateLedger $rootPath
+  $eventsById = @{}
+  foreach ($event in @(Get-AsArray $handoff.events)) {
+    $eventsById[[string]$event.eventId] = $event
+  }
+  $evalsByRef = @{}
+  foreach ($evaluation in @(Get-AsArray $handoff.evaluations)) {
+    $evalsByRef[[string]$evaluation.eventRef] = $evaluation
+  }
+  $candidates = @()
+  foreach ($candidate in @(Get-AsArray $handoff.researchCandidates)) {
+    $eligibleProp = $candidate.PSObject.Properties['eligible']
+    if ($eligibleProp -and $candidate.eligible -ne $true) { continue }
+    $eventRef = [string]$candidate.eventRef
+    if (-not $eventRef) { continue }
+    $evaluation = $evalsByRef[$eventRef]
+    $event = $eventsById[$eventRef]
+    $disposition = Get-CandidateDisposition $ledger $eventRef
+    $status = 'Pending'
+    if ($disposition -and $disposition.status) { $status = [string]$disposition.status }
+    $question = [string]$candidate.researchQuestion
+    if (-not $question -and $evaluation -and $evaluation.researchCandidate) {
+      $question = [string]$evaluation.researchCandidate.researchQuestion
+    }
+    if (-not $question -and $disposition -and $disposition.researchQuestion) {
+      $question = [string]$disposition.researchQuestion
+    }
+    $impact = $null
+    if ($evaluation -and $evaluation.impact) { $impact = $evaluation.impact }
+    $evidenceRefs = @()
+    if ($evaluation -and $evaluation.evidenceRefs) {
+      $evidenceRefs = @(Get-AsArray $evaluation.evidenceRefs)
+    }
+    $importance = $null
+    $relevance = $null
+    $relevanceBasis = $null
+    if ($evaluation) {
+      $importance = $evaluation.importance
+      $relevance = $evaluation.relevance
+      $relevanceBasis = $evaluation.relevanceBasis
+    }
+    $reason = $null
+    if ($candidate.reason) { $reason = [string]$candidate.reason }
+    $cardId = $null
+    if ($disposition -and $disposition.cardId) { $cardId = [string]$disposition.cardId }
+    $updatedAt = $null
+    if ($disposition -and $disposition.updatedAt) { $updatedAt = [string]$disposition.updatedAt }
+    $row = [PSCustomObject]@{
+      eventRef = $eventRef
+      status = $status
+      researchQuestion = $question
+      importance = $importance
+      relevance = $relevance
+      relevanceBasis = $relevanceBasis
+      impact = $impact
+      evidenceRefs = $evidenceRefs
+      event = $event
+      reason = $reason
+      cardId = $cardId
+      updatedAt = $updatedAt
+    }
+    $candidates += $row
+  }
+  return [PSCustomObject]@{
+    candidates = @($candidates)
+    handoffPath = 'data/research-candidates-handoff.json'
+    ledgerPath = 'data/candidate-gate.json'
+  }
+}
+
+function Apply-CandidateCardLink($rootPath, $cardId, $linkPayload) {
+  $id = ([string]$cardId).Trim()
+  if ([string]::IsNullOrWhiteSpace($id) -or $id -match '[\\/]' -or $id -eq '.' -or $id -eq '..') {
+    return @{ ok = $false; error = 'invalid_card'; message = 'Please select an existing Research Card.' }
+  }
+  $dir = Join-Path $rootPath ("research\" + $id)
+  $cardPath = Join-Path $dir 'card.json'
+  if (-not (Test-Path -LiteralPath $cardPath -PathType Leaf)) {
+    return @{ ok = $false; error = 'missing_card'; message = 'Please select an existing Research Card.' }
+  }
+  $card = Read-Utf8Json $cardPath
+  $questions = @()
+  if ((Test-HasJsonProperty $card 'questions') -and $card.questions) {
+    $questions = @(Get-AsArray $card.questions)
+  }
+  $questionText = [string]$linkPayload.researchQuestion
+  if ($questionText -and -not ($questions | Where-Object { [string]$_ -eq $questionText })) {
+    $questions += $questionText
+  }
+  $links = @()
+  if ((Test-HasJsonProperty $card 'candidateLinks') -and $card.candidateLinks) {
+    $links = @(Get-AsArray $card.candidateLinks)
+  }
+  $eventRef = [string]$linkPayload.eventRef
+  $existingLink = $links | Where-Object { [string]$_.eventRef -eq $eventRef } | Select-Object -First 1
+  if (-not $existingLink) {
+    $links += [PSCustomObject]@{
+      eventRef = $eventRef
+      researchQuestion = $questionText
+      importance = $linkPayload.importance
+      relevance = $linkPayload.relevance
+      impact = $linkPayload.impact
+      evidenceRefs = @(Get-AsArray $linkPayload.evidenceRefs)
+      linkedAt = Get-Date -Format 'yyyy-MM-dd'
+      status = 'Linked'
+    }
+  }
+  $card | Add-Member -NotePropertyName candidateLinks -NotePropertyValue $links -Force
+  $card | Add-Member -NotePropertyName questions -NotePropertyValue $questions -Force
+  $card | Add-Member -NotePropertyName updated -NotePropertyValue (Get-Date -Format 'yyyy-MM-dd') -Force
+  Write-ResearchCardJson $cardPath $card $questions
+  return @{
+    ok = $true
+    cardId = $id
+    questions = $questions
+    candidateLinks = $links
+  }
+}
+
+function Invoke-CandidateGateAction($rootPath, $body) {
+  $action = if ($body -and $body.action) { ([string]$body.action).Trim().ToLowerInvariant() } else { '' }
+  $eventRef = if ($body -and $body.eventRef) { ([string]$body.eventRef).Trim() } else { '' }
+  $cardId = if ($body -and $body.cardId) { ([string]$body.cardId).Trim() } else { '' }
+  if (-not $eventRef) {
+    return @{ ok = $false; statusCode = 400; error = 'invalid_payload'; message = 'eventRef is required' }
+  }
+  $view = Build-CandidateGateView $rootPath
+  $candidate = @($view.candidates | Where-Object { [string]$_.eventRef -eq $eventRef } | Select-Object -First 1)
+  if (-not $candidate -or $candidate.Count -eq 0) {
+    return @{ ok = $false; statusCode = 404; error = 'missing_candidate'; message = 'Candidate not found in handoff' }
+  }
+  $candidate = $candidate[0]
+  $ledger = Read-CandidateGateLedger $rootPath
+  $current = Get-CandidateDisposition $ledger $eventRef
+  $currentStatus = if ($current -and $current.status) { [string]$current.status } else { 'Pending' }
+
+  if ($action -eq 'ignore') {
+    if ($currentStatus -in @('Linked', 'Queued')) {
+      return @{ ok = $false; statusCode = 400; error = 'invalid_state'; message = 'Linked/Queued Candidate cannot be Ignored' }
+    }
+    $ledger = Set-CandidateDisposition $ledger $eventRef 'Ignored' $candidate.researchQuestion $null
+    Write-CandidateGateLedger $rootPath $ledger
+    return @{ ok = $true; statusCode = 200; status = 'Ignored'; eventRef = $eventRef; view = (Build-CandidateGateView $rootPath) }
+  }
+
+  if ($action -eq 'watch') {
+    if ($currentStatus -in @('Ignored', 'Linked', 'Queued')) {
+      return @{ ok = $false; statusCode = 400; error = 'invalid_state'; message = 'Cannot Watch from ' + $currentStatus }
+    }
+    $ledger = Set-CandidateDisposition $ledger $eventRef 'Watching' $candidate.researchQuestion $null
+    Write-CandidateGateLedger $rootPath $ledger
+    return @{ ok = $true; statusCode = 200; status = 'Watching'; eventRef = $eventRef; view = (Build-CandidateGateView $rootPath) }
+  }
+
+  if ($action -eq 'link' -or $action -eq 'queue') {
+    if (-not $cardId) {
+      return @{ ok = $false; statusCode = 400; error = 'missing_card'; message = 'Please select an existing Research Card.' }
+    }
+    if ($currentStatus -eq 'Ignored') {
+      return @{ ok = $false; statusCode = 400; error = 'invalid_state'; message = 'Ignored Candidate cannot be Linked/Queued' }
+    }
+    $linkImpact = $null
+    if ($candidate.impact) {
+      $linkImpact = [PSCustomObject]@{
+        target = $candidate.impact.target
+        direction = $candidate.impact.direction
+        strength = $candidate.impact.strength
+      }
+    }
+    $linkEvidence = @()
+    foreach ($ref in @(Get-AsArray $candidate.evidenceRefs)) {
+      $linkEvidence += [PSCustomObject]@{
+        newsRef = $ref.newsRef
+        source = $ref.source
+        class = $ref.class
+        claim = $ref.claim
+        url = $ref.url
+      }
+    }
+    $linkPayload = [PSCustomObject]@{
+      eventRef = $eventRef
+      researchQuestion = $candidate.researchQuestion
+      importance = $candidate.importance
+      relevance = $candidate.relevance
+      impact = $linkImpact
+      evidenceRefs = $linkEvidence
+    }
+    $linked = Apply-CandidateCardLink $rootPath $cardId $linkPayload
+    if (-not $linked.ok) {
+      return @{ ok = $false; statusCode = 400; error = $linked.error; message = $linked.message }
+    }
+    $status = if ($action -eq 'queue') { 'Queued' } else { 'Linked' }
+    $queueResult = $null
+    if ($action -eq 'queue') {
+      $queueResult = Ensure-QueueItem $rootPath $cardId 'Research Candidate'
+    }
+    $ledger = Set-CandidateDisposition $ledger $eventRef $status $candidate.researchQuestion $cardId
+    Write-CandidateGateLedger $rootPath $ledger
+    return @{
+      ok = $true
+      statusCode = 200
+      status = $status
+      eventRef = $eventRef
+      cardId = $cardId
+      queue = $queueResult
+      candidateLinks = $linked.candidateLinks
+      questions = $linked.questions
+      view = (Build-CandidateGateView $rootPath)
+    }
+  }
+
+  return @{ ok = $false; statusCode = 400; error = 'invalid_action'; message = 'action must be ignore, watch, link, or queue' }
+}
+
 function Get-LatestEvidenceItems($rootPath) {
   $map = @{}
   $candidates = @()
@@ -1449,6 +1755,35 @@ while ($listener.IsListening) {
       $addedFrom = if ($body -and $body.addedFrom) { $body.addedFrom } else { $null }
       $result = Ensure-QueueItem $root $id $addedFrom
       Send-Json $response @{ added = $result.added; items = $result.items }
+    }
+    elseif ($localPath -eq '/api/candidate-gate' -and $method -eq 'GET') {
+      $view = Build-CandidateGateView $root
+      Send-Json $response $view
+    }
+    elseif ($localPath -eq '/api/candidate-gate' -and $method -eq 'POST') {
+      $body = Read-Body $request
+      $result = Invoke-CandidateGateAction $root $body
+      if (-not $result.ok) {
+        Send-Json $response @{
+          error = $result.error
+          message = $result.message
+        } $result.statusCode
+      } else {
+        $payload = [ordered]@{
+          ok = $true
+          status = $result.status
+          eventRef = $result.eventRef
+          candidates = $result.view.candidates
+        }
+        if ($result.cardId) { $payload.cardId = $result.cardId }
+        if ($null -ne $result.queue) {
+          $payload.queueAdded = [bool]$result.queue.added
+          $payload.queueItems = $result.queue.items
+        }
+        if ($result.candidateLinks) { $payload.candidateLinks = $result.candidateLinks }
+        if ($result.questions) { $payload.questions = $result.questions }
+        Send-Json $response ([PSCustomObject]$payload)
+      }
     }
     elseif ($localPath -eq '/api/cases' -and $method -eq 'POST') {
       $body = Read-Body $request

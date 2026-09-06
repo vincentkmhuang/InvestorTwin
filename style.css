@@ -5,6 +5,11 @@ aside{width:220px;background:#1f2937;color:#fff;padding:16px;min-height:100vh;di
 .version-info{margin-top:auto;padding-top:16px;font-size:11px;color:#94a3b8;line-height:1.6}
 main{flex:1;padding:20px}
 .box{background:#fff;border-radius:10px;padding:16px;margin-bottom:16px}
+.candidate-gate-card{border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:12px}
+.candidate-gate-card h3{margin:0 0 8px;font-size:16px}
+.candidate-gate-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.candidate-gate-actions button{cursor:pointer}
+.candidate-gate-empty,.candidate-gate-status,.muted{color:#64748b}
 .brief{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .item{background:#f4f6fa;padding:12px;border-radius:8px;cursor:pointer}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
