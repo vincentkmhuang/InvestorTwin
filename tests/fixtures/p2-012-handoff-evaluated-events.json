@@ -1,0 +1,211 @@
+{
+  "news": [
+    {
+      "id": "news-global-a",
+      "source": "NVIDIA Official Blog",
+      "title": "NVIDIA to Acquire Hugging Face",
+      "publishedTime": "2026-09-03",
+      "url": "https://blogs.nvidia.com/blog/nvidia-to-acquire-hugging-face/",
+      "summary": "NVIDIA has agreed to acquire Hugging Face.",
+      "subject": "NVIDIA / Hugging Face",
+      "eventRef": "evt:corporate-action/hugging-face,nvidia/acquire"
+    },
+    {
+      "id": "news-taiwan-a",
+      "source": "TWSE",
+      "title": "Major foreign net buy in Taiwan semiconductors",
+      "publishedTime": "2026-09-04",
+      "url": null,
+      "summary": "Foreign investors posted a material net buy in Taiwan listed semiconductor names.",
+      "subject": "Taiwan / Semiconductors",
+      "eventRef": "evt:industry/taiwan-semiconductor/foreign-flow"
+    },
+    {
+      "id": "news-future-a",
+      "source": "Federal Reserve",
+      "title": "Future FOMC placeholder",
+      "publishedTime": "2026-09-20",
+      "url": null,
+      "summary": "A future-dated policy event must not enter Yesterday.",
+      "subject": "Federal Reserve",
+      "eventRef": "evt:policy/federal-reserve/future-placeholder"
+    },
+    {
+      "id": "news-low-a",
+      "source": "Acceptance Fixture",
+      "title": "Low importance filler",
+      "publishedTime": "2026-09-02",
+      "url": null,
+      "summary": "Should be filtered by importance gate.",
+      "subject": "Other",
+      "eventRef": "evt:other/low-importance/note"
+    }
+  ],
+  "events": [
+    {
+      "eventId": "evt:corporate-action/hugging-face,nvidia/acquire",
+      "what": "acquire",
+      "when": "2026-09-03",
+      "subject": "hugging-face / nvidia",
+      "eventType": "Corporate Action",
+      "newsRefs": ["news-global-a"]
+    },
+    {
+      "eventId": "evt:industry/taiwan-semiconductor/foreign-flow",
+      "what": "foreign-flow",
+      "when": "2026-09-04",
+      "subject": "taiwan / semiconductor",
+      "eventType": "Industry",
+      "newsRefs": ["news-taiwan-a"]
+    },
+    {
+      "eventId": "evt:policy/federal-reserve/future-placeholder",
+      "what": "policy-meeting",
+      "when": "2026-09-20",
+      "subject": "federal-reserve",
+      "eventType": "Policy",
+      "newsRefs": ["news-future-a"]
+    },
+    {
+      "eventId": "evt:other/low-importance/note",
+      "what": "note",
+      "when": "2026-09-02",
+      "subject": "other",
+      "eventType": "Other",
+      "newsRefs": ["news-low-a"]
+    }
+  ],
+  "links": [],
+  "evaluations": [
+    {
+      "eventRef": "evt:corporate-action/hugging-face,nvidia/acquire",
+      "importance": 5,
+      "relevance": "High",
+      "relevanceBasis": "與 NVIDIA AI platform 延伸高度相關。",
+      "impact": {
+        "target": "NVIDIA / AI ecosystem",
+        "direction": "Mixed",
+        "strength": "High",
+        "evidenceStatus": {
+          "FACT": [
+            {
+              "claim": "NVIDIA 宣布收購 Hugging Face",
+              "newsRef": "news-global-a",
+              "source": "NVIDIA Official Blog"
+            }
+          ],
+          "ESTIMATE": [],
+          "INFERENCE": [
+            {
+              "claim": "可能擴大 NVIDIA AI ecosystem 控制力",
+              "newsRef": "news-global-a",
+              "source": "NVIDIA Official Blog"
+            }
+          ],
+          "UNKNOWN": [
+            {
+              "claim": "實際營收貢獻",
+              "newsRef": "news-global-a",
+              "source": "NVIDIA Official Blog"
+            }
+          ]
+        }
+      },
+      "evidenceRefs": [
+        {
+          "newsRef": "news-global-a",
+          "source": "NVIDIA Official Blog",
+          "class": "FACT",
+          "claim": "NVIDIA 宣布收購 Hugging Face"
+        }
+      ],
+      "researchCandidate": {
+        "eligible": false,
+        "reason": "Intentionally not a Candidate — Event must still enter Brief.",
+        "researchQuestion": "Should NOT be used as the Brief event title.",
+        "stance": null,
+        "eventRef": "evt:corporate-action/hugging-face,nvidia/acquire"
+      }
+    },
+    {
+      "eventRef": "evt:industry/taiwan-semiconductor/foreign-flow",
+      "importance": 4,
+      "relevance": "High",
+      "relevanceBasis": "外資流向會改變台灣半導體風險偏好。",
+      "impact": {
+        "target": "Taiwan semiconductors",
+        "direction": "Positive",
+        "strength": "Medium",
+        "evidenceStatus": {
+          "FACT": [
+            {
+              "claim": "外資對台股半導體出現明顯淨買超",
+              "newsRef": "news-taiwan-a",
+              "source": "TWSE"
+            }
+          ],
+          "ESTIMATE": [],
+          "INFERENCE": [],
+          "UNKNOWN": []
+        }
+      },
+      "evidenceRefs": [
+        {
+          "newsRef": "news-taiwan-a",
+          "source": "TWSE",
+          "class": "FACT",
+          "claim": "外資對台股半導體出現明顯淨買超"
+        }
+      ]
+    },
+    {
+      "eventRef": "evt:policy/federal-reserve/future-placeholder",
+      "importance": 5,
+      "relevance": "High",
+      "relevanceBasis": "Future-dated policy must not enter Yesterday.",
+      "impact": {
+        "target": "Rates",
+        "direction": "Unclear",
+        "strength": "Medium",
+        "evidenceStatus": {
+          "FACT": [
+            {
+              "claim": "Future FOMC placeholder",
+              "newsRef": "news-future-a",
+              "source": "Federal Reserve"
+            }
+          ],
+          "ESTIMATE": [],
+          "INFERENCE": [],
+          "UNKNOWN": []
+        }
+      },
+      "evidenceRefs": []
+    },
+    {
+      "eventRef": "evt:other/low-importance/note",
+      "importance": 1,
+      "relevance": "Low",
+      "relevanceBasis": "Too weak for Brief.",
+      "impact": {
+        "target": "Other",
+        "direction": "Unclear",
+        "strength": "Low",
+        "evidenceStatus": {
+          "FACT": [
+            {
+              "claim": "Low importance filler",
+              "newsRef": "news-low-a",
+              "source": "Acceptance Fixture"
+            }
+          ],
+          "ESTIMATE": [],
+          "INFERENCE": [],
+          "UNKNOWN": []
+        }
+      },
+      "evidenceRefs": []
+    }
+  ],
+  "researchCandidates": []
+}

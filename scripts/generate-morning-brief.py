@@ -35,6 +35,15 @@ MAX_EXEC_SIGNALS = 3
 MAX_TODAY_THINGS = 3
 MATERIAL_FLOW = 50.0
 MARKET_STATUS_PREFIX = "市場狀態｜"
+EVENT_PREFIX = "事件｜"
+MAX_BRIEF_EVENTS = 3
+MIN_EVENT_IMPORTANCE = 3
+EVENT_RELEVANCE_OK = ("High", "Medium")
+HANDOFF_REL = os.path.join("data", "research-candidates-handoff.json")
+TAIWAN_MARKERS = (
+    "taiwan", "taiex", "twse", "tpex", "mops",
+    "台股", "台灣", "臺灣", "台北", "臺北",
+)
 
 # Canonical Research Card ids only. Unmapped instruments stay unselected.
 INSTRUMENT_MAP = {
@@ -351,6 +360,222 @@ def filter_upcoming_events(events, brief_date):
     return kept
 
 
+def load_handoff_payload(root):
+    path = os.path.join(root, HANDOFF_REL)
+    if not os.path.isfile(path):
+        return None
+    try:
+        raw = load_json(path)
+    except Exception:
+        return None
+    return raw if isinstance(raw, dict) else None
+
+
+def _first_fact_claim(evaluation):
+    impact = evaluation.get("impact") if isinstance(evaluation, dict) else None
+    status = impact.get("evidenceStatus") if isinstance(impact, dict) else None
+    facts = status.get("FACT") if isinstance(status, dict) else None
+    if isinstance(facts, list):
+        for row in facts:
+            if not isinstance(row, dict):
+                continue
+            claim = str(row.get("claim") or "").strip()
+            if claim:
+                return claim, str(row.get("source") or "").strip()
+    refs = evaluation.get("evidenceRefs") if isinstance(evaluation, dict) else None
+    if isinstance(refs, list):
+        for row in refs:
+            if not isinstance(row, dict):
+                continue
+            if str(row.get("class") or "").upper() != "FACT":
+                continue
+            claim = str(row.get("claim") or "").strip()
+            if claim:
+                return claim, str(row.get("source") or "").strip()
+    return "", ""
+
+
+def _event_region(event, news_rows, source):
+    blob = " ".join([
+        str(event.get("subject") or ""),
+        str(event.get("eventType") or ""),
+        str(event.get("what") or ""),
+        str(source or ""),
+    ]).lower()
+    for row in news_rows or []:
+        if not isinstance(row, dict):
+            continue
+        blob += " " + str(row.get("source") or "").lower()
+        blob += " " + str(row.get("subject") or "").lower()
+        blob += " " + str(row.get("title") or "").lower()
+    for marker in TAIWAN_MARKERS:
+        if marker.lower() in blob or marker in blob:
+            return "taiwan"
+    return "global"
+
+
+def collect_evaluated_events(root, brief_date):
+    """Read-only handoff adapter: evaluated Events only (Candidate not required)."""
+    payload = load_handoff_payload(root)
+    if not payload:
+        return []
+    events = [row for row in (payload.get("events") or []) if isinstance(row, dict)]
+    evaluations = [row for row in (payload.get("evaluations") or []) if isinstance(row, dict)]
+    news = [row for row in (payload.get("news") or []) if isinstance(row, dict)]
+    events_by_id = {}
+    for row in events:
+        eid = str(row.get("eventId") or "").strip()
+        if eid:
+            events_by_id[eid] = row
+    news_by_id = {}
+    for row in news:
+        nid = str(row.get("id") or "").strip()
+        if nid:
+            news_by_id[nid] = row
+
+    packets = []
+    for evaluation in evaluations:
+        event_ref = str(evaluation.get("eventRef") or "").strip()
+        if not event_ref:
+            continue
+        event = events_by_id.get(event_ref)
+        if not event:
+            continue
+        when = parse_event_date(event.get("when"))
+        if when is None:
+            continue
+        # Future events must not appear as Yesterday / historical Brief events.
+        if when > brief_date:
+            continue
+        try:
+            importance = int(evaluation.get("importance"))
+        except (TypeError, ValueError):
+            continue
+        relevance = str(evaluation.get("relevance") or "").strip()
+        if importance < MIN_EVENT_IMPORTANCE:
+            continue
+        if relevance not in EVENT_RELEVANCE_OK:
+            continue
+
+        news_rows = []
+        for ref in event.get("newsRefs") or []:
+            item = news_by_id.get(str(ref).strip())
+            if item:
+                news_rows.append(item)
+        fact_claim, fact_source = _first_fact_claim(evaluation)
+        subject = str(event.get("subject") or "").strip()
+        what = str(event.get("what") or "").strip()
+        event_type = str(event.get("eventType") or "").strip()
+        if fact_claim:
+            fact_title = fact_claim
+        elif subject and what:
+            fact_title = f"{subject}：{what}"
+            if event_type:
+                fact_title = f"{fact_title}（{event_type}）"
+        else:
+            continue
+
+        why = str(evaluation.get("relevanceBasis") or "").strip()
+        if not why:
+            impact = evaluation.get("impact") if isinstance(evaluation.get("impact"), dict) else {}
+            target = str(impact.get("target") or "").strip()
+            direction = str(impact.get("direction") or "").strip()
+            strength = str(impact.get("strength") or "").strip()
+            bits = [bit for bit in (target, direction, strength) if bit]
+            why = "／".join(bits)
+        if not why:
+            continue
+
+        source = fact_source
+        if not source and news_rows:
+            source = str(news_rows[0].get("source") or "").strip()
+        if not source:
+            source = "Event"
+
+        # Candidate eligibility is intentionally ignored — Event ≠ Candidate.
+        packets.append({
+            "eventId": event_ref,
+            "when": when,
+            "subject": subject,
+            "what": what,
+            "eventType": event_type,
+            "importance": importance,
+            "relevance": relevance,
+            "why": why,
+            "factTitle": fact_title,
+            "source": source,
+            "region": _event_region(event, news_rows, source),
+            "impact": evaluation.get("impact") if isinstance(evaluation.get("impact"), dict) else {},
+        })
+
+    packets.sort(key=lambda row: (-row["importance"], row["when"], row["eventId"]))
+    return packets[:MAX_BRIEF_EVENTS]
+
+
+def event_brief_item(packet):
+    """Honest Event item — never quote-as-news; never Candidate researchQuestion as what."""
+    return {
+        "title": EVENT_PREFIX + packet["factTitle"],
+        "source": packet["source"],
+        "researchId": None,
+        "eventRef": packet["eventId"],
+        "kind": "event",
+        "when": packet["when"],
+        "whyItMatters": packet["why"],
+        "importance": packet["importance"],
+        "relevance": packet["relevance"],
+    }
+
+
+def event_macro_lens_line(packet):
+    """Investment observation for Macro Decision Lens — distinct from Executive what+why.
+
+    Uses impact target/direction/strength plus relevance/subject/eventType already on the
+    Event packet. Never restates factTitle+why. Never emits researchQuestion as Event fact.
+    Returns None to omit when a honest distinct lens cannot be formed.
+    """
+    impact = packet.get("impact") if isinstance(packet.get("impact"), dict) else {}
+    target = str(impact.get("target") or "").strip()
+    direction = str(impact.get("direction") or "").strip()
+    strength = str(impact.get("strength") or "").strip()
+    relevance = str(packet.get("relevance") or "").strip()
+    event_type = str(packet.get("eventType") or "").strip()
+    subject = str(packet.get("subject") or "").strip()
+    fact_title = str(packet.get("factTitle") or "").strip()
+    why = str(packet.get("why") or "").strip()
+
+    # Need a real observation angle; otherwise omit rather than duplicate Executive.
+    if not target or not direction:
+        return None
+
+    core = f"對「{target}」的影響方向為 {direction}"
+    qualifiers = []
+    if strength:
+        qualifiers.append(f"強度 {strength}")
+    if relevance:
+        qualifiers.append(f"relevance {relevance}")
+    if qualifiers:
+        core += "（" + "；".join(qualifiers) + "）"
+
+    ctx_bits = []
+    if subject:
+        ctx_bits.append(subject)
+    if event_type:
+        ctx_bits.append(event_type)
+
+    line = "觀察角度：" + core
+    if ctx_bits:
+        line += "；標的脈絡 " + "／".join(ctx_bits)
+    line += "。此為投資觀察角度，非結論、非買賣建議。"
+
+    # Dedup / honesty: must not collapse into Executive factTitle + why.
+    if fact_title and fact_title in line:
+        return None
+    if why and why in line:
+        return None
+    return line
+
+
 def evidence_stamp(items, unit_fallback="index", max_bits=3):
     bits = format_group(items, unit_fallback)[:max_bits]
     if not bits:
@@ -655,6 +880,12 @@ def build_brief(root, evidence, previous):
 
     lens = build_macro_lens(selected)
 
+    # Sprint 012: thin read-only evaluated Event adapter (handoff). Candidate not required.
+    event_packets = collect_evaluated_events(root, date)
+    elevated_ids = set()
+    if event_packets:
+        elevated_ids.add(event_packets[0]["eventId"])
+
     # Global: rates remain market-status context; equities/oil/VIX live in Temperature.
     global_hits = [item for item in selected if in_section(item, "globalMarketAndNews")]
     macro_hits = [item for item in global_hits if item.get("theme") == "macro"]
@@ -672,6 +903,13 @@ def build_brief(root, evidence, previous):
             "Global",
             None,
         ))
+    for packet in event_packets:
+        if packet["region"] != "global":
+            continue
+        if packet["eventId"] in elevated_ids:
+            # Elevated into Yesterday/exec — avoid full duplicate in Global.
+            continue
+        global_items.append(event_brief_item(packet))
     if macro_hits:
         global_summary = MARKET_STATUS_PREFIX + "；".join(format_group(macro_hits, "percent"))
         if temp_owned:
@@ -680,6 +918,9 @@ def build_brief(root, evidence, previous):
         global_summary = MARKET_STATUS_PREFIX + "美股／油價／波動數值見市場溫度。"
     else:
         global_summary = "全球市場沒有可選入 Brief 的最新 Evidence。"
+    if any(packet["region"] == "global" for packet in event_packets):
+        global_summary = (global_summary.rstrip("。") + "；含已評估事件。"
+                          if global_summary else "含已評估全球事件。")
 
     taiwan_hits = [item for item in selected if in_section(item, "taiwanMarketAndNews")]
     taiwan_items = []
@@ -699,11 +940,19 @@ def build_brief(root, evidence, previous):
             "台股",
             None,
         ))
+    for packet in event_packets:
+        if packet["region"] != "taiwan":
+            continue
+        if packet["eventId"] in elevated_ids:
+            continue
+        taiwan_items.append(event_brief_item(packet))
     taiwan_bits = format_group(taiwan_hits, "index")
     taiwan_summary = (
         MARKET_STATUS_PREFIX + "；".join(taiwan_bits)
         if taiwan_bits else "台股沒有可選入 Brief 的 Evidence。"
     )
+    if any(packet["region"] == "taiwan" for packet in event_packets):
+        taiwan_summary = taiwan_summary.rstrip("。") + "；含已評估事件。"
 
     sox = by_id.get("SOX")
     ai_items = []
@@ -742,7 +991,51 @@ def build_brief(root, evidence, previous):
         deduped_ai.append(item)
 
     things = build_today_things(selected)
-    summary, _signals = build_executive_summary(selected)
+    # Event attention for Today's 3 Things (why-first; what happened as evidence note).
+    event_things = []
+    for packet in event_packets:
+        event_things.append(today_item(
+            packet["why"],
+            packet["why"],
+            packet["source"],
+            [packet["eventId"]],
+            None,
+            evidence_note=EVENT_PREFIX + packet["factTitle"],
+        ))
+    if event_things:
+        merged = []
+        seen_why = set()
+        for item in event_things + things:
+            key = str(item.get("whyItMatters") or item.get("title") or "")
+            if key in seen_why:
+                continue
+            seen_why.add(key)
+            merged.append(item)
+        things = merged[:MAX_TODAY_THINGS]
+
+    summary, signals = build_executive_summary(selected)
+    if event_packets:
+        top = event_packets[0]
+        # Executive = what happened + why important (factTitle + why).
+        event_line = (
+            f"{EVENT_PREFIX}{top['factTitle']}。"
+            f"注意理由：{top['why']}"
+            f"（Event {top['eventId']}；when {top['when']}）。"
+        )
+        combined = [event_line] + list(signals)
+        combined = combined[:MAX_EXEC_SIGNALS]
+        summary = "\n".join(f"{index}. {text}" for index, text in enumerate(combined, start=1))
+        # Macro Decision Lens = distinct investment observation; omit if not distinct.
+        lens_event = event_macro_lens_line(top)
+        kept_lens = [
+            line for line in lens
+            if "事件｜" not in str(line) and not str(line).startswith("觀察角度：")
+        ]
+        if lens_event:
+            lens = [lens_event] + kept_lens
+        else:
+            lens = kept_lens
+        lens = lens[:MAX_EXEC_SIGNALS]
 
     return {
         "date": date,
@@ -759,6 +1052,7 @@ def build_brief(root, evidence, previous):
         "_selection": {
             "selected": [item["instrument"] for item in selected],
             "excluded": [item["instrument"] for item in excluded],
+            "events": [packet["eventId"] for packet in event_packets],
         },
     }
 
@@ -790,6 +1084,7 @@ def main(argv):
     print("instruments=" + ",".join(sorted(evidence.keys())))
     print("selected=" + ",".join(selection.get("selected") or []))
     print("excluded=" + ",".join(selection.get("excluded") or []))
+    print("events=" + ",".join(selection.get("events") or []))
     return 0
 
 
