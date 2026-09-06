@@ -1,6 +1,4 @@
-# Phase 2 Sprint 004 — News Dedup & Event Linking Acceptance Cases
-
-This Sprint delivers **SPEC + acceptance cases only**. There is no Dedup engine and no production News / Event store.
+# Phase 2 Sprint 004 — News Dedup & Event Linking
 
 SPEC:
 
@@ -8,25 +6,27 @@ SPEC:
 docs/Phase 2 Sprint 004 News Dedup & Event Linking SPEC.md
 ```
 
-Cases:
+Engine:
 
-- `tests/fixtures/p2-004-case-a-same-event.json`
-- `tests/fixtures/p2-004-case-b-related-event.json`
-- `tests/fixtures/p2-004-case-c-separate-event.json`
-- `tests/fixtures/p2-004-case-d-same-subject-different-event.json`
-- `tests/fixtures/p2-004-case-e-same-event-different-wording.json`
-- `tests/fixtures/p2-004-case-f-same-subject-new-information.json`
-- `tests/fixtures/p2-004-news-dedup-event-linking.json`
+```
+python scripts/link-news-events.py --input tests/fixtures/p2-004-case-a-same-event.json
+```
 
-| Case | Relation | Event refs |
-|---|---|---|
-| A | Same Event | A and B → Event-001 |
-| B | Related Event | Event-001 ≠ Event-002 |
-| C | Separate Event | Event-001 ≠ Event-002 |
-| D | Separate Event | same subject + same date, still not merged |
-| E | Same Event | titles differ; core fact matches |
-| F | Related Event | announce ≠ complete |
+The engine prints relations and canonical `eventRef` values. It does not write Brief, Queue, Research Cards, or Decisions. It does not use title similarity.
 
-TEST 42–52 are defined in the SPEC. They are not executed in this Sprint because no implementation exists yet.
+Run acceptance + regression:
 
-News Dedup must not use `briefDedupText` or 031-B `(title, researchId)` presentation dedup.
+```
+powershell -File tests/p2-004-news-dedup-event-linking.ps1
+```
+
+| Case | Relation |
+|---|---|
+| A | Same Event |
+| B | Related Event |
+| C | Separate Event |
+| D | Separate Event |
+| E | Same Event |
+| F | Related Event |
+
+Event identity is a deterministic canonical key from event type, entities, and event state. It is not `Event-001` by execution order.
