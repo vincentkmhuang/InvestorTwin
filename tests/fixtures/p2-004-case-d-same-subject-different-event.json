@@ -1,0 +1,57 @@
+{
+  "id": "p2-004-case-d",
+  "sprint": "Phase 2 Sprint 004",
+  "case": "D",
+  "label": "Same subject + same date, two different NVIDIA corporate actions",
+  "relation": "Separate Event",
+  "newsA": {
+    "id": "news-a",
+    "source": "NVIDIA Official Blog",
+    "title": "NVIDIA to Acquire Hugging Face",
+    "publishedTime": "2026-09-03",
+    "url": "https://blogs.nvidia.com/blog/nvidia-to-acquire-hugging-face/",
+    "summary": "NVIDIA has agreed to acquire Hugging Face.",
+    "subject": "NVIDIA",
+    "eventRef": "Event-001"
+  },
+  "newsB": {
+    "id": "news-b",
+    "source": "Acceptance Fixture",
+    "title": "NVIDIA announces a separate manufacturing partnership",
+    "publishedTime": "2026-09-03",
+    "url": null,
+    "summary": "On the same day, NVIDIA announced a separate manufacturing partnership. This is a different corporate action from the Hugging Face acquisition.",
+    "subject": "NVIDIA",
+    "eventRef": "Event-002"
+  },
+  "eventA": {
+    "eventId": "Event-001",
+    "what": "NVIDIA announces acquisition of Hugging Face",
+    "when": "2026-09-03",
+    "subject": "NVIDIA",
+    "eventType": "Corporate Action",
+    "newsRefs": ["news-a"]
+  },
+  "eventB": {
+    "eventId": "Event-002",
+    "what": "NVIDIA announces a separate manufacturing partnership",
+    "when": "2026-09-03",
+    "subject": "NVIDIA",
+    "eventType": "Corporate Action",
+    "newsRefs": ["news-b"]
+  },
+  "reason": "Subject and publishedTime match, but core fact does not. Same subject + same date must not imply Same Event.",
+  "expected": {
+    "relation": "Separate Event",
+    "eventRefA": "Event-001",
+    "eventRefB": "Event-002",
+    "sameSubject": true,
+    "sameDate": true,
+    "mergesEvents": false,
+    "titleSimilarityMustNotDecide": true,
+    "writesResearchQueue": false,
+    "createsResearchCard": false,
+    "createsDecision": false,
+    "buySellRecommendation": null
+  }
+}

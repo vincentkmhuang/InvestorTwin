@@ -1,0 +1,50 @@
+{
+  "id": "p2-004-case-e",
+  "sprint": "Phase 2 Sprint 004",
+  "case": "E",
+  "label": "Same Event — titles differ, core fact is the same acquisition",
+  "relation": "Same Event",
+  "eventId": "Event-001",
+  "newsA": {
+    "id": "news-a",
+    "source": "NVIDIA Official Blog",
+    "title": "NVIDIA to Acquire Hugging Face",
+    "publishedTime": "2026-09-03",
+    "url": "https://blogs.nvidia.com/blog/nvidia-to-acquire-hugging-face/",
+    "summary": "NVIDIA has agreed to acquire Hugging Face for $12,930,300,000.",
+    "subject": "NVIDIA / Hugging Face",
+    "eventRef": "Event-001"
+  },
+  "newsB": {
+    "id": "news-b",
+    "source": "Acceptance Fixture",
+    "title": "Hugging Face will become part of Jensen Huang’s open-model home",
+    "publishedTime": "2026-09-03",
+    "url": null,
+    "summary": "Hugging Face has agreed to a $12,930,300,000 transaction in which NVIDIA acquires the company. Hugging Face remains an open platform.",
+    "subject": "NVIDIA / Hugging Face",
+    "eventRef": "Event-001"
+  },
+  "event": {
+    "eventId": "Event-001",
+    "what": "NVIDIA announces acquisition of Hugging Face",
+    "when": "2026-09-03",
+    "subject": "NVIDIA / Hugging Face",
+    "eventType": "Corporate Action",
+    "newsRefs": ["news-a", "news-b"]
+  },
+  "reason": "Titles do not match. Subject, event type, event time, and core fact (NVIDIA acquires Hugging Face) do match. Title similarity must not be required.",
+  "expected": {
+    "relation": "Same Event",
+    "eventRefA": "Event-001",
+    "eventRefB": "Event-001",
+    "titlesMatch": false,
+    "titleSimilarityOnlyWouldFail": true,
+    "preservesNewsA": true,
+    "preservesNewsB": true,
+    "writesResearchQueue": false,
+    "createsResearchCard": false,
+    "createsDecision": false,
+    "buySellRecommendation": null
+  }
+}

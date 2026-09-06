@@ -1,0 +1,58 @@
+{
+  "id": "p2-004-case-b",
+  "sprint": "Phase 2 Sprint 004",
+  "case": "B",
+  "label": "Related Event — acquisition announced vs regulators begin review",
+  "relation": "Related Event",
+  "newsA": {
+    "id": "news-a",
+    "source": "NVIDIA Official Blog",
+    "title": "NVIDIA to Acquire Hugging Face",
+    "publishedTime": "2026-09-03",
+    "url": "https://blogs.nvidia.com/blog/nvidia-to-acquire-hugging-face/",
+    "summary": "NVIDIA has agreed to acquire Hugging Face.",
+    "subject": "NVIDIA / Hugging Face",
+    "eventRef": "Event-001"
+  },
+  "newsB": {
+    "id": "news-b",
+    "source": "Acceptance Fixture",
+    "title": "Regulators begin reviewing NVIDIA / Hugging Face deal",
+    "publishedTime": "2026-09-10",
+    "url": null,
+    "summary": "Regulators have begun reviewing the NVIDIA agreement to acquire Hugging Face. This is a new process step, not a second report of the original announcement.",
+    "subject": "NVIDIA / Hugging Face",
+    "eventRef": "Event-002"
+  },
+  "eventA": {
+    "eventId": "Event-001",
+    "what": "NVIDIA announces acquisition of Hugging Face",
+    "when": "2026-09-03",
+    "subject": "NVIDIA / Hugging Face",
+    "eventType": "Corporate Action",
+    "newsRefs": ["news-a"],
+    "relatedEventRefs": ["Event-002"]
+  },
+  "eventB": {
+    "eventId": "Event-002",
+    "what": "Regulators begin reviewing the NVIDIA / Hugging Face acquisition",
+    "when": "2026-09-10",
+    "subject": "NVIDIA / Hugging Face",
+    "eventType": "Corporate Action",
+    "newsRefs": ["news-b"],
+    "relatedEventRefs": ["Event-001"]
+  },
+  "reason": "Shared subject and the same deal, but B is a new event state (review begins). Core fact is not the announcement itself.",
+  "expected": {
+    "relation": "Related Event",
+    "eventRefA": "Event-001",
+    "eventRefB": "Event-002",
+    "preservesNewsA": true,
+    "preservesNewsB": true,
+    "mergesEvents": false,
+    "writesResearchQueue": false,
+    "createsResearchCard": false,
+    "createsDecision": false,
+    "buySellRecommendation": null
+  }
+}

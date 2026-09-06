@@ -1,0 +1,47 @@
+{
+  "sprint": "Phase 2 Sprint 004",
+  "spec": "docs/Phase 2 Sprint 004 News Dedup & Event Linking SPEC.md",
+  "handbook": "docs/Investor Twin Handbook V2.0.md",
+  "priorSpec": "docs/Phase 2 Sprint 001 News Intelligence Foundation SPEC.md",
+  "implementation": null,
+  "cases": [
+    "p2-004-case-a-same-event.json",
+    "p2-004-case-b-related-event.json",
+    "p2-004-case-c-separate-event.json",
+    "p2-004-case-d-same-subject-different-event.json",
+    "p2-004-case-e-same-event-different-wording.json",
+    "p2-004-case-f-same-subject-new-information.json"
+  ],
+  "relations": ["Same Event", "Related Event", "Separate Event"],
+  "requiredJudgmentKeys": [
+    "subject",
+    "eventType",
+    "eventTime",
+    "coreFact",
+    "newInformation"
+  ],
+  "forbiddenRules": [
+    "title similarity only",
+    "same subject + same date = Same Event",
+    "delete original News after linking",
+    "treat briefDedupText as News Dedup",
+    "treat 031-B (title, researchId) as News Dedup"
+  ],
+  "forbiddenProductionPaths": [
+    "data/news/",
+    "data/events/"
+  ],
+  "tests": [
+    "TEST 42",
+    "TEST 43",
+    "TEST 44",
+    "TEST 45",
+    "TEST 46",
+    "TEST 47",
+    "TEST 48",
+    "TEST 49",
+    "TEST 50",
+    "TEST 51",
+    "TEST 52"
+  ]
+}

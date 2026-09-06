@@ -1,0 +1,51 @@
+{
+  "id": "p2-004-case-a",
+  "sprint": "Phase 2 Sprint 004",
+  "case": "A",
+  "label": "Same Event — NVIDIA Official + Reuters, Hugging Face acquisition",
+  "relation": "Same Event",
+  "eventId": "Event-001",
+  "newsA": {
+    "id": "news-a",
+    "source": "NVIDIA Official Blog",
+    "title": "NVIDIA to Acquire Hugging Face",
+    "publishedTime": "2026-09-03",
+    "url": "https://blogs.nvidia.com/blog/nvidia-to-acquire-hugging-face/",
+    "summary": "NVIDIA has agreed to acquire Hugging Face. Together, we will scale Hugging Face’s platform, strengthen its infrastructure and expand access to AI for developers and institutions worldwide.",
+    "subject": "NVIDIA / Hugging Face",
+    "eventRef": "Event-001"
+  },
+  "newsB": {
+    "id": "news-b",
+    "source": "Reuters",
+    "title": "NVIDIA to acquire Hugging Face",
+    "publishedTime": "2026-09-03",
+    "url": null,
+    "summary": "NVIDIA said it will acquire Hugging Face. The report describes the same announced acquisition as the NVIDIA official blog.",
+    "subject": "NVIDIA / Hugging Face",
+    "eventRef": "Event-001"
+  },
+  "event": {
+    "eventId": "Event-001",
+    "what": "NVIDIA announces acquisition of Hugging Face",
+    "when": "2026-09-03",
+    "subject": "NVIDIA / Hugging Face",
+    "eventType": "Corporate Action",
+    "newsRefs": ["news-a", "news-b"]
+  },
+  "reason": "Same subject, same event type, same event time, same core fact (announce acquisition). News B adds no new event state.",
+  "expected": {
+    "relation": "Same Event",
+    "eventRefA": "Event-001",
+    "eventRefB": "Event-001",
+    "preservesNewsA": true,
+    "preservesNewsB": true,
+    "sourceA": "NVIDIA Official Blog",
+    "sourceB": "Reuters",
+    "mergesEvents": true,
+    "writesResearchQueue": false,
+    "createsResearchCard": false,
+    "createsDecision": false,
+    "buySellRecommendation": null
+  }
+}
