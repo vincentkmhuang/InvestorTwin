@@ -12,7 +12,7 @@
     {
       "sourceId": "fsc-press-rss",
       "label": "FSC 金管會新聞稿 RSS",
-      "enabled": false,
+      "enabled": true,
       "adapter": "collect-fsc-press-rss.py",
       "feedUrl": "https://www.fsc.gov.tw/RSS/Messages?serno=201202290009&language=chinese"
     },
