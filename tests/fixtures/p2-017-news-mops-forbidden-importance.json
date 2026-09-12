@@ -1,0 +1,14 @@
+{
+  "fixture": true,
+  "fixtureNote": "FIXTURE ONLY — must fail Collect contract because importance is forbidden.",
+  "source": "MOPS 重大訊息 OpenAPI",
+  "title": "[FIXTURE] 上市測試重大訊息甲僅供單元測試",
+  "publishedTime": "2026-09-11T13:58:44Z",
+  "url": "https://mops.twse.com.tw/material/listed/1721/1150911/135844/aaaaaaaaaaaaaaaa",
+  "summary": "[FIXTURE] 虛構說明：上市重大訊息摘要，僅供 contract 測試。",
+  "subject": "[上市] [1721] [三公司]",
+  "eventRef": null,
+  "id": "https://mops.twse.com.tw/material/listed/1721/1150911/135844/aaaaaaaaaaaaaaaa",
+  "sourceId": "mops-material-openapi",
+  "importance": 5
+}
