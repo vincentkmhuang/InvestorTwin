@@ -1,13 +1,53 @@
 {
   "schemaVersion": "1.0",
-  "description": "Template only — runtime bootstrap-state.json is gitignored. Written by scripts/bootstrap-fsc-press-seen.py after a successful seen-only snapshot.",
-  "sourceId": "fsc-press-rss",
+  "description": "Template only — runtime bootstrap-state.json is gitignored. Written by seen-only bootstrap scripts (FSC / TWSE / MOPS). New writers merge into bySource while preserving prior source entries (including legacy flat FSC shape).",
   "mode": "seen-only",
+  "lastSourceId": "mops-material-openapi",
   "completedAt": "ISO-8601",
+  "sourceId": "mops-material-openapi",
   "seededCount": 0,
   "alreadySeenCount": 0,
   "fetchedCount": 0,
-  "feedUrl": "https://www.fsc.gov.tw/RSS/Messages?serno=201202290009&language=chinese",
+  "feedUrl": "https://openapi.twse.com.tw/v1/opendata/t187ap04_L",
+  "otcUrl": "http://www.tpex.org.tw/openapi/v1/mopsfin_t187ap04_O",
   "normalizedCount": 0,
-  "integrateCount": 0
+  "integrateCount": 0,
+  "bySource": {
+    "fsc-press-rss": {
+      "schemaVersion": "1.0",
+      "sourceId": "fsc-press-rss",
+      "mode": "seen-only",
+      "completedAt": "ISO-8601",
+      "seededCount": 0,
+      "fetchedCount": 0,
+      "feedUrl": "https://www.fsc.gov.tw/RSS/Messages?serno=201202290009&language=chinese",
+      "normalizedCount": 0,
+      "integrateCount": 0
+    },
+    "twse-news-openapi": {
+      "schemaVersion": "1.0",
+      "sourceId": "twse-news-openapi",
+      "mode": "seen-only",
+      "completedAt": "ISO-8601",
+      "seededCount": 0,
+      "fetchedCount": 0,
+      "feedUrl": "https://openapi.twse.com.tw/v1/news/newsList",
+      "normalizedCount": 0,
+      "integrateCount": 0
+    },
+    "mops-material-openapi": {
+      "schemaVersion": "1.0",
+      "sourceId": "mops-material-openapi",
+      "mode": "seen-only",
+      "completedAt": "ISO-8601",
+      "seededCount": 0,
+      "fetchedCount": 0,
+      "listedCount": 0,
+      "otcCount": 0,
+      "feedUrl": "https://openapi.twse.com.tw/v1/opendata/t187ap04_L",
+      "otcUrl": "http://www.tpex.org.tw/openapi/v1/mopsfin_t187ap04_O",
+      "normalizedCount": 0,
+      "integrateCount": 0
+    }
+  }
 }
