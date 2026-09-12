@@ -12,6 +12,7 @@
     "sources.json",
     "seen.example.json",
     "pipeline-seen.example.json",
+    "bootstrap-state.example.json",
     "history/by-url/index.example.json",
     "history/by-url/.gitkeep",
     "runs/.gitkeep",
@@ -20,6 +21,7 @@
   "runtimeGitignored": [
     "seen.json",
     "pipeline-seen.json",
+    "bootstrap-state.json",
     "history/by-url/index.json",
     "runs/run-*/"
   ]

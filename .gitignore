@@ -12,3 +12,4 @@ data/news/runs/run-*/
 
 # Pipeline-layer urls already sent to integrate (local runtime)
 data/news/pipeline-seen.json
+data/news/bootstrap-state.json

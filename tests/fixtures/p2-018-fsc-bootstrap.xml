@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  FIXTURE ONLY — fictional FSC-shaped RSS for p2-018 bootstrap tests.
+  NOT real FSC news.
+-->
+<rss version="2.0">
+  <channel>
+    <title>[FIXTURE] FSC bootstrap feed</title>
+    <link>https://www.fsc.gov.tw/</link>
+    <description>p2-018 bootstrap fixture</description>
+    <item>
+      <title><![CDATA[[FIXTURE] Bootstrap item A]]></title>
+      <pubDate>Fri, 11 Sep 2026 00:00:00 GMT</pubDate>
+      <link><![CDATA[https://www.fsc.gov.tw/ch/home.jsp?id=96&amp;parentpath=0,2&amp;mcustomize=news_view.jsp&amp;dataserno=fixtureBootA001&amp;dtable=News]]></link>
+      <guid isPermaLink="true"><![CDATA[https://www.fsc.gov.tw/ch/home.jsp?id=96&amp;parentpath=0,2&amp;mcustomize=news_view.jsp&amp;dataserno=fixtureBootA001&amp;dtable=News]]></guid>
+      <description><![CDATA[[FIXTURE] summary A]]></description>
+    </item>
+    <item>
+      <title><![CDATA[[FIXTURE] Bootstrap item B]]></title>
+      <pubDate>Thu, 10 Sep 2026 00:00:00 GMT</pubDate>
+      <link><![CDATA[https://www.fsc.gov.tw/ch/home.jsp?id=96&amp;parentpath=0,2&amp;mcustomize=news_view.jsp&amp;dataserno=fixtureBootB002&amp;dtable=News]]></link>
+      <guid isPermaLink="true"><![CDATA[https://www.fsc.gov.tw/ch/home.jsp?id=96&amp;parentpath=0,2&amp;mcustomize=news_view.jsp&amp;dataserno=fixtureBootB002&amp;dtable=News]]></guid>
+      <description><![CDATA[[FIXTURE] summary B]]></description>
+    </item>
+  </channel>
+</rss>

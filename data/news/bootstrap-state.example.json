@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1.0",
+  "description": "Template only — runtime bootstrap-state.json is gitignored. Written by scripts/bootstrap-fsc-press-seen.py after a successful seen-only snapshot.",
+  "sourceId": "fsc-press-rss",
+  "mode": "seen-only",
+  "completedAt": "ISO-8601",
+  "seededCount": 0,
+  "alreadySeenCount": 0,
+  "fetchedCount": 0,
+  "feedUrl": "https://www.fsc.gov.tw/RSS/Messages?serno=201202290009&language=chinese",
+  "normalizedCount": 0,
+  "integrateCount": 0
+}
