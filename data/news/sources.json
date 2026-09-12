@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "description": "News Collect Foundation source registry. CNA enabled by default; FSC adapter registered (enable when ready).",
+  "description": "News Collect Foundation source registry. CNA enabled by default; FSC/TWSE adapters registered (enable when ready).",
   "sources": [
     {
       "sourceId": "cna-finance-rss",
@@ -15,6 +15,13 @@
       "enabled": false,
       "adapter": "collect-fsc-press-rss.py",
       "feedUrl": "https://www.fsc.gov.tw/RSS/Messages?serno=201202290009&language=chinese"
+    },
+    {
+      "sourceId": "twse-news-openapi",
+      "label": "TWSE 證交所新聞 OpenAPI",
+      "enabled": false,
+      "adapter": "collect-twse-news-openapi.py",
+      "feedUrl": "https://openapi.twse.com.tw/v1/news/newsList"
     }
   ]
 }

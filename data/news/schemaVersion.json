@@ -4,7 +4,7 @@
   "description": "Local-first News Collect store (News Collect Foundation v1). Not an Event DB.",
   "newsObjectContract": "data/news/news-object-v1.contract.json",
   "sourceIdV1": "cna-finance-rss",
-  "sourceIds": ["cna-finance-rss", "fsc-press-rss"],
+  "sourceIds": ["cna-finance-rss", "fsc-press-rss", "twse-news-openapi"],
   "validation": "scripts/news-object-contract.py (reuses evaluate-news-intelligence.validate_news_object)",
   "committed": [
     "schemaVersion.json",

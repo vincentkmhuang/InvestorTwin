@@ -1,0 +1,13 @@
+{
+  "fixture": true,
+  "fixtureNote": "FIXTURE ONLY — fictional test News Object. Not real TWSE news.",
+  "source": "TWSE 證交所新聞 OpenAPI",
+  "title": "[FIXTURE] TWSE 測試新聞甲僅供單元測試",
+  "publishedTime": "2026-09-11T00:00:00Z",
+  "url": "https://www.twse.com.tw/zh/about/news/news/content.html?fixture-twse-20260911a001",
+  "summary": "[FIXTURE] TWSE 測試新聞甲僅供單元測試",
+  "subject": null,
+  "eventRef": null,
+  "id": "https://www.twse.com.tw/zh/about/news/news/content.html?fixture-twse-20260911a001",
+  "sourceId": "twse-news-openapi"
+}

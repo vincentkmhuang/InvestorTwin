@@ -135,14 +135,17 @@ def strip_collect_meta_for_integrate(news_list):
 ADAPTER_BY_SOURCE = {
     "cna-finance-rss": ("collect-cna-finance-rss.py", "collect_cna_finance_rss"),
     "fsc-press-rss": ("collect-fsc-press-rss.py", "collect_fsc_press_rss"),
+    "twse-news-openapi": ("collect-twse-news-openapi.py", "collect_twse_news_openapi"),
 }
 
 
 def fixture_applies_to_source(source_id, fixture_path):
-    """Fixture files are adapter-specific; do not feed a CNA fixture into FSC (and vice versa)."""
+    """Fixture files are adapter-specific; do not cross-feed CNA/FSC/TWSE fixtures."""
     if not fixture_path:
         return True
     name = os.path.basename(str(fixture_path)).lower()
+    if "twse" in name:
+        return source_id == "twse-news-openapi"
     if "fsc" in name:
         return source_id == "fsc-press-rss"
     if "cna" in name:
