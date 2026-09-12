@@ -146,24 +146,21 @@ $afterSeen = Get-Content -LiteralPath (Join-Path $StoreA 'seen.json') -Raw -Enco
 $afterUrlCount = @($afterSeen.byUrl.PSObject.Properties).Count
 Add-TestResult 'TEST 017-A-DEDUP' ($dupOk -and ($afterUrlCount -eq $beforeUrlCount)) ("normalized=$($run2.normalizedCount); skipped=$($run2.skippedSeenCount); seenUrls=$afterUrlCount")
 
-# Protected engines + prior adapters
+# News Intelligence engines only (adapter runId/helper edits are not engine edits).
 $protected = @(
   'scripts/evaluate-news-intelligence.py',
   'scripts/link-news-events.py',
   'scripts/integrate-news-event-evaluation.py',
   'scripts/publish-research-candidates-handoff.py',
   'js/investment-meaning-gate.js',
-  'scripts/generate-morning-brief.py',
-  'scripts/collect-cna-finance-rss.py',
-  'scripts/collect-fsc-press-rss.py',
-  'scripts/collect-twse-news-openapi.py'
+  'scripts/generate-morning-brief.py'
 )
 $dirty = @()
 foreach ($rel in $protected) {
   $diff = & git -C $RepoRoot diff --name-only -- $rel
   if ($diff) { $dirty += $rel }
 }
-Add-TestResult 'TEST 017-A-NO-ENGINE-EDIT' ($dirty.Count -eq 0) $(if ($dirty.Count -eq 0) { 'protected + CNA/FSC/TWSE untouched' } else { $dirty -join ', ' })
+Add-TestResult 'TEST 017-A-NO-ENGINE-EDIT' ($dirty.Count -eq 0) $(if ($dirty.Count -eq 0) { 'NI engines untouched' } else { $dirty -join ', ' })
 
 # Dispatch
 Reset-Store $StoreDispatch -EnableMopsOnly

@@ -42,8 +42,15 @@ def utc_now_iso():
 
 
 def make_run_id(when=None):
-    dt = when or datetime.now(timezone.utc)
-    return "run-" + dt.strftime("%Y%m%dT%H%M%SZ")
+    # Shared helper: millisecond stamp + process sequence (avoids same-second collisions).
+    mod = sys.modules.get("news_collect_run_id")
+    if mod is None:
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "news-collect-run-id.py")
+        spec = importlib.util.spec_from_file_location("news_collect_run_id", path)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules["news_collect_run_id"] = mod
+        spec.loader.exec_module(mod)
+    return mod.make_run_id(when)
 
 
 def load_contract_module():

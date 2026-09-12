@@ -3,7 +3,7 @@
   "kind": "news-collect-run",
   "description": "Template only — Adapter writes real run.json under runs/run-*/. Not used at runtime.",
   "fields": {
-    "runId": "run-YYYYMMDDTHHMMSSZ",
+    "runId": "run-YYYYMMDDTHHMMSSmmmZ-NNNN",
     "sourceId": "cna-finance-rss",
     "startedAt": "ISO-8601",
     "finishedAt": "ISO-8601",
