@@ -20,6 +20,7 @@ async function init() {
     await WorkflowEngine.loadResearch(id);
   }
 
+  await bindMorningBriefPage();
   await bindTodayWorkspaceFromMorningBrief();
   await loadExplorerCardIds();
   renderKnowledgeExplorer();
@@ -34,13 +35,89 @@ async function init() {
   }
 }
 
-async function bindTodayWorkspaceFromMorningBrief() {
-  await DataEngine.loadMorningBrief();
+async function bindMorningBriefPage() {
+  // Default home: Morning Brief via existing DataEngine renderer (no second Brief system).
+  try { await DataEngine.loadMorningBrief(); } catch (_) {}
   await DataEngine.renderMorningBrief(openMorningBriefResearch);
-  // Sprint 008: derived Candidate Attention from handoff + ledger (display only).
-  const attentionEl = document.getElementById('morningCandidateAttention');
-  if (attentionEl && typeof CandidateGate !== 'undefined') {
-    await CandidateGate.renderAttention(attentionEl);
+}
+
+async function bindTodayWorkspaceFromMorningBrief() {
+  // Today V2: do not render Morning Brief dumps on Today (market temperature / news / highlights).
+  // Brief data may still load for shared state; generator / schema untouched.
+  try { await DataEngine.loadMorningBrief(); } catch (_) {}
+  await renderTodayMeaningChanges();
+  const watchEl = document.getElementById('todayInvestorWatch');
+  if (watchEl && typeof InvestorWatch !== 'undefined') {
+    await InvestorWatch.render(watchEl);
+  }
+  const checkEl = document.getElementById('todayInvestmentCheck');
+  if (checkEl && typeof InvestmentCheck !== 'undefined') {
+    await InvestmentCheck.render(checkEl);
+  }
+  await renderTodayQueueStrip();
+  const openQueueBtn = document.getElementById('todayQueueOpenBtn');
+  if (openQueueBtn) {
+    openQueueBtn.onclick = () => showPage('queue');
+  }
+}
+
+async function renderTodayMeaningChanges() {
+  const listEl = document.getElementById('morningCandidateAttention');
+  const emptyEl = document.getElementById('todayMeaningEmpty');
+  if (!listEl) return;
+  if (typeof CandidateGate === 'undefined') {
+    if (emptyEl) emptyEl.style.display = 'block';
+    return;
+  }
+  await CandidateGate.load();
+  // Investment Meaning Gate: do not show merely because Candidate is Pending/Watching.
+  const items = typeof CandidateGate.attentionCandidatesForToday === 'function'
+    ? await CandidateGate.attentionCandidatesForToday()
+    : [];
+  if (!items.length) {
+    listEl.innerHTML = '';
+    if (emptyEl) emptyEl.style.display = 'block';
+    return;
+  }
+  if (emptyEl) emptyEl.style.display = 'none';
+  await CandidateGate.renderAttention(listEl);
+}
+
+async function renderTodayQueueStrip() {
+  const listEl = document.getElementById('todayQueueList');
+  if (!listEl || typeof WorkflowEngine === 'undefined') return;
+  listEl.innerHTML = '';
+  const ids = WorkflowEngine.getQueueIds();
+  if (!ids.length) {
+    const li = document.createElement('li');
+    li.className = 'today-queue-empty muted';
+    li.textContent = '研究佇列目前是空的。當 Investor Watch 或投資意義變化值得正式研究時，再加入既有 Queue。';
+    li.style.cursor = 'default';
+    listEl.appendChild(li);
+    return;
+  }
+  for (const q of ids) {
+    if (!WorkflowEngine.researchCache[q]) {
+      try { await WorkflowEngine.loadResearch(q); } catch (_) {}
+    }
+    const li = document.createElement('li');
+    const candidateLabel = typeof CandidateGate !== 'undefined'
+      ? CandidateGate.queueDisplayLabel(q)
+      : null;
+    const queueItem = WorkflowEngine.queue?.items?.find(item => item.id === q);
+    const fromCandidate = queueItem?.addedFrom === 'Research Candidate';
+    const fromWatch = queueItem?.addedFrom === 'Investor Watch';
+    li.textContent = (fromCandidate && candidateLabel)
+      ? candidateLabel
+      : (fromWatch ? `[Watch] ${WorkflowEngine.cardTitle(q)}` : WorkflowEngine.cardTitle(q));
+    li.onclick = () => {
+      showPage('cards', { skipHash: true });
+      openResearchCard(q, document.getElementById('card'), {
+        resetPath: true,
+        fromPage: 'today'
+      });
+    };
+    listEl.appendChild(li);
   }
 }
 
@@ -68,10 +145,21 @@ async function loadVersionInfo() {
 
 function showPage(id, options) {
   document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
-  document.getElementById(id).style.display = 'block';
-  document.getElementById('title').textContent = id === 'today'
-    ? '今日工作台'
-    : document.querySelector('[onclick="showPage(\'' + id + '\')"]').textContent.trim();
+  const pageEl = document.getElementById(id);
+  if (pageEl) pageEl.style.display = (id === 'brief') ? 'grid' : 'block';
+  const titleEl = document.getElementById('title');
+  if (titleEl) {
+    if (id === 'brief') titleEl.textContent = 'Morning Brief';
+    else if (id === 'today') titleEl.textContent = '今日工作台';
+    else {
+      const nav = document.querySelector('[onclick="showPage(\'' + id + '\')"]');
+      titleEl.textContent = nav ? nav.textContent.trim() : id;
+    }
+  }
+  document.querySelectorAll('aside .nav').forEach(nav => {
+    const onclick = nav.getAttribute('onclick') || '';
+    nav.classList.toggle('active', onclick.indexOf("showPage('" + id + "')") >= 0);
+  });
   const skipHash = options?.skipHash === true || skipNextViewHash;
   skipNextViewHash = false;
   if (skipHash) return;
@@ -150,7 +238,8 @@ function pushViewHash(page, contentId) {
 
 function parseViewHash() {
   const raw = hashPath();
-  if (!raw || raw === 'today') return { page: 'today' };
+  if (!raw || raw === 'brief') return { page: 'brief' };
+  if (raw === 'today') return { page: 'today' };
 
   if (raw.startsWith('case/')) {
     return { page: 'cases', caseId: decodeHashSegment(raw.slice('case/'.length)) };
@@ -162,9 +251,9 @@ function parseViewHash() {
     return { page: 'knowledge', knowledgeKey: decodeHashSegment(raw.slice('knowledge/'.length)) };
   }
 
-  const pages = ['today', 'queue', 'cards', 'cases', 'knowledge', 'sources', 'portfolio'];
+  const pages = ['brief', 'today', 'queue', 'cards', 'cases', 'knowledge', 'sources', 'portfolio'];
   if (pages.includes(raw)) return { page: raw };
-  return { page: 'today' };
+  return { page: 'brief' };
 }
 
 async function restoreViewFromHash() {
@@ -200,7 +289,7 @@ async function restoreViewFromHash() {
       });
       return;
     }
-    showPage(view.page || 'today');
+    showPage(view.page || 'brief');
     if (view.page === 'cards' && !view.researchId) {
       const cardEl = document.getElementById('card');
       if (cardEl) cardEl.textContent = '請選擇研究卡';
@@ -593,6 +682,8 @@ async function render() {
   if (radarEl) {
     DataEngine.renderOpportunityRadar(radarEl, openFromOpportunityRadar);
   }
+  try { await renderTodayQueueStrip(); } catch (_) {}
+  try { await renderTodayMeaningChanges(); } catch (_) {}
   renderCaseList();
 }
 

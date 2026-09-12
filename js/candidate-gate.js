@@ -141,6 +141,23 @@ const CandidateGate = {
     return rows.filter(item => this.isAttentionStatus(item?.status || 'Pending'));
   },
 
+  /**
+   * Today entry: eligible attention status AND Investment Meaning Gate passed.
+   * Do not use eligible + Pending/Watching alone.
+   */
+  async attentionCandidatesForToday() {
+    if (!this.candidates.length) {
+      await this.load();
+    }
+    const base = this.attentionCandidates();
+    if (typeof InvestmentMeaningGate === 'undefined') {
+      // Fail closed: without Meaning Gate, do not dump Candidates into Today.
+      return [];
+    }
+    const ctx = await InvestmentMeaningGate.buildContext();
+    return InvestmentMeaningGate.filterForToday(base, ctx);
+  },
+
   goToHumanGate() {
     if (typeof showPage === 'function') {
       showPage('queue');
@@ -151,50 +168,169 @@ const CandidateGate = {
     }
   },
 
-  // Display/attention only — never POST Gate actions from Brief/Today.
-  // Sprint 010: compact scan card — question primary; details secondary.
+  // Display/attention only — never POST Gate disposition from Today.
+  // Today V2: up to 3 investment-meaning change cards with Watch / Check / Research next steps.
   async renderAttention(container) {
     if (!container) return;
     if (!this.candidates.length) {
       await this.load();
     }
-    const items = this.attentionCandidates();
+    const items = (await this.attentionCandidatesForToday()).slice(0, 3);
     if (!items.length) {
-      container.innerHTML = '<p class="candidate-gate-empty" data-candidate-attention-empty="1">目前沒有待注意的 Research Candidate。</p>';
+      container.innerHTML = '';
       return;
     }
-    container.innerHTML = items.map(candidate => {
-      const status = candidate.status || 'Pending';
-      const question = candidate.researchQuestion || '--';
-      const evidence = this.evidenceLines(candidate)
-        .slice(0, 2)
-        .map(item => `<li data-attention-source="${this.escapeHtml(item.source)}" data-attention-news-ref="${this.escapeHtml(item.newsRef || '')}">` +
-          `${this.escapeHtml(item.source)}` +
-          (item.newsRef ? ` <span class="muted">(${this.escapeHtml(item.newsRef)})</span>` : '') +
-          `</li>`)
-        .join('');
-      const meta = [
-        `Status: ${this.escapeHtml(status)}`,
-        `Importance: ${this.escapeHtml(this.stars(candidate.importance))} (${this.escapeHtml(candidate.importance ?? '--')})`,
-        `Relevance: ${this.escapeHtml(candidate.relevance || '--')}`,
-        `Impact: ${this.escapeHtml(this.impactLabel(candidate.impact))}`
-      ].join(' · ');
-      return `<article class="candidate-attention-card candidate-attention-compact" data-attention-event-ref="${this.escapeHtml(candidate.eventRef || '')}" data-goto-queue="1">
-        <p class="candidate-attention-question" data-attention-research-question="${this.escapeHtml(question)}"><span class="sr-only">Research Question:</span>${this.escapeHtml(question)}</p>
-        <p class="candidate-attention-meta muted">${meta}</p>
-        <p class="candidate-attention-event muted">eventRef: <code data-attention-event-ref-text>${this.escapeHtml(candidate.eventRef || '--')}</code></p>
-        <ul class="candidate-attention-evidence muted" data-attention-evidence>${evidence || '<li>--</li>'}</ul>
-        <p class="candidate-attention-cta"><button type="button" data-goto-queue="1">前往 Human Gate</button></p>
-      </article>`;
-    }).join('');
+    container.innerHTML = items.map(candidate => this.meaningChangeCardHtml(candidate)).join('');
+    if (typeof InvestmentMeaningGate !== 'undefined') {
+      const recorded = await InvestmentMeaningGate.recordPassed(items);
+      if (recorded && recorded.ok === false) {
+        console.error(
+          '[CandidateGate] meaning-gate baseline persistence failed — Watching quiet rule will not work until POST /api/meaning-gate-state succeeds.',
+          recorded.error || recorded
+        );
+      }
+    }
+    container.querySelectorAll('[data-next-watch]').forEach(button => {
+      button.onclick = async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const eventRef = button.getAttribute('data-event-ref');
+        const candidate = this.candidates.find(row => String(row?.eventRef || '') === eventRef);
+        if (!candidate || typeof InvestorWatch === 'undefined') return;
+        const result = await InvestorWatch.addFromAttention(candidate);
+        if (result?.cancelled) return;
+        if (!result?.ok) {
+          window.alert(result?.message || '無法建立 Investor Watch');
+          return;
+        }
+        const watchEl = document.getElementById('todayInvestorWatch');
+        if (watchEl) await InvestorWatch.render(watchEl);
+      };
+    });
 
-    container.querySelectorAll('[data-goto-queue]').forEach(el => {
-      el.onclick = (event) => {
+    container.querySelectorAll('[data-next-check]').forEach(button => {
+      button.onclick = async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (button.disabled) return;
+        const eventRef = button.getAttribute('data-event-ref');
+        const candidate = this.candidates.find(row => String(row?.eventRef || '') === eventRef);
+        if (!candidate || typeof InvestmentCheck === 'undefined') return;
+        button.disabled = true;
+        try {
+          const result = await InvestmentCheck.createFromAttention(candidate);
+          if (result?.cancelled || result?.busy) return;
+          if (!result?.ok) {
+            window.alert(result?.message || '無法建立 Investment Check');
+            return;
+          }
+          const checkEl = document.getElementById('todayInvestmentCheck');
+          if (checkEl) await InvestmentCheck.render(checkEl);
+        } finally {
+          button.disabled = false;
+        }
+      };
+    });
+
+    container.querySelectorAll('[data-next-research]').forEach(button => {
+      button.onclick = (event) => {
         event.preventDefault();
         event.stopPropagation();
         this.goToHumanGate();
       };
     });
+  },
+
+  evidenceClassBlocks(candidate) {
+    const impact = candidate?.impact;
+    const status = impact && typeof impact === 'object' ? impact.evidenceStatus : null;
+    const classes = ['FACT', 'ESTIMATE', 'INFERENCE', 'UNKNOWN'];
+    if (!status || typeof status !== 'object') {
+      // Preserve honesty: do not invent claims; show structure with available evidenceRefs class.
+      const refs = Array.isArray(candidate?.evidenceRefs) ? candidate.evidenceRefs : [];
+      const byClass = { FACT: [], ESTIMATE: [], INFERENCE: [], UNKNOWN: [] };
+      for (const row of refs) {
+        const cls = String(row?.class || '').toUpperCase();
+        if (byClass[cls]) {
+          const claim = String(row?.claim || '').trim();
+          if (claim) byClass[cls].push(claim);
+        }
+      }
+      return classes.map(name => {
+        const claims = byClass[name];
+        const body = claims.length
+          ? claims.slice(0, 2).map(c => this.escapeHtml(c)).join('；')
+          : '—';
+        return `<li data-evidence-class="${name}"><span class="evidence-class-${name.toLowerCase()}">${name}</span>: ${body}</li>`;
+      }).join('');
+    }
+    return classes.map(name => {
+      const rows = Array.isArray(status[name]) ? status[name] : [];
+      const claims = rows
+        .map(row => String(row?.claim || '').trim())
+        .filter(Boolean)
+        .slice(0, 2);
+      const body = claims.length ? claims.map(c => this.escapeHtml(c)).join('；') : '—';
+      return `<li data-evidence-class="${name}"><span class="evidence-class-${name.toLowerCase()}">${name}</span>: ${body}</li>`;
+    }).join('');
+  },
+
+  unknownToVerify(candidate) {
+    const impact = candidate?.impact;
+    const status = impact && typeof impact === 'object' ? impact.evidenceStatus : null;
+    const unknowns = status && Array.isArray(status.UNKNOWN) ? status.UNKNOWN : [];
+    const claims = unknowns.map(row => String(row?.claim || '').trim()).filter(Boolean);
+    if (claims.length) return claims.slice(0, 2).join('；');
+    const refs = Array.isArray(candidate?.evidenceRefs) ? candidate.evidenceRefs : [];
+    const fromRefs = refs
+      .filter(row => String(row?.class || '').toUpperCase() === 'UNKNOWN')
+      .map(row => String(row?.claim || '').trim())
+      .filter(Boolean);
+    if (fromRefs.length) return fromRefs.slice(0, 2).join('；');
+    return '尚待 Human Gate 確認研究方向與 Evidence 缺口';
+  },
+
+  meaningChangeCardHtml(candidate) {
+    const status = candidate.status || 'Pending';
+    const title = candidate.researchQuestion || this.eventLabel(candidate) || '--';
+    const summary = candidate.relevanceBasis || candidate.reason || '投資意義可能變化；細節見 Evidence。';
+    const evidence = this.evidenceLines(candidate)
+      .slice(0, 3)
+      .map(item => `<li data-attention-source="${this.escapeHtml(item.source)}" data-attention-news-ref="${this.escapeHtml(item.newsRef || '')}">` +
+        `${this.escapeHtml(item.source)}` +
+        (item.newsRef ? ` <span class="muted">(${this.escapeHtml(item.newsRef)})</span>` : '') +
+        `</li>`)
+      .join('');
+    const relevance = [
+      candidate.relevance || '--',
+      this.impactLabel(candidate.impact)
+    ].join(' · ');
+    const gate = candidate.meaningGate || {};
+    const meaningBit = gate.meaningType
+      ? `Meaning: ${this.escapeHtml(gate.meaningType)}`
+      : 'Meaning: --';
+    const linkBit = Array.isArray(gate.personalLinks) && gate.personalLinks.length
+      ? `Relevance link: ${this.escapeHtml(gate.personalLinks.join(', '))}`
+      : '';
+    const eventRef = candidate.eventRef || '';
+    // Three next-step paths when we have a real attention candidate (do not invent extra cards).
+    return `<article class="candidate-attention-card candidate-attention-compact meaning-change-card" data-attention-event-ref="${this.escapeHtml(eventRef)}" data-meaning-gate-passed="1">
+      <p class="candidate-attention-question meaning-change-title" data-attention-research-question="${this.escapeHtml(title)}"><span class="sr-only">Title:</span>${this.escapeHtml(title)}</p>
+      <p class="meaning-change-summary">${this.escapeHtml(summary)}</p>
+      <p class="candidate-attention-meta muted"><b>Investment Relevance:</b> ${this.escapeHtml(relevance)} · ${meaningBit}${linkBit ? ' · ' + linkBit : ''} · Status: ${this.escapeHtml(status)} · Importance: ${this.escapeHtml(this.stars(candidate.importance))} (${this.escapeHtml(candidate.importance ?? '--')})</p>
+      <p class="muted"><b>Evidence / Sources:</b></p>
+      <ul class="candidate-attention-evidence muted" data-attention-evidence>${evidence || '<li>--</li>'}</ul>
+      <p class="muted"><b>FACT / ESTIMATE / INFERENCE / UNKNOWN:</b></p>
+      <ul class="meaning-change-classes muted">${this.evidenceClassBlocks(candidate)}</ul>
+      <p class="muted"><b>To be verified:</b> ${this.escapeHtml(this.unknownToVerify(candidate))}</p>
+      <p class="muted"><b>Next Step:</b> 選一條路徑（三者不要混用）</p>
+      <div class="meaning-change-next-steps">
+        <button type="button" data-next-watch="1" data-event-ref="${this.escapeHtml(eventRef)}">👁️ 幫我持續注意</button>
+        <button type="button" data-next-check="1" data-event-ref="${this.escapeHtml(eventRef)}">🔎 幫我檢查</button>
+        <button type="button" data-next-research="1" data-event-ref="${this.escapeHtml(eventRef)}">🔬 進一步研究</button>
+      </div>
+      <p class="candidate-attention-event muted">eventRef: <code data-attention-event-ref-text>${this.escapeHtml(eventRef || '--')}</code></p>
+    </article>`;
   },
 
   async render(container) {
@@ -257,11 +393,9 @@ const CandidateGate = {
           WorkflowEngine.queue = { items: result.data.queueItems };
         }
         await this.render(container);
-        const attentionEl = document.getElementById('morningCandidateAttention');
-        if (attentionEl) {
-          try { await this.renderAttention(attentionEl); } catch (_) {}
-        }
+        try { await renderTodayMeaningChanges(); } catch (_) {}
         if (typeof render === 'function') render();
+        try { await renderTodayQueueStrip(); } catch (_) {}
       };
     });
   },

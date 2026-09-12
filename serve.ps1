@@ -1044,6 +1044,426 @@ function Write-CandidateGateLedger($rootPath, $ledger) {
   Write-Utf8Text $path ($payload | ConvertTo-Json -Depth 10)
 }
 
+function Get-InvestorWatchPath($rootPath) {
+  return (Join-Path $rootPath 'data\investor-watch.json')
+}
+
+function Read-InvestorWatch($rootPath) {
+  $path = Get-InvestorWatchPath $rootPath
+  if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+    return [PSCustomObject]@{ schemaVersion = '1.0'; items = @() }
+  }
+  $store = Read-Utf8Json $path
+  if (-not $store) {
+    return [PSCustomObject]@{ schemaVersion = '1.0'; items = @() }
+  }
+  if (-not (Test-HasJsonProperty $store 'items')) {
+    $store | Add-Member -NotePropertyName items -NotePropertyValue @() -Force
+  }
+  if (-not (Test-HasJsonProperty $store 'schemaVersion')) {
+    $store | Add-Member -NotePropertyName schemaVersion -NotePropertyValue '1.0' -Force
+  }
+  return $store
+}
+
+function Write-InvestorWatch($rootPath, $store) {
+  $path = Get-InvestorWatchPath $rootPath
+  $dir = Split-Path -Parent $path
+  if (-not (Test-Path -LiteralPath $dir)) {
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+  }
+  $payload = [PSCustomObject]@{
+    schemaVersion = if ($store.schemaVersion) { [string]$store.schemaVersion } else { '1.0' }
+    items = @(Get-AsArray $store.items)
+  }
+  Write-Utf8Text $path ($payload | ConvertTo-Json -Depth 10)
+}
+
+function ConvertTo-InvestorWatchTheme($rawText) {
+  # Client usually sends watchTheme already shaped. Server only normalizes lightly
+  # with Unicode code points (avoid encoding-fragile literals in this file).
+  $text = ([string]$rawText).Trim()
+  if (-not $text) { return '' }
+  $period = [string][char]0x3002
+  $qFull = [string][char]0xFF1F
+  while ($text.EndsWith('.') -or $text.EndsWith('!') -or $text.EndsWith($period)) {
+    $text = $text.Substring(0, $text.Length - 1).TrimEnd()
+  }
+  if (-not ($text.EndsWith('?') -or $text.EndsWith($qFull))) {
+    $text = $text + $qFull
+  }
+  return $text
+}
+
+function New-InvestorWatchItem($rawText, $watchTheme, $eventRef, $source) {
+  $raw = ([string]$rawText).Trim()
+  $theme = ([string]$watchTheme).Trim()
+  if (-not $theme) { $theme = ConvertTo-InvestorWatchTheme $raw }
+  else { $theme = ConvertTo-InvestorWatchTheme $theme }
+  $now = Get-Date -Format 'yyyy-MM-ddTHH:mm:ssK'
+  $id = 'watch-' + (Get-Date -Format 'yyyyMMddHHmmss') + '-' + ([guid]::NewGuid().ToString('N').Substring(0, 6))
+  $dirMsg = 'Seek Evidence that can verify or challenge this observation; stay quiet until material new Evidence appears.'
+  $verifyMsg = 'Awaiting Evidence. User observation is not FACT and not an investment conclusion.'
+  $row = [PSCustomObject]@{
+    id = $id
+    rawObservation = $raw
+    watchTheme = $theme
+    attentionDirection = $dirMsg
+    status = 'Pending'
+    createdAt = $now
+    updatedAt = $now
+    verificationNote = $verifyMsg
+    evidenceClass = 'UNKNOWN'
+  }
+  $eref = if ($null -ne $eventRef) { ([string]$eventRef).Trim() } else { '' }
+  if ($eref) {
+    $row | Add-Member -NotePropertyName eventRef -NotePropertyValue $eref -Force
+  }
+  $src = if ($null -ne $source) { ([string]$source).Trim() } else { '' }
+  if ($src) {
+    $row | Add-Member -NotePropertyName source -NotePropertyValue $src -Force
+  }
+  return $row
+}
+
+function Invoke-InvestorWatchAction($rootPath, $body) {
+  $action = if ($body -and $body.action) { ([string]$body.action).Trim().ToLowerInvariant() } else { '' }
+  $store = Read-InvestorWatch $rootPath
+  $allowed = @('Pending', 'Watching', 'NewEvidence', 'Challenge', 'Supported', 'ThesisImpact', 'Closed')
+
+  if ($action -eq 'add') {
+    $text = if ($body -and $body.text) { ([string]$body.text).Trim() } else { '' }
+    $theme = if ($body -and $body.watchTheme) { ([string]$body.watchTheme).Trim() } else { '' }
+    $eventRef = if ($body -and $body.eventRef) { ([string]$body.eventRef).Trim() } else { '' }
+    $source = if ($body -and $body.source) { ([string]$body.source).Trim() } else { '' }
+    if (-not $text) {
+      return @{ ok = $false; statusCode = 400; error = 'invalid_payload'; message = 'text is required' }
+    }
+    $item = New-InvestorWatchItem $text $theme $eventRef $source
+    $store.items = @(Get-AsArray $store.items) + @($item)
+    Write-InvestorWatch $rootPath $store
+    return @{ ok = $true; statusCode = 200; item = $item; items = @(Get-AsArray $store.items) }
+  }
+
+  if ($action -eq 'updatestatus' -or $action -eq 'update_status') {
+    $id = if ($body -and $body.id) { ([string]$body.id).Trim() } else { '' }
+    $status = if ($body -and $body.status) { ([string]$body.status).Trim() } else { '' }
+    if (-not $id -or -not $status) {
+      return @{ ok = $false; statusCode = 400; error = 'invalid_payload'; message = 'id and status are required' }
+    }
+    if ($allowed -notcontains $status) {
+      return @{ ok = $false; statusCode = 400; error = 'invalid_status'; message = 'Unsupported Investor Watch status' }
+    }
+    $found = $false
+    $next = @()
+    foreach ($row in @(Get-AsArray $store.items)) {
+      if ([string]$row.id -eq $id) {
+        $found = $true
+        $row.status = $status
+        $row | Add-Member -NotePropertyName updatedAt -NotePropertyValue (Get-Date -Format 'yyyy-MM-ddTHH:mm:ssK') -Force
+      }
+      $next += $row
+    }
+    if (-not $found) {
+      return @{ ok = $false; statusCode = 404; error = 'missing_watch'; message = 'Investor Watch item not found' }
+    }
+    $store.items = $next
+    Write-InvestorWatch $rootPath $store
+    return @{ ok = $true; statusCode = 200; items = @(Get-AsArray $store.items) }
+  }
+
+  if ($action -eq 'close') {
+    $id = if ($body -and $body.id) { ([string]$body.id).Trim() } else { '' }
+    if (-not $id) {
+      return @{ ok = $false; statusCode = 400; error = 'invalid_payload'; message = 'id is required' }
+    }
+    $found = $false
+    $next = @()
+    foreach ($row in @(Get-AsArray $store.items)) {
+      if ([string]$row.id -eq $id) {
+        $found = $true
+        $row.status = 'Closed'
+        $row | Add-Member -NotePropertyName updatedAt -NotePropertyValue (Get-Date -Format 'yyyy-MM-ddTHH:mm:ssK') -Force
+      }
+      $next += $row
+    }
+    if (-not $found) {
+      return @{ ok = $false; statusCode = 404; error = 'missing_watch'; message = 'Investor Watch item not found' }
+    }
+    $store.items = $next
+    Write-InvestorWatch $rootPath $store
+    return @{ ok = $true; statusCode = 200; items = @(Get-AsArray $store.items) }
+  }
+
+  return @{ ok = $false; statusCode = 400; error = 'invalid_action'; message = 'Unknown Investor Watch action' }
+}
+
+function Get-InvestmentCheckPath($rootPath) {
+  return (Join-Path $rootPath 'data\investment-checks.json')
+}
+
+function Read-InvestmentCheck($rootPath) {
+  $path = Get-InvestmentCheckPath $rootPath
+  if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+    return [PSCustomObject]@{ schemaVersion = '1.0'; items = @() }
+  }
+  $store = Read-Utf8Json $path
+  if (-not $store) {
+    return [PSCustomObject]@{ schemaVersion = '1.0'; items = @() }
+  }
+  if (-not (Test-HasJsonProperty $store 'items')) {
+    $store | Add-Member -NotePropertyName items -NotePropertyValue @() -Force
+  }
+  if (-not (Test-HasJsonProperty $store 'schemaVersion')) {
+    $store | Add-Member -NotePropertyName schemaVersion -NotePropertyValue '1.0' -Force
+  }
+  return $store
+}
+
+function Write-InvestmentCheck($rootPath, $store) {
+  $path = Get-InvestmentCheckPath $rootPath
+  $dir = Split-Path -Parent $path
+  if (-not (Test-Path -LiteralPath $dir)) {
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+  }
+  $payload = [PSCustomObject]@{
+    schemaVersion = if ($store.schemaVersion) { [string]$store.schemaVersion } else { '1.0' }
+    items = @(Get-AsArray $store.items)
+  }
+  Write-Utf8Text $path ($payload | ConvertTo-Json -Depth 10)
+}
+
+function ConvertTo-InvestmentCheckQuestion($rawText) {
+  $text = ([string]$rawText).Trim()
+  if (-not $text) { return '' }
+  $period = [string][char]0x3002
+  $qFull = [string][char]0xFF1F
+  while ($text.EndsWith('.') -or $text.EndsWith('!') -or $text.EndsWith($period)) {
+    $text = $text.Substring(0, $text.Length - 1).TrimEnd()
+  }
+  if (-not ($text.EndsWith('?') -or $text.EndsWith($qFull))) {
+    $text = $text + $qFull
+  }
+  return $text
+}
+
+function Normalize-InvestmentCheckQuestionKey($rawText) {
+  $text = ConvertTo-InvestmentCheckQuestion $rawText
+  $qFull = [string][char]0xFF1F
+  $text = $text.Replace($qFull, '?').Trim().ToLowerInvariant()
+  return $text
+}
+
+function Find-ActiveInvestmentCheckDuplicate($store, $triggerEventRef, $question) {
+  $keyEvent = ([string]$triggerEventRef).Trim()
+  $keyQuestion = Normalize-InvestmentCheckQuestionKey $question
+  if (-not $keyQuestion) { return $null }
+  foreach ($row in @(Get-AsArray $store.items)) {
+    $status = if ($row.status) { [string]$row.status } else { 'Pending' }
+    if ($status -eq 'Closed') { continue }
+    $rowEvent = if ($row.triggerEventRef) { ([string]$row.triggerEventRef).Trim() } else { '' }
+    $rowQuestion = Normalize-InvestmentCheckQuestionKey $row.question
+    if ($keyEvent) {
+      if ($rowEvent -eq $keyEvent -and $rowQuestion -eq $keyQuestion) { return $row }
+    } else {
+      if (-not $rowEvent -and $rowQuestion -eq $keyQuestion) { return $row }
+    }
+  }
+  return $null
+}
+
+function New-InvestmentCheckItem($question, $triggerEventRef, $triggerTitle, $relatedCompany) {
+  $q = ConvertTo-InvestmentCheckQuestion $question
+  $now = Get-Date -Format 'yyyy-MM-ddTHH:mm:ssK'
+  $id = 'check-' + (Get-Date -Format 'yyyyMMddHHmmss') + '-' + ([guid]::NewGuid().ToString('N').Substring(0, 6))
+  $row = [PSCustomObject]@{
+    id = $id
+    question = $q
+    triggerEventRef = if ($triggerEventRef) { ([string]$triggerEventRef).Trim() } else { $null }
+    triggerTitle = if ($triggerTitle) { ([string]$triggerTitle).Trim() } else { $null }
+    relatedCompany = if ($relatedCompany) { ([string]$relatedCompany).Trim() } else { $null }
+    status = 'Pending'
+    createdAt = $now
+    updatedAt = $now
+    evidenceClass = 'UNKNOWN'
+    note = 'Entry only. User question is not FACT and not a valuation conclusion.'
+  }
+  return $row
+}
+
+function Invoke-InvestmentCheckAction($rootPath, $body) {
+  $action = if ($body -and $body.action) { ([string]$body.action).Trim().ToLowerInvariant() } else { '' }
+  $store = Read-InvestmentCheck $rootPath
+  $allowed = @('Pending', 'Open', 'EscalatedToQueue', 'Closed')
+
+  if ($action -eq 'add') {
+    $question = if ($body -and $body.question) { ([string]$body.question).Trim() } else { '' }
+    if (-not $question) {
+      return @{ ok = $false; statusCode = 400; error = 'invalid_payload'; message = 'question is required' }
+    }
+    $triggerEventRef = if ($body -and $body.triggerEventRef) { ([string]$body.triggerEventRef).Trim() } else { '' }
+    $triggerTitle = if ($body -and $body.triggerTitle) { ([string]$body.triggerTitle).Trim() } else { '' }
+    $relatedCompany = if ($body -and $body.relatedCompany) { ([string]$body.relatedCompany).Trim() } else { '' }
+    $existing = Find-ActiveInvestmentCheckDuplicate $store $triggerEventRef $question
+    if ($existing) {
+      return @{
+        ok = $true
+        statusCode = 200
+        reused = $true
+        item = $existing
+        items = @(Get-AsArray $store.items)
+        message = 'This Investment Check is already open; duplicate not created.'
+      }
+    }
+    $item = New-InvestmentCheckItem $question $triggerEventRef $triggerTitle $relatedCompany
+    $store.items = @(Get-AsArray $store.items) + @($item)
+    Write-InvestmentCheck $rootPath $store
+    return @{
+      ok = $true
+      statusCode = 200
+      reused = $false
+      item = $item
+      items = @(Get-AsArray $store.items)
+    }
+  }
+
+  if ($action -eq 'updatestatus' -or $action -eq 'update_status') {
+    $id = if ($body -and $body.id) { ([string]$body.id).Trim() } else { '' }
+    $status = if ($body -and $body.status) { ([string]$body.status).Trim() } else { '' }
+    if (-not $id -or -not $status) {
+      return @{ ok = $false; statusCode = 400; error = 'invalid_payload'; message = 'id and status are required' }
+    }
+    if ($allowed -notcontains $status) {
+      return @{ ok = $false; statusCode = 400; error = 'invalid_status'; message = 'Unsupported Investment Check status' }
+    }
+    $found = $false
+    $next = @()
+    foreach ($row in @(Get-AsArray $store.items)) {
+      if ([string]$row.id -eq $id) {
+        $found = $true
+        $row.status = $status
+        $row | Add-Member -NotePropertyName updatedAt -NotePropertyValue (Get-Date -Format 'yyyy-MM-ddTHH:mm:ssK') -Force
+      }
+      $next += $row
+    }
+    if (-not $found) {
+      return @{ ok = $false; statusCode = 404; error = 'missing_check'; message = 'Investment Check item not found' }
+    }
+    $store.items = $next
+    Write-InvestmentCheck $rootPath $store
+    return @{ ok = $true; statusCode = 200; items = @(Get-AsArray $store.items) }
+  }
+
+  if ($action -eq 'close') {
+    $id = if ($body -and $body.id) { ([string]$body.id).Trim() } else { '' }
+    if (-not $id) {
+      return @{ ok = $false; statusCode = 400; error = 'invalid_payload'; message = 'id is required' }
+    }
+    $found = $false
+    $next = @()
+    foreach ($row in @(Get-AsArray $store.items)) {
+      if ([string]$row.id -eq $id) {
+        $found = $true
+        $row.status = 'Closed'
+        $row | Add-Member -NotePropertyName updatedAt -NotePropertyValue (Get-Date -Format 'yyyy-MM-ddTHH:mm:ssK') -Force
+      }
+      $next += $row
+    }
+    if (-not $found) {
+      return @{ ok = $false; statusCode = 404; error = 'missing_check'; message = 'Investment Check item not found' }
+    }
+    $store.items = $next
+    Write-InvestmentCheck $rootPath $store
+    return @{ ok = $true; statusCode = 200; items = @(Get-AsArray $store.items) }
+  }
+
+  return @{ ok = $false; statusCode = 400; error = 'invalid_action'; message = 'Unknown Investment Check action' }
+}
+
+function Get-MeaningGateStatePath($rootPath) {
+  return (Join-Path $rootPath 'data\meaning-gate-state.json')
+}
+
+function Read-MeaningGateState($rootPath) {
+  $path = Get-MeaningGateStatePath $rootPath
+  if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+    return [PSCustomObject]@{ schemaVersion = '1.0'; seen = [PSCustomObject]@{} }
+  }
+  $store = Read-Utf8Json $path
+  if (-not $store) {
+    return [PSCustomObject]@{ schemaVersion = '1.0'; seen = [PSCustomObject]@{} }
+  }
+  if (-not (Test-HasJsonProperty $store 'seen') -or $null -eq $store.seen) {
+    $store | Add-Member -NotePropertyName seen -NotePropertyValue ([PSCustomObject]@{}) -Force
+  }
+  if (-not (Test-HasJsonProperty $store 'schemaVersion')) {
+    $store | Add-Member -NotePropertyName schemaVersion -NotePropertyValue '1.0' -Force
+  }
+  return $store
+}
+
+function Write-MeaningGateState($rootPath, $store) {
+  $path = Get-MeaningGateStatePath $rootPath
+  $dir = Split-Path -Parent $path
+  if (-not (Test-Path -LiteralPath $dir)) {
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+  }
+  $payload = [PSCustomObject]@{
+    schemaVersion = if ($store.schemaVersion) { [string]$store.schemaVersion } else { '1.0' }
+    seen = if ($null -ne $store.seen) { $store.seen } else { [PSCustomObject]@{} }
+  }
+  Write-Utf8Text $path ($payload | ConvertTo-Json -Depth 10)
+}
+
+function Invoke-MeaningGateStateAction($rootPath, $body) {
+  $action = if ($body -and $body.action) { ([string]$body.action).Trim().ToLowerInvariant() } else { '' }
+  $store = Read-MeaningGateState $rootPath
+  if ($action -ne 'recordpassed' -and $action -ne 'record_passed') {
+    return @{ ok = $false; statusCode = 400; error = 'invalid_action'; message = 'Unknown meaning-gate-state action' }
+  }
+  $updates = @()
+  if ($body -and $body.updates) { $updates = @(Get-AsArray $body.updates) }
+  $seenMap = @{}
+  if ($store.seen) {
+    foreach ($prop in $store.seen.PSObject.Properties) {
+      $seenMap[$prop.Name] = $prop.Value
+    }
+  }
+  $now = Get-Date -Format 'yyyy-MM-ddTHH:mm:ssK'
+  foreach ($row in $updates) {
+    if (-not $row) { continue }
+    $eventRef = if ($row.eventRef) { ([string]$row.eventRef).Trim() } else { '' }
+    if (-not $eventRef) { continue }
+    $fp = if ($row.evidenceFingerprint) { ([string]$row.evidenceFingerprint) } else { '' }
+    $meaningType = if ($row.meaningType) { ([string]$row.meaningType) } else { $null }
+    $evaluatedAt = if ($row.evaluatedAt) { ([string]$row.evaluatedAt).Trim() } else { $now }
+    $seenMap[$eventRef] = [PSCustomObject]@{
+      evidenceFingerprint = $fp
+      meaningType = $meaningType
+      lastPassedAt = $now
+      evaluatedAt = $evaluatedAt
+    }
+  }
+  $seenObj = [PSCustomObject]@{}
+  foreach ($key in @($seenMap.Keys)) {
+    $seenObj | Add-Member -NotePropertyName $key -NotePropertyValue $seenMap[$key] -Force
+  }
+  $store.seen = $seenObj
+  try {
+    Write-MeaningGateState $rootPath $store
+  } catch {
+    return @{
+      ok = $false
+      statusCode = 500
+      error = 'persistence_failure'
+      message = $_.Exception.Message
+    }
+  }
+  # Re-read to confirm disk write (do not report success on write failure).
+  $verify = Read-MeaningGateState $rootPath
+  return @{ ok = $true; statusCode = 200; seen = $verify.seen }
+}
+
 function Read-CandidateHandoff($rootPath) {
   $path = Get-CandidateHandoffPath $rootPath
   if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
@@ -1783,6 +2203,81 @@ while ($listener.IsListening) {
         if ($result.candidateLinks) { $payload.candidateLinks = $result.candidateLinks }
         if ($result.questions) { $payload.questions = $result.questions }
         Send-Json $response ([PSCustomObject]$payload)
+      }
+    }
+    elseif ($localPath -eq '/api/investor-watch' -and $method -eq 'GET') {
+      $store = Read-InvestorWatch $root
+      Send-Json $response @{
+        schemaVersion = $store.schemaVersion
+        items = @(Get-AsArray $store.items)
+        path = 'data/investor-watch.json'
+      }
+    }
+    elseif ($localPath -eq '/api/investor-watch' -and $method -eq 'POST') {
+      $body = Read-Body $request
+      $result = Invoke-InvestorWatchAction $root $body
+      if (-not $result.ok) {
+        Send-Json $response @{
+          error = $result.error
+          message = $result.message
+        } $result.statusCode
+      } else {
+        $payload = [ordered]@{
+          ok = $true
+          items = $result.items
+        }
+        if ($result.item) { $payload.item = $result.item }
+        Send-Json $response ([PSCustomObject]$payload)
+      }
+    }
+    elseif ($localPath -eq '/api/investment-check' -and $method -eq 'GET') {
+      $store = Read-InvestmentCheck $root
+      Send-Json $response @{
+        schemaVersion = $store.schemaVersion
+        items = @(Get-AsArray $store.items)
+        path = 'data/investment-checks.json'
+      }
+    }
+    elseif ($localPath -eq '/api/investment-check' -and $method -eq 'POST') {
+      $body = Read-Body $request
+      $result = Invoke-InvestmentCheckAction $root $body
+      if (-not $result.ok) {
+        Send-Json $response @{
+          error = $result.error
+          message = $result.message
+        } $result.statusCode
+      } else {
+        $payload = [ordered]@{
+          ok = $true
+          items = $result.items
+        }
+        if ($result.item) { $payload.item = $result.item }
+        if ($null -ne $result.reused) { $payload.reused = [bool]$result.reused }
+        if ($result.message) { $payload.message = [string]$result.message }
+        Send-Json $response ([PSCustomObject]$payload)
+      }
+    }
+    elseif ($localPath -eq '/api/meaning-gate-state' -and $method -eq 'GET') {
+      $store = Read-MeaningGateState $root
+      Send-Json $response @{
+        schemaVersion = $store.schemaVersion
+        seen = $store.seen
+        path = 'data/meaning-gate-state.json'
+      }
+    }
+    elseif ($localPath -eq '/api/meaning-gate-state' -and $method -eq 'POST') {
+      $body = Read-Body $request
+      $result = Invoke-MeaningGateStateAction $root $body
+      if (-not $result.ok) {
+        Send-Json $response @{
+          error = $result.error
+          message = $result.message
+        } $result.statusCode
+      } else {
+        Send-Json $response @{
+          ok = $true
+          seen = $result.seen
+        }
       }
     }
     elseif ($localPath -eq '/api/cases' -and $method -eq 'POST') {

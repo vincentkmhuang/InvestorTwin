@@ -1,11 +1,12 @@
 <!doctype html><html lang="zh-Hant"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Investor Twin v0.5</title>
-<link rel="stylesheet" href="style.css?v=010a2&ui=005r1"></head>
+<link rel="stylesheet" href="style.css?v=012tw3"></head>
 <body>
 <aside>
 <h2>投資雙胞胎</h2>
-<div class="nav active" onclick="showPage('today')">🏠 今日工作台</div>
+<div class="nav active" onclick="showPage('brief')">📰 Morning Brief</div>
+<div class="nav" onclick="showPage('today')">🏠 今日工作台</div>
 <div class="nav" onclick="showPage('queue')">📥 研究佇列</div>
 <div class="nav" onclick="showPage('cards')">📄 研究卡</div>
 <div class="nav" onclick="showPage('cases')">📋 投資個案</div>
@@ -20,66 +21,94 @@
 </div>
 </aside>
 <main>
-<h1 id="title">今日工作台</h1>
+<h1 id="title">Morning Brief</h1>
 
-<div id="today" class="page morning-brief today-workspace" data-today-primary-path="1">
-<!-- Sprint 010 primary ~30s path: Yesterday → Market Temperature → Today's 3 Things → Candidates -->
-<div class="today-primary-band" data-today-band="primary">
-<section class="box today-primary" id="todayExecutiveSummary" data-today-role="primary">
+<div id="brief" class="page morning-brief" data-morning-brief="1">
+<section class="box" id="briefExecutiveSummary">
 <h2>昨日最重要 3 件事</h2>
 <p class="morning-brief-date">Brief 日期：<span id="morningBriefDate">--</span></p>
 <p id="morningExecutiveSummary"></p>
 <ol id="morningTopThings"></ol>
 </section>
 
-<section class="box today-glance" id="todayMarketTemperature" data-today-role="primary">
+<section class="box" id="briefMarketTemperature">
 <h2>市場溫度</h2>
 <p class="section-role muted">市場狀態｜Detect，不 Decide</p>
 <div id="morningMarketTemperature" class="morning-market"></div>
 </section>
 
-<section class="box today-decision" id="todayThreeThings" data-today-role="primary">
+<section class="box" id="briefThreeThings">
 <h2>今日三件事</h2>
 <p class="section-role muted">Why it matters｜今天最該注意什麼</p>
 <ul id="morningTodaysThreeThings"></ul>
 </section>
 
-<section class="box today-attention" id="todayCandidateAttention" data-candidate-attention="1" data-today-role="primary">
-<h2>Research Candidates｜值得研究的候選</h2>
-<p class="muted">這些事情可能值得花時間研究（研究問題為主，不是新聞標題）。Disposition 請至研究佇列 Human Gate。</p>
-<div id="morningCandidateAttention"></div>
-</section>
-</div>
-
-<!-- Supporting context — must not bury the primary path -->
-<div class="today-supporting-band" data-today-band="supporting">
-<p class="today-supporting-label muted">支援資訊｜市場摘要與事件（非第一閱讀路徑）</p>
-<section class="box today-context" id="todayGlobalMarket" data-today-role="supporting">
+<section class="box" id="briefGlobalMarket">
 <h2>全球市場與新聞</h2>
 <p class="section-role muted">市場狀態摘要（報價／證據摘錄；不一定是新聞事件）</p>
 <p id="morningGlobalMarket"></p>
 <ul id="morningGlobalNews"></ul>
 </section>
 
-<section class="box today-context" id="todayTaiwanMarket" data-today-role="supporting">
+<section class="box" id="briefTaiwanMarket">
 <h2>台灣市場與新聞</h2>
 <p class="section-role muted">市場狀態摘要（報價／證據摘錄；不一定是新聞事件）</p>
 <p id="morningTaiwanMarket"></p>
 <ul id="morningTaiwanNews"></ul>
 </section>
 
-<section class="box today-context" id="todayUpcomingEvents" data-today-role="supporting">
+<section class="box" id="briefUpcomingEvents">
 <h2>即將事件</h2>
 <p class="section-role muted">Upcoming｜時間相關事件</p>
 <ul id="morningUpcomingEvents"></ul>
 </section>
 
-<section class="box today-context" id="todayAiHighlights" data-today-role="supporting" style="display:none">
+<section class="box" id="todayAiHighlights" style="display:none">
 <h2>產業／敘事摘要</h2>
 <p class="section-role muted">既有 Brief highlights（顯示層；非新資料）</p>
 <ul id="morningAiHighlights"></ul>
 </section>
+
+<section class="box" id="morningRadarSection" style="display:none">
+<h2 id="morningRadarTitle">Opportunity Radar</h2>
+<ul id="morningOpportunityRadar"></ul>
+</section>
 </div>
+
+<div id="today" class="page today-workspace" data-today-v2="1" style="display:none">
+<!-- Today Workspace V2.0: meaning changes → Investor Watch → Research Queue (not a second Brief) -->
+
+<section class="box today-meaning" id="todayMeaningSection" data-today-role="meaning-changes">
+<h2>今日值得注意的投資變化</h2>
+<p class="section-role muted">AI 發現的投資意義變化｜最多三件｜不是市場新聞 dump</p>
+<div id="todayMeaningEmpty" class="today-empty-state" style="display:none" data-today-empty="1">
+<p><b>今天沒有需要特別提高注意力的投資變化。</b></p>
+<p class="muted">Morning Brief 中的重要市場資訊，目前沒有新的 Evidence 足以改變投資意義，也沒有需要立即進一步研究的問題。</p>
+</div>
+<div id="morningCandidateAttention" data-candidate-attention="1"></div>
+<p class="muted today-meaning-gate-hint">Disposition（Ignore / Watch / Link / Queue）請至研究佇列 Human Gate。不在此頁直接裁決。</p>
+</section>
+
+<section class="box today-investor-watch" id="todayInvestorWatchSection" data-today-role="investor-watch">
+<h2>Investor Watch｜我想請 Investor Twin 幫我注意</h2>
+<p class="section-role muted">你的直覺／疑問／觀察｜不是 FACT｜無重大新 Evidence 時保持安靜</p>
+<div id="todayInvestorWatch"></div>
+</section>
+
+<section class="box today-investment-check" id="todayInvestmentCheckSection" data-today-role="investment-check">
+<h2>🔎 Investment Check｜投資檢查</h2>
+<p class="section-role muted">這個變化會不會影響我的投資？｜入口階段｜不做自動估值／買賣建議</p>
+<div id="todayInvestmentCheck"></div>
+</section>
+
+<section class="box today-queue" id="todayQueueSection" data-today-role="research-queue">
+<h2>Research Queue</h2>
+<p class="section-role muted">沿用既有研究佇列｜有足夠 Evidence 後再升級研究</p>
+<ul id="todayQueueList"></ul>
+<p class="today-queue-actions">
+<button type="button" id="todayQueueOpenBtn">開啟完整研究佇列</button>
+</p>
+</section>
 </div>
 
 <div id="queue" class="page" style="display:none">
@@ -158,6 +187,9 @@
 <script src="js/data-engine.js?v=010a1&ui=005r3"></script>
 <script src="js/workflow-engine.js?v=007a1&ui=0081c"></script>
 <script src="js/knowledge-engine.js?v=005c5"></script>
-<script src="js/candidate-gate.js?v=010a1"></script>
-<script src="app.js?v=008a1"></script>
+<script src="js/investment-meaning-gate.js?v=012tw6"></script>
+<script src="js/candidate-gate.js?v=012tw8"></script>
+<script src="js/investor-watch.js?v=012tw3"></script>
+<script src="js/investment-check.js?v=012tw4"></script>
+<script src="app.js?v=012tw7"></script>
 </main></body></html>

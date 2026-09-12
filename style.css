@@ -33,34 +33,53 @@ main{flex:1;padding:20px}
 .morning-brief .box li.morning-brief-linked{cursor:pointer}
 .morning-brief-evidence{margin-top:2px;font-size:12px;color:#94a3b8}
 .section-role{margin:0 0 8px !important;font-size:12px !important;line-height:1.4 !important}
-.today-primary-band{display:contents}
-.today-supporting-band{display:contents}
-.today-supporting-label{grid-column:1/-1;margin:8px 0 0;font-size:12px;letter-spacing:.02em}
-.morning-brief-residual{color:#64748b;font-weight:500}
-#today.morning-brief{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
-#today.morning-brief>.box{margin-bottom:0}
-#today.today-workspace #todayExecutiveSummary,
-#today.today-workspace #todayMarketTemperature,
-#today.today-workspace #todayThreeThings,
-#today.today-workspace #todayCandidateAttention,
-#today.today-workspace .today-supporting-label,
-#morningRadarSection{grid-column:1/-1}
-#today.today-workspace .today-primary,
-#today.today-workspace .today-glance,
-#today.today-workspace .today-decision,
-#today.today-workspace .today-attention{border:1px solid #cbd5e1;box-shadow:0 1px 0 rgba(15,23,42,.04)}
-#today.today-workspace .today-context{opacity:.96}
-#today.today-workspace .today-primary h2,
-#today.today-workspace .today-glance h2,
-#today.today-workspace .today-decision h2,
-#today.today-workspace .today-attention h2{font-size:20px;color:#1f2937}
-#today.today-workspace .today-context h2{font-size:15px;color:#64748b}
-#today.today-workspace .morning-brief-date{margin:0 0 8px;font-size:14px;color:#64748b}
-#today.today-workspace #morningExecutiveSummary{margin:0 0 8px;font-size:14px;line-height:1.55;color:#334155}
-#today.today-workspace #morningGlobalMarket,
-#today.today-workspace #morningTaiwanMarket{margin:0 0 8px;font-size:12px;line-height:1.45;color:#64748b}
-#today.today-workspace #morningTopThings{margin-top:4px;font-weight:600;font-size:14px}
-#today.today-workspace #morningTodaysThreeThings .morning-brief-title{font-size:15px}
+/* Morning Brief home page — existing renderer DOM */
+#brief.morning-brief{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+#brief.morning-brief>.box{margin-bottom:0}
+#brief.morning-brief #briefExecutiveSummary,
+#brief.morning-brief #briefMarketTemperature,
+#brief.morning-brief #briefThreeThings,
+#brief.morning-brief #morningRadarSection{grid-column:1/-1}
+/* Today Workspace V2.0 — attention path, not Brief dump */
+#today.today-workspace{display:block;max-width:920px}
+#today.today-workspace>.box{margin-bottom:16px}
+#today.today-workspace .today-meaning,
+#today.today-workspace .today-investor-watch,
+#today.today-workspace .today-investment-check,
+#today.today-workspace .today-queue{border:1px solid #cbd5e1;box-shadow:0 1px 0 rgba(15,23,42,.04)}
+#today.today-workspace h2{margin-top:0;margin-bottom:8px;font-size:20px;color:#1f2937}
+.today-empty-state{background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:14px 16px;margin:8px 0 12px}
+.today-empty-state p{margin:0 0 8px;line-height:1.55;color:#334155}
+.today-empty-state p:last-child{margin-bottom:0}
+.today-meaning-gate-hint{margin:10px 0 0;font-size:12px}
+.meaning-change-card{cursor:default}
+.meaning-change-title{font-size:16px;line-height:1.45;margin:0 0 6px;color:#1f2937;font-weight:600}
+.meaning-change-summary{margin:0 0 8px;line-height:1.5;color:#334155}
+.meaning-change-classes{margin:4px 0 8px;padding-left:18px;font-size:12px}
+.meaning-change-next-steps{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 4px}
+.meaning-change-next-steps button{cursor:pointer;font:inherit;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc}
+.meaning-change-next-steps button:hover{background:#eef2ff}
+.evidence-class-fact{color:#0f766e;font-weight:600}
+.evidence-class-estimate{color:#a16207;font-weight:600}
+.evidence-class-inference{color:#1d4ed8;font-weight:600}
+.evidence-class-unknown{color:#64748b;font-weight:600}
+.investor-watch-form{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.investor-watch-form textarea{width:100%;max-width:100%;box-sizing:border-box;padding:10px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;resize:vertical}
+.investor-watch-form button,#todayQueueOpenBtn,.investor-watch-actions button{cursor:pointer}
+.investor-watch-hint{margin:0;font-size:12px}
+.investor-watch-card{border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin:8px 0 12px;background:#fbfdff}
+.investor-watch-theme{margin:0 0 6px;line-height:1.45}
+.investor-watch-verify{margin:6px 0}
+.investor-watch-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.investor-watch-quiet{margin:8px 0 0;font-size:13px}
+.investment-check-hint{margin:0 0 10px;font-size:12px}
+.investment-check-empty{margin:0;font-size:13px}
+.investment-check-card{border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin:8px 0 12px;background:#fbfdff}
+.investment-check-question{margin:0 0 6px;line-height:1.45}
+.investment-check-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.investment-check-actions button{cursor:pointer}
+.today-queue-actions{margin:10px 0 0}
+#todayQueueList li.today-queue-empty{cursor:default;color:#64748b}
 .morning-market{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
 .morning-market-item{background:#f4f6fa;padding:8px 10px;border-radius:8px}
 .morning-market-name{font-size:11px;color:#64748b}
@@ -87,21 +106,7 @@ li{cursor:pointer;margin:6px 0}
   main { flex: 1; min-width: 0; padding: 12px; }
   #title { font-size: 20px; margin: 0 0 12px; }
   .box { padding: 12px; margin-bottom: 12px; }
-  #today.morning-brief {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    align-items: start;
-  }
-  #today.morning-brief > .box { margin-bottom: 0; min-width: 0; }
-  #today.morning-brief > .box:first-child,
-  #today.today-workspace #todayExecutiveSummary,
-  #today.today-workspace #todayMarketTemperature,
-  #today.today-workspace #todayThreeThings,
-  #today.today-workspace #todayCandidateAttention,
-  #today.today-workspace .today-supporting-label,
-  #morningRadarSection { grid-column: 1 / -1; }
-  .morning-market { grid-template-columns: repeat(3, 1fr); }
+  #today.today-workspace { max-width: none; }
   #cards,
   #cases {
     display: grid;
