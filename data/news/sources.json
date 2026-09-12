@@ -19,7 +19,7 @@
     {
       "sourceId": "twse-news-openapi",
       "label": "TWSE 證交所新聞 OpenAPI",
-      "enabled": false,
+      "enabled": true,
       "adapter": "collect-twse-news-openapi.py",
       "feedUrl": "https://openapi.twse.com.tw/v1/news/newsList"
     },
