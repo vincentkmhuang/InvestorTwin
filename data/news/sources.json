@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "description": "News Collect Foundation source registry. One enabled source in v1.",
+  "description": "News Collect Foundation source registry. CNA enabled by default; FSC adapter registered (enable when ready).",
   "sources": [
     {
       "sourceId": "cna-finance-rss",
@@ -8,6 +8,13 @@
       "enabled": true,
       "adapter": "collect-cna-finance-rss.py",
       "feedUrl": "https://feeds.feedburner.com/rsscna/finance"
+    },
+    {
+      "sourceId": "fsc-press-rss",
+      "label": "FSC 金管會新聞稿 RSS",
+      "enabled": false,
+      "adapter": "collect-fsc-press-rss.py",
+      "feedUrl": "https://www.fsc.gov.tw/RSS/Messages?serno=201202290009&language=chinese"
     }
   ]
 }

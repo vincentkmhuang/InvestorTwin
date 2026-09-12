@@ -132,12 +132,37 @@ def strip_collect_meta_for_integrate(news_list):
     return out
 
 
-def run_cna_collect(source, store_root, fixture_path=None):
-    adapter = load_module("collect-cna-finance-rss.py", "collect_cna_finance_rss")
+ADAPTER_BY_SOURCE = {
+    "cna-finance-rss": ("collect-cna-finance-rss.py", "collect_cna_finance_rss"),
+    "fsc-press-rss": ("collect-fsc-press-rss.py", "collect_fsc_press_rss"),
+}
+
+
+def fixture_applies_to_source(source_id, fixture_path):
+    """Fixture files are adapter-specific; do not feed a CNA fixture into FSC (and vice versa)."""
+    if not fixture_path:
+        return True
+    name = os.path.basename(str(fixture_path)).lower()
+    if "fsc" in name:
+        return source_id == "fsc-press-rss"
+    if "cna" in name:
+        return source_id == "cna-finance-rss"
+    # Unknown fixture naming: only CNA (historical default).
+    return source_id == "cna-finance-rss"
+
+
+def run_source_collect(source, store_root, fixture_path=None):
+    source_id = str(source.get("sourceId") or "")
+    entry = ADAPTER_BY_SOURCE.get(source_id)
+    if not entry:
+        raise ValueError("unsupported sourceId: " + source_id)
+    filename, module_name = entry
+    adapter = load_module(filename, module_name)
     feed_url = source.get("feedUrl") or adapter.DEFAULT_FEED_URL
+    use_fixture = fixture_path if fixture_applies_to_source(source_id, fixture_path) else None
     return adapter.collect(
         feed_url=feed_url,
-        fixture_path=fixture_path,
+        fixture_path=use_fixture,
         store_root=store_root,
     )
 
@@ -164,17 +189,22 @@ def pipeline(
         errors.append({"stage": "registry", "message": "no enabled sources in sources.json"})
 
     collect_run = None
+    collect_run_ids = []
     if status != "failed" and not skip_collect:
         for source in sources:
             source_id = str(source.get("sourceId") or "")
-            if source_id != "cna-finance-rss":
+            if source_id not in ADAPTER_BY_SOURCE:
                 errors.append({
                     "stage": "collect",
-                    "message": "v1 only supports cna-finance-rss; skipped " + source_id,
+                    "message": "unsupported sourceId; skipped " + source_id,
                 })
                 continue
+            if fixture_path and not fixture_applies_to_source(source_id, fixture_path):
+                # Fixture runs target one adapter; skip other enabled sources.
+                continue
             try:
-                collect_run = run_cna_collect(source, store_root, fixture_path=fixture_path)
+                collect_run = run_source_collect(source, store_root, fixture_path=fixture_path)
+                collect_run_ids.append(collect_run.get("runId"))
                 collect_runs.append({
                     "sourceId": source_id,
                     "runId": collect_run.get("runId"),
@@ -188,6 +218,7 @@ def pipeline(
                     errors.append({
                         "stage": "collect",
                         "message": "collect failed",
+                        "sourceId": source_id,
                         "errors": collect_run.get("errors") or [],
                     })
             except Exception as exc:
@@ -199,15 +230,21 @@ def pipeline(
             errors.append({"stage": "collect", "message": "--run-id required with --skip-collect"})
         else:
             collect_run = {"runId": run_id, "status": "reuse"}
+            collect_run_ids = [run_id]
 
     news_for_integrate = []
-    if status != "failed" and collect_run and collect_run.get("runId"):
-        run_dir = os.path.join(store_root, "runs", collect_run["runId"])
-        normalized = load_normalized_news(run_dir)
+    if status != "failed" and collect_run_ids:
+        normalized = []
+        for rid in collect_run_ids:
+            if not rid:
+                continue
+            run_dir = os.path.join(store_root, "runs", rid)
+            normalized.extend(load_normalized_news(run_dir))
         pipeline_seen_path = ensure_pipeline_seen(store_root)
         pipeline_seen = read_json(pipeline_seen_path, {"schemaVersion": "1.0", "byUrl": {}})
         pipeline_news, skipped = filter_new_for_pipeline(normalized, pipeline_seen)
         news_for_integrate = strip_collect_meta_for_integrate(pipeline_news)
+        primary_run_id = collect_run_ids[-1]
 
         if len(news_for_integrate) == 0:
             status = "skipped_no_new_news"
@@ -234,7 +271,7 @@ def pipeline(
                     publisher.publish_handoff(integrate_result, publish_handoff_path)
                 # Only mark pipeline-seen after successful integrate.
                 pipeline_seen = mark_pipeline_seen(
-                    pipeline_seen, pipeline_news, collect_run["runId"], started_at
+                    pipeline_seen, pipeline_news, primary_run_id, started_at
                 )
                 write_json(pipeline_seen_path, pipeline_seen)
             except SystemExit as exc:
@@ -280,7 +317,7 @@ def pipeline(
             "candidateCount": len(integrate_result.get("researchCandidates") or []),
         }
 
-    # Persist pipeline summary beside collect run when possible (runtime; under runs/ = gitignored).
+    # Persist pipeline summary beside last collect run when possible (runtime; under runs/ = gitignored).
     if collect_run and collect_run.get("runId"):
         run_dir = os.path.join(store_root, "runs", collect_run["runId"])
         if os.path.isdir(run_dir):

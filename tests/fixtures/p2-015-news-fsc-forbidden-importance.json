@@ -1,0 +1,14 @@
+{
+  "fixture": true,
+  "fixtureNote": "FIXTURE ONLY — must fail Collect contract because importance is forbidden.",
+  "source": "FSC 金管會新聞稿 RSS",
+  "title": "[FIXTURE] 金管會測試新聞稿甲僅供單元測試",
+  "publishedTime": "2026-09-11T00:00:00Z",
+  "url": "https://www.fsc.gov.tw/ch/home.jsp?id=96&parentpath=0,2&mcustomize=news_view.jsp&dataserno=fixture202609110001&dtable=News",
+  "summary": "[FIXTURE] 虛構摘要：本段落僅供 contract 測試，不是真實新聞內容。",
+  "subject": null,
+  "eventRef": null,
+  "id": "https://www.fsc.gov.tw/ch/home.jsp?id=96&parentpath=0,2&mcustomize=news_view.jsp&dataserno=fixture202609110001&dtable=News",
+  "sourceId": "fsc-press-rss",
+  "importance": 5
+}

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  FIXTURE ONLY — fictional test content for Investor Twin FSC press RSS adapter.
+  NOT a real FSC feed dump. NOT real news. Do not treat titles/summaries as facts.
+  Offline use for p2-015 adapter tests (no network required).
+  Mimics FSC CDATA + literal &amp; inside link/guid (real feed quirk).
+-->
+<rss version="2.0">
+  <channel>
+    <title>[FIXTURE] 行政院金融監督管理委員會-新聞稿（虛構測試）</title>
+    <link>https://www.fsc.gov.tw/</link>
+    <description>Investor Twin p2-015 offline FSC-shaped RSS fixture — fictional items only</description>
+    <language>zh-Hant</language>
+    <item>
+      <title><![CDATA[[FIXTURE] 金管會測試新聞稿甲僅供單元測試]]></title>
+      <pubDate>Fri, 11 Sep 2026 00:00:00 GMT</pubDate>
+      <link><![CDATA[https://www.fsc.gov.tw/ch/home.jsp?id=96&amp;parentpath=0,2&amp;mcustomize=news_view.jsp&amp;dataserno=fixture202609110001&amp;dtable=News]]></link>
+      <guid isPermaLink="true"><![CDATA[https://www.fsc.gov.tw/ch/home.jsp?id=96&amp;parentpath=0,2&amp;mcustomize=news_view.jsp&amp;dataserno=fixture202609110001&amp;dtable=News]]></guid>
+      <description><![CDATA[[FIXTURE] 虛構摘要：本段落僅供 RSS 解析測試，不是真實新聞內容。]]></description>
+    </item>
+    <item>
+      <title><![CDATA[[FIXTURE] 金管會測試新聞稿乙（無 description）僅供單元測試]]></title>
+      <pubDate>Thu, 10 Sep 2026 00:00:00 GMT</pubDate>
+      <link><![CDATA[https://www.fsc.gov.tw/ch/home.jsp?id=96&amp;parentpath=0,2&amp;mcustomize=news_view.jsp&amp;dataserno=fixture202609100002&amp;dtable=News]]></link>
+      <guid isPermaLink="true"><![CDATA[https://www.fsc.gov.tw/ch/home.jsp?id=96&amp;parentpath=0,2&amp;mcustomize=news_view.jsp&amp;dataserno=fixture202609100002&amp;dtable=News]]></guid>
+      <!-- intentionally no description: adapter must keep item via title→summary fallback -->
+    </item>
+  </channel>
+</rss>
