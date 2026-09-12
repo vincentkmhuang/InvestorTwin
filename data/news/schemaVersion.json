@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "kind": "news-store",
+  "description": "Local-first News Collect store (News Collect Foundation v1). Not an Event DB.",
+  "newsObjectContract": "data/news/news-object-v1.contract.json",
+  "sourceIdV1": "cna-finance-rss",
+  "validation": "scripts/news-object-contract.py (reuses evaluate-news-intelligence.validate_news_object)",
+  "committed": [
+    "schemaVersion.json",
+    "news-object-v1.contract.json",
+    "sources.json",
+    "seen.example.json",
+    "pipeline-seen.example.json",
+    "history/by-url/index.example.json",
+    "history/by-url/.gitkeep",
+    "runs/.gitkeep",
+    "runs/run.template.json"
+  ],
+  "runtimeGitignored": [
+    "seen.json",
+    "pipeline-seen.json",
+    "history/by-url/index.json",
+    "runs/run-*/"
+  ]
+}

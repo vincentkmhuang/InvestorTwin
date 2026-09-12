@@ -1,0 +1,13 @@
+{
+  "fixture": true,
+  "fixtureNote": "FIXTURE ONLY — fictional test News Object. Not real CNA news.",
+  "source": "CNA Finance RSS",
+  "title": "[FIXTURE] 測試公司甲8月營收數字僅供單元測試",
+  "publishedTime": "2026-09-10T09:25:00Z",
+  "url": "https://www.cna.com.tw/news/afe/fixture-20260910a001.aspx",
+  "summary": "[FIXTURE] 虛構摘要：本段落僅供 contract 測試，不是真實新聞內容。",
+  "subject": null,
+  "eventRef": null,
+  "id": "https://www.cna.com.tw/news/afe/fixture-20260910a001.aspx",
+  "sourceId": "cna-finance-rss"
+}

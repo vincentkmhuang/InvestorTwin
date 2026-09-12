@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1.0",
+  "kind": "news-collect-run",
+  "description": "Template only — Adapter writes real run.json under runs/run-*/. Not used at runtime.",
+  "fields": {
+    "runId": "run-YYYYMMDDTHHMMSSZ",
+    "sourceId": "cna-finance-rss",
+    "startedAt": "ISO-8601",
+    "finishedAt": "ISO-8601",
+    "status": "ok | partial | failed",
+    "rawFiles": ["raw/cna-finance-rss.xml"],
+    "fetchedCount": 0,
+    "normalizedCount": 0,
+    "skippedSeenCount": 0,
+    "errorCount": 0,
+    "errors": [],
+    "writesHandoff": false,
+    "writesBrief": false
+  }
+}

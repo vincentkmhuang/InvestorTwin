@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1.0",
+  "description": "News Collect Foundation source registry. One enabled source in v1.",
+  "sources": [
+    {
+      "sourceId": "cna-finance-rss",
+      "label": "CNA Finance RSS",
+      "enabled": true,
+      "adapter": "collect-cna-finance-rss.py",
+      "feedUrl": "https://feeds.feedburner.com/rsscna/finance"
+    }
+  ]
+}

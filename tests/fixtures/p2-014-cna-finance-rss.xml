@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  FIXTURE ONLY — fictional test content for Investor Twin News Collect Foundation.
+  NOT a real CNA feed dump. NOT real news. Do not treat titles/summaries as facts.
+  Offline use for p2-014 contract / future adapter tests (no network required).
+-->
+<rss version="2.0">
+  <channel>
+    <title>[FIXTURE] 中央社產經證券（虛構測試，非真實新聞）</title>
+    <link>https://www.cna.com.tw/</link>
+    <description>Investor Twin p2-014 offline RSS fixture — fictional items only</description>
+    <language>zh-Hant</language>
+    <item>
+      <title>[FIXTURE] 測試公司甲8月營收數字僅供單元測試</title>
+      <link>https://www.cna.com.tw/news/afe/fixture-20260910a001.aspx</link>
+      <guid isPermaLink="false">cna-fixture-20260910a001</guid>
+      <pubDate>Wed, 10 Sep 2026 09:25:00 GMT</pubDate>
+      <description>[FIXTURE] 虛構摘要：本段落僅供 RSS 解析測試，不是真實新聞內容。</description>
+    </item>
+    <item>
+      <title>[FIXTURE] 測試法人動向字串僅供單元測試</title>
+      <link>https://www.cna.com.tw/news/afe/fixture-20260910a002.aspx</link>
+      <guid isPermaLink="false">cna-fixture-20260910a002</guid>
+      <pubDate>Wed, 10 Sep 2026 08:48:00 GMT</pubDate>
+      <description>[FIXTURE] 虛構摘要：本段落僅供 RSS 解析測試，不是真實新聞內容。</description>
+    </item>
+  </channel>
+</rss>

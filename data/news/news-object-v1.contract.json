@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1.0",
+  "contractId": "news-object-v1",
+  "alignedWith": [
+    "docs/Phase 2 Sprint 001 News Intelligence Foundation SPEC.md §2",
+    "scripts/evaluate-news-intelligence.py validate_news_object / news_from",
+    "scripts/nvidia-official-adapter.py News Object output"
+  ],
+  "requiredCore": {
+    "source": "string, non-empty",
+    "title": "string, non-empty",
+    "publishedTime": "string, non-empty (alias published accepted by core validator)",
+    "summaryOrContent": "summary or content, at least one non-empty (core validator)"
+  },
+  "requiredCollect": {
+    "url": "string, non-empty — LOCKED: Collect identity / seen / history dedup key"
+  },
+  "optionalFields": {
+    "summary": "prefer summary over content for RSS adapters",
+    "subject": "optional string; may be empty or null",
+    "eventRef": "optional; Collect stage leaves null"
+  },
+  "collectStoreFields": {
+    "id": "optional stable id; default = normalized url",
+    "sourceId": "optional adapter id, e.g. cna-finance-rss",
+    "collectedAt": "optional ISO timestamp when collected",
+    "collectRunId": "optional run-YYYYMMDDTHHMMSSZ"
+  },
+  "forbiddenOnNewsObject": [
+    "importance",
+    "relevance",
+    "impact",
+    "researchCandidate",
+    "candidate"
+  ],
+  "notes": [
+    "Do not invent Importance / Relevance / Impact on News Objects.",
+    "Event linking and evaluation remain in existing NI scripts.",
+    "url is Collect-required (decision locked) even though Sprint 001 core validator treats url as optional.",
+    "Runtime files data/news/seen.json, history/by-url/index.json, runs/run-*/ are gitignored; use *.example.json seeds."
+  ]
+}

@@ -1,0 +1,14 @@
+# News Collect Foundation - runtime state only (not product schema/contracts).
+# Do not ignore formal investment data under data/evidence, research/, handoff, etc.
+
+# Collect-layer seen fingerprint (url / guid) - local runtime
+data/news/seen.json
+
+# URL history index - local runtime
+data/news/history/by-url/index.json
+
+# Live collect runs (raw RSS + normalized News Objects)
+data/news/runs/run-*/
+
+# Pipeline-layer urls already sent to integrate (local runtime)
+data/news/pipeline-seen.json
