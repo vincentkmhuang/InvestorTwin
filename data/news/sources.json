@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "description": "News Collect Foundation source registry. Fed Press RSS and NVIDIA Newsroom RSS registered disabled until First-Enable.",
+  "description": "News Collect Foundation source registry. BLS CPI/EmpSit, NVIDIA, and EIA Today in Energy / Press RSS enabled. Fed Press RSS registered disabled until First-Enable.",
   "sources": [
     {
       "sourceId": "cna-finance-rss",
@@ -51,6 +51,50 @@
       "feedUrl": "https://nvidianews.nvidia.com/rss.xml",
       "enabled": true,
       "adapter": "collect-nvidia-newsroom-rss.py"
+    },
+    {
+      "sourceId": "bls-cpi-rss",
+      "name": "BLS CPI News Release RSS",
+      "label": "BLS CPI News Release RSS",
+      "type": "rss",
+      "official": true,
+      "url": "https://www.bls.gov/feed/cpi.rss",
+      "feedUrl": "https://www.bls.gov/feed/cpi.rss",
+      "enabled": true,
+      "adapter": "collect-bls-cpi-rss.py"
+    },
+    {
+      "sourceId": "bls-empsit-rss",
+      "name": "BLS Employment Situation RSS",
+      "label": "BLS Employment Situation RSS",
+      "type": "rss",
+      "official": true,
+      "url": "https://www.bls.gov/feed/empsit.rss",
+      "feedUrl": "https://www.bls.gov/feed/empsit.rss",
+      "enabled": true,
+      "adapter": "collect-bls-empsit-rss.py"
+    },
+    {
+      "sourceId": "eia-today-energy-rss",
+      "name": "EIA Today in Energy RSS",
+      "label": "EIA Today in Energy RSS",
+      "type": "rss",
+      "official": true,
+      "url": "https://www.eia.gov/rss/todayinenergy.xml",
+      "feedUrl": "https://www.eia.gov/rss/todayinenergy.xml",
+      "enabled": true,
+      "adapter": "collect-eia-today-energy-rss.py"
+    },
+    {
+      "sourceId": "eia-press-rss",
+      "name": "EIA Press Releases RSS",
+      "label": "EIA Press Releases RSS",
+      "type": "rss",
+      "official": true,
+      "url": "https://www.eia.gov/rss/press_rss.xml",
+      "feedUrl": "https://www.eia.gov/rss/press_rss.xml",
+      "enabled": true,
+      "adapter": "collect-eia-press-rss.py"
     }
   ]
 }

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- FIXTURE ONLY — fictional BLS CPI Atom feed for p2-029 tests. -->
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>[FIXTURE] BLS CPI</title>
+  <link href="https://www.bls.gov/cpi/"/>
+  <updated>2026-09-11T12:00:00Z</updated>
+  <entry>
+    <title>[FIXTURE] CPI for all items increases 0.4% in August; gasoline rises</title>
+    <link href="https://www.bls.gov/news.release/archives/cpi_09112026_fixture.htm" rel="alternate"/>
+    <id>cpi-fixture-2026_09_11</id>
+    <published>2026-09-11T11:50:40Z</published>
+    <updated>2026-09-11T11:50:40Z</updated>
+    <summary>In August, the Consumer Price Index for All Urban Consumers rose 0.4 percent, seasonally adjusted.</summary>
+  </entry>
+  <entry>
+    <title>[FIXTURE] CPI for all items increases 0.1% in July; shelter rises</title>
+    <link href="https://www.bls.gov/news.release/archives/cpi_08122026_fixture.htm" rel="alternate"/>
+    <id>cpi-fixture-2026_08_12</id>
+    <published>2026-08-12T11:51:16Z</published>
+    <updated>2026-08-12T11:51:16Z</updated>
+    <summary>In July, the Consumer Price Index for All Urban Consumers rose 0.1 percent, seasonally adjusted.</summary>
+  </entry>
+</feed>

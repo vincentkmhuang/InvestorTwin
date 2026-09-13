@@ -139,11 +139,15 @@ ADAPTER_BY_SOURCE = {
     "mops-material-openapi": ("collect-mops-material-openapi.py", "collect_mops_material_openapi"),
     "fed-press-rss": ("collect-fed-press-rss.py", "collect_fed_press_rss"),
     "nvidia-newsroom-rss": ("collect-nvidia-newsroom-rss.py", "collect_nvidia_newsroom_rss"),
+    "bls-cpi-rss": ("collect-bls-cpi-rss.py", "collect_bls_cpi_rss"),
+    "bls-empsit-rss": ("collect-bls-empsit-rss.py", "collect_bls_empsit_rss"),
+    "eia-today-energy-rss": ("collect-eia-today-energy-rss.py", "collect_eia_today_energy_rss"),
+    "eia-press-rss": ("collect-eia-press-rss.py", "collect_eia_press_rss"),
 }
 
 
 def fixture_applies_to_source(source_id, fixture_path):
-    """Fixture files are adapter-specific; do not cross-feed CNA/FSC/TWSE/MOPS/Fed/NVIDIA fixtures."""
+    """Fixture files are adapter-specific; do not cross-feed CNA/FSC/TWSE/MOPS/Fed/NVIDIA/BLS/EIA fixtures."""
     if not fixture_path:
         return True
     name = os.path.basename(str(fixture_path)).lower()
@@ -155,6 +159,14 @@ def fixture_applies_to_source(source_id, fixture_path):
         return source_id == "fsc-press-rss"
     if "nvidia" in name:
         return source_id == "nvidia-newsroom-rss"
+    if "empsit" in name or "bls-empsit" in name:
+        return source_id == "bls-empsit-rss"
+    if "bls-cpi" in name or ("bls" in name and "cpi" in name):
+        return source_id == "bls-cpi-rss"
+    if "eia-press" in name or ("eia" in name and "press" in name):
+        return source_id == "eia-press-rss"
+    if "eia-today" in name or "todayinenergy" in name or ("eia" in name and "today" in name):
+        return source_id == "eia-today-energy-rss"
     if "fed" in name:
         return source_id == "fed-press-rss"
     if "cna" in name:

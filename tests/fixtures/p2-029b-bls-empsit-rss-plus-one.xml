@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- FIXTURE ONLY — p2-029 EmpSit fixture plus one NEW Atom entry for incremental collect. -->
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>[FIXTURE] BLS Employment Situation + one</title>
+  <link href="https://www.bls.gov/ces/"/>
+  <updated>2026-09-05T12:00:00Z</updated>
+  <entry>
+    <title>[FIXTURE] Payroll employment increases by 162,000 in August; unemployment rate unchanged at 4.1%</title>
+    <link href="https://www.bls.gov/news.release/archives/empsit_09042026_fixture.htm" rel="alternate"/>
+    <id>empsit-fixture-2026_09_04</id>
+    <published>2026-09-04T11:51:08Z</published>
+    <updated>2026-09-04T11:51:08Z</updated>
+    <summary>Total nonfarm payroll employment increased by 162,000 in August, and the unemployment rate was unchanged at 4.1 percent.</summary>
+  </entry>
+  <entry>
+    <title>[FIXTURE] Both payroll employment (-23,000) and unemployment rate (4.1%) change little in July</title>
+    <link href="https://www.bls.gov/news.release/archives/empsit_08072026_fixture.htm" rel="alternate"/>
+    <id>empsit-fixture-2026_08_07</id>
+    <published>2026-08-07T11:50:34Z</published>
+    <updated>2026-08-07T11:50:34Z</updated>
+    <summary>Both nonfarm payroll employment (-23,000) and the unemployment rate (4.1 percent) changed little in July.</summary>
+  </entry>
+  <entry>
+    <title>[FIXTURE] NEW Employment Situation special note for September fixture</title>
+    <link href="https://www.bls.gov/news.release/archives/empsit_09052026_fixture_new.htm" rel="alternate"/>
+    <id>empsit-fixture-2026_09_05_new</id>
+    <published>2026-09-05T12:00:00Z</published>
+    <updated>2026-09-05T12:00:00Z</updated>
+    <summary>Fixture-only incremental EmpSit item for First-Enable bootstrap tests.</summary>
+  </entry>
+</feed>

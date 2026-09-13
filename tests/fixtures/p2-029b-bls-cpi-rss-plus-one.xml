@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- FIXTURE ONLY — p2-029 CPI fixture plus one NEW Atom entry for incremental collect. -->
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>[FIXTURE] BLS CPI + one</title>
+  <link href="https://www.bls.gov/cpi/"/>
+  <updated>2026-09-12T12:00:00Z</updated>
+  <entry>
+    <title>[FIXTURE] CPI for all items increases 0.4% in August; gasoline rises</title>
+    <link href="https://www.bls.gov/news.release/archives/cpi_09112026_fixture.htm" rel="alternate"/>
+    <id>cpi-fixture-2026_09_11</id>
+    <published>2026-09-11T11:50:40Z</published>
+    <updated>2026-09-11T11:50:40Z</updated>
+    <summary>In August, the Consumer Price Index for All Urban Consumers rose 0.4 percent, seasonally adjusted.</summary>
+  </entry>
+  <entry>
+    <title>[FIXTURE] CPI for all items increases 0.1% in July; shelter rises</title>
+    <link href="https://www.bls.gov/news.release/archives/cpi_08122026_fixture.htm" rel="alternate"/>
+    <id>cpi-fixture-2026_08_12</id>
+    <published>2026-08-12T11:51:16Z</published>
+    <updated>2026-08-12T11:51:16Z</updated>
+    <summary>In July, the Consumer Price Index for All Urban Consumers rose 0.1 percent, seasonally adjusted.</summary>
+  </entry>
+  <entry>
+    <title>[FIXTURE] NEW CPI special release note for September fixture</title>
+    <link href="https://www.bls.gov/news.release/archives/cpi_09122026_fixture_new.htm" rel="alternate"/>
+    <id>cpi-fixture-2026_09_12_new</id>
+    <published>2026-09-12T12:00:00Z</published>
+    <updated>2026-09-12T12:00:00Z</updated>
+    <summary>Fixture-only incremental CPI item for First-Enable bootstrap tests.</summary>
+  </entry>
+</feed>

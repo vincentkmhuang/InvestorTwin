@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!-- FIXTURE ONLY — fictional EIA Press RSS for p2-031 tests. Includes relative link. -->
+<rss version="2.0">
+  <channel>
+    <title>[FIXTURE] EIA Press Releases</title>
+    <link>https://www.eia.gov/pressroom/</link>
+    <description>p2-031 EIA Press Releases fixture</description>
+    <item>
+      <title>[FIXTURE] EIA expects record electricity generation</title>
+      <link>/pressroom/releases/press592_fixture.php</link>
+      <guid>/pressroom/releases/press592_fixture.php</guid>
+      <pubDate>Wed, 09 Sep 2026 12:00:00 EST</pubDate>
+      <description>Fixture press release about electricity generation.</description>
+    </item>
+    <item>
+      <title>[FIXTURE] EIA publishes Short-Term Energy Outlook update</title>
+      <link>/pressroom/releases/press591_fixture.php</link>
+      <guid>/pressroom/releases/press591_fixture.php</guid>
+      <pubDate>Tue, 11 Aug 2026 12:00:00 EST</pubDate>
+      <description>Fixture press release about STEO.</description>
+    </item>
+  </channel>
+</rss>

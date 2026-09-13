@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!-- FIXTURE ONLY — p2-031 Today in Energy plus one NEW item. -->
+<rss version="2.0">
+  <channel>
+    <title>[FIXTURE] EIA Today in Energy + one</title>
+    <link>https://www.eia.gov/todayinenergy/</link>
+    <description>p2-031 incremental fixture</description>
+    <item>
+      <title>[FIXTURE] United States crude oil production remains elevated</title>
+      <link>https://www.eia.gov/todayinenergy/detail.php?id=68125</link>
+      <guid>https://www.eia.gov/todayinenergy/detail.php?id=68125</guid>
+      <pubDate>Thu, 10 Sep 2026 09:00:00 EST</pubDate>
+      <description>Fixture article about U.S. crude oil production trends.</description>
+    </item>
+    <item>
+      <title>[FIXTURE] Natural gas storage builds ahead of winter</title>
+      <link>https://www.eia.gov/todayinenergy/detail.php?id=68124</link>
+      <guid>https://www.eia.gov/todayinenergy/detail.php?id=68124</guid>
+      <pubDate>Wed, 09 Sep 2026 09:00:00 EST</pubDate>
+      <description>Fixture article about natural gas storage.</description>
+    </item>
+    <item>
+      <title>[FIXTURE] NEW petroleum demand note for September</title>
+      <link>https://www.eia.gov/todayinenergy/detail.php?id=68199</link>
+      <guid>https://www.eia.gov/todayinenergy/detail.php?id=68199</guid>
+      <pubDate>Fri, 11 Sep 2026 09:00:00 EST</pubDate>
+      <description>Fixture-only incremental Today in Energy item.</description>
+    </item>
+  </channel>
+</rss>

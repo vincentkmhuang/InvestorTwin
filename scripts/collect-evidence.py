@@ -5,6 +5,8 @@
 # US indices: Stooq primary, FRED fallback (NASDAQCOM / SP500 / DJIA / NASDAQSOX).
 # TWSE: previous-session weekday lookback (weekends / missing sessions).
 # Gold: no reliable daily FRED USD series currently available (LBMA series removed).
+# P2-029: BLS Public Data API monthly series (CPI / Employment) — observation month ≠ release date.
+# P2-031: EIA API v2 (RWTC/RBRTE/WCESTUS1) — observation period ≠ release date; key via EIA_API_KEY only.
 import csv
 import datetime
 import io
@@ -14,7 +16,19 @@ import re
 import ssl
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
+
+BLS_API_BASE = "https://api.bls.gov/publicAPI/v2/timeseries/data/"
+BLS_ATTRIBUTION = "U.S. Bureau of Labor Statistics (BLS)"
+BLS_PERIOD_RE = re.compile(r"^M(0[1-9]|1[0-2])$")
+# P2-029A: set locally (never commit): BLS_REGISTRATION_KEY=<key from data.bls.gov/registrationEngine/>
+BLS_REGISTRATION_KEY_ENV = "BLS_REGISTRATION_KEY"
+
+EIA_API_BASE = "https://api.eia.gov"
+EIA_ATTRIBUTION = "U.S. Energy Information Administration (EIA)"
+# P2-031: set locally (never commit): EIA_API_KEY=<key from eia.gov/opendata/register.php>
+EIA_API_KEY_ENV = "EIA_API_KEY"
 
 DATE_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
 MAX_OBSERVATIONS = 30
@@ -116,6 +130,95 @@ SOURCE_CATALOG = {
         ],
         "unit": "TWD_hundred_million",
         "asOfKind": "close",
+    },
+    # P2-029 BLS Public Data API (monthly). asOf = observation month start (YYYY-MM-01).
+    "bls-cpi-sa": {
+        "source": "bls",
+        "instrument": "CPI_U_SA",
+        "unit": "index",
+        "asOfKind": "month",
+        "seriesId": "CUSR0000SA0",
+        "label": "CPI-U All items (seasonally adjusted)",
+    },
+    "bls-cpi-nsa": {
+        "source": "bls",
+        "instrument": "CPI_U_NSA",
+        "unit": "index",
+        "asOfKind": "month",
+        "seriesId": "CUUR0000SA0",
+        "label": "CPI-U All items (not seasonally adjusted)",
+    },
+    "bls-core-cpi-sa": {
+        "source": "bls",
+        "instrument": "CORE_CPI_SA",
+        "unit": "index",
+        "asOfKind": "month",
+        "seriesId": "CUSR0000SA0L1E",
+        "label": "CPI-U All items less food and energy (SA)",
+    },
+    "bls-core-cpi-nsa": {
+        "source": "bls",
+        "instrument": "CORE_CPI_NSA",
+        "unit": "index",
+        "asOfKind": "month",
+        "seriesId": "CUUR0000SA0L1E",
+        "label": "CPI-U All items less food and energy (NSA)",
+    },
+    "bls-unemployment": {
+        "source": "bls",
+        "instrument": "UNEMPLOYMENT_RATE",
+        "unit": "percent",
+        "asOfKind": "month",
+        "seriesId": "LNS14000000",
+        "label": "Unemployment rate (U-3)",
+    },
+    "bls-nonfarm": {
+        "source": "bls",
+        "instrument": "NONFARM_PAYROLLS",
+        "unit": "thousands",
+        "asOfKind": "month",
+        "seriesId": "CES0000000001",
+        "label": "Total nonfarm payroll employment",
+    },
+    "bls-ahe": {
+        "source": "bls",
+        "instrument": "AVG_HOURLY_EARNINGS",
+        "unit": "USD",
+        "asOfKind": "month",
+        "seriesId": "CES0500000003",
+        "label": "Average hourly earnings of all employees",
+    },
+    # P2-031 EIA API v2. Parallel to FRED WTI/Brent (distinct instruments — avoid overwrite).
+    # asOf = observation period (API `period`); releaseDate unknown from timeseries response.
+    "eia-wti": {
+        "source": "eia",
+        "instrument": "EIA_WTI",
+        "unit": "USD_per_barrel",
+        "asOfKind": "close",
+        "seriesId": "RWTC",
+        "route": "/v2/petroleum/pri/spt/data/",
+        "frequency": "daily",
+        "label": "WTI crude oil spot (EIA RWTC)",
+    },
+    "eia-brent": {
+        "source": "eia",
+        "instrument": "EIA_Brent",
+        "unit": "USD_per_barrel",
+        "asOfKind": "close",
+        "seriesId": "RBRTE",
+        "route": "/v2/petroleum/pri/spt/data/",
+        "frequency": "daily",
+        "label": "Brent crude oil spot (EIA RBRTE)",
+    },
+    "eia-crude-stocks": {
+        "source": "eia",
+        "instrument": "US_CRUDE_INVENTORIES",
+        "unit": "thousand_barrels",
+        "asOfKind": "week",
+        "seriesId": "WCESTUS1",
+        "route": "/v2/petroleum/sum/sndw/data/",
+        "frequency": "weekly",
+        "label": "US crude oil stocks ex-SPR (EIA WCESTUS1)",
     },
 }
 
@@ -283,9 +386,26 @@ def observations_from_payload(payload):
         for extra in ("foreign", "trust", "dealer"):
             if extra in row:
                 extras[extra] = parse_number(row.get(extra))
+        if "preliminary" in row:
+            extras["preliminary"] = bool(row.get("preliminary"))
+        if row.get("seriesId"):
+            extras["seriesId"] = row.get("seriesId")
+        if row.get("observationPeriod"):
+            extras["observationPeriod"] = row.get("observationPeriod")
+        if "releaseDate" in row:
+            extras["releaseDate"] = row.get("releaseDate")
+        # P2-029A: preserve BLS API v2 calculations (distinct from raw value / local delta).
+        if isinstance(row.get("blsCalculations"), dict):
+            extras["blsCalculations"] = row.get("blsCalculations")
+        if row.get("frequency"):
+            extras["frequency"] = row.get("frequency")
+        if row.get("unit"):
+            extras["unit"] = row.get("unit")
         if as_of is None:
             continue
-        if value is None and not any(item is not None for item in extras.values()):
+        if value is None and not any(
+            item is not None for key, item in extras.items() if key in ("foreign", "trust", "dealer")
+        ):
             continue
         item = {"date": as_of, "value": value}
         item.update(extras)
@@ -411,6 +531,281 @@ def live_fred(series_id):
             rows.append({"date": as_of, "value": value})
     rows.sort(key=lambda item: item["date"])
     return {"observations": rows[-MAX_OBSERVATIONS:]}
+
+
+def bls_period_to_asof(year, period):
+    """Map BLS year+Mxx to observation-month asOf (first calendar day). Not release date."""
+    year_s = str(year or "").strip()
+    period_s = str(period or "").strip().upper()
+    if not year_s.isdigit() or not BLS_PERIOD_RE.match(period_s):
+        return None
+    month = int(period_s[1:])
+    return datetime.date(int(year_s), month, 1).isoformat()
+
+
+def bls_footnotes_preliminary(footnotes):
+    if not isinstance(footnotes, list):
+        return False
+    for note in footnotes:
+        if not isinstance(note, dict):
+            continue
+        code = str(note.get("code") or "").upper()
+        text = str(note.get("text") or "").lower()
+        if code == "P" or "preliminary" in text:
+            return True
+    return False
+
+
+def bls_registration_key():
+    """Return BLS API v2 registration key from environment (never log or persist)."""
+    return os.environ.get(BLS_REGISTRATION_KEY_ENV, "").strip()
+
+
+def bls_parse_api_calculations(row):
+    """Extract BLS v2 calculations; kept separate from raw observation value."""
+    calc = row.get("calculations") if isinstance(row, dict) else None
+    if not isinstance(calc, dict):
+        return None
+    net = calc.get("net_changes")
+    pct = calc.get("pct_changes")
+    if not isinstance(net, dict) and not isinstance(pct, dict):
+        return None
+    out = {"source": "bls-api-v2"}
+    if isinstance(net, dict) and net:
+        out["net_changes"] = {str(k): str(v) for k, v in net.items() if v is not None}
+    if isinstance(pct, dict) and pct:
+        out["pct_changes"] = {str(k): str(v) for k, v in pct.items() if v is not None}
+    return out if len(out) > 1 else None
+
+
+def live_bls(series_id):
+    """Fetch one BLS series (wrapper around multi-series POST)."""
+    bundled = live_bls_multi([series_id])
+    return bundled.get(str(series_id)) or {
+        "observations": [],
+        "seriesId": series_id,
+        "attribution": BLS_ATTRIBUTION,
+        "source": "bls",
+    }
+
+
+def live_bls_multi(series_ids, require_registration_key=False):
+    """POST multiple BLS series in one request to conserve daily query quota."""
+    ids = [str(sid) for sid in series_ids if sid]
+    if not ids:
+        return {}
+    reg_key = bls_registration_key()
+    if require_registration_key and not reg_key:
+        raise ValueError("BLS_REGISTRATION_KEY not set")
+    request_body = {"seriesid": ids}
+    if reg_key:
+        request_body["registrationkey"] = reg_key
+        request_body["calculations"] = True
+        today = datetime.date.today()
+        request_body["endyear"] = str(today.year)
+        request_body["startyear"] = str(today.year - 2)
+    body = json.dumps(request_body).encode("utf-8")
+    url = BLS_API_BASE.rstrip("/") + "/"
+    request = urllib.request.Request(
+        url,
+        data=body,
+        headers={
+            "User-Agent": "InvestorTwin-Evidence/029A",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+        method="POST",
+    )
+    last_exc = None
+    text = None
+    live_bls_multi.last_http_status = None
+    live_bls_multi.last_api_status = None
+    live_bls_multi.registration_key_used = bool(reg_key)
+    for insecure in (False, True):
+        try:
+            context = ssl._create_unverified_context() if insecure else None
+            with urllib.request.urlopen(request, timeout=60, context=context) as response:
+                live_bls_multi.last_http_status = int(getattr(response, "status", None) or response.getcode())
+                text = response.read().decode("utf-8", errors="replace")
+            break
+        except Exception as exc:
+            last_exc = exc
+    if text is None:
+        raise last_exc
+    payload = json.loads(text)
+    live_bls_multi.last_api_status = str(payload.get("status") or "")
+    if live_bls_multi.last_api_status != "REQUEST_SUCCEEDED":
+        raise ValueError(
+            "BLS API status=" + live_bls_multi.last_api_status
+            + " message=" + str(payload.get("message"))
+        )
+    out = {}
+    for series_row in ((payload.get("Results") or {}).get("series") or []):
+        series_id = str(series_row.get("seriesID") or "")
+        data = series_row.get("data") or []
+        observations = []
+        for row in data:
+            if not isinstance(row, dict):
+                continue
+            value = parse_number(row.get("value"))
+            as_of = bls_period_to_asof(row.get("year"), row.get("period"))
+            if value is None or as_of is None:
+                continue
+            period = str(row.get("period") or "").upper()
+            observation_period = None
+            if period.startswith("M") and len(period) == 3:
+                observation_period = str(row.get("year")) + "-" + period[1:]
+            observation = {
+                "date": as_of,
+                "value": value,
+                "seriesId": series_id,
+                "observationPeriod": observation_period,
+                "periodName": row.get("periodName"),
+                "preliminary": bls_footnotes_preliminary(row.get("footnotes")),
+                "releaseDate": None,
+            }
+            bls_calc = bls_parse_api_calculations(row)
+            if bls_calc:
+                observation["blsCalculations"] = bls_calc
+            observations.append(observation)
+        observations.sort(key=lambda item: item["date"])
+        out[series_id] = {
+            "observations": observations[-MAX_OBSERVATIONS:],
+            "seriesId": series_id,
+            "attribution": BLS_ATTRIBUTION,
+            "source": "bls",
+            "api": BLS_API_BASE,
+            "registrationKeyUsed": bool(reg_key),
+            "calculationsAvailable": any(item.get("blsCalculations") for item in observations),
+        }
+    for series_id in ids:
+        if series_id not in out:
+            out[series_id] = {
+                "observations": [],
+                "seriesId": series_id,
+                "attribution": BLS_ATTRIBUTION,
+                "source": "bls",
+                "api": BLS_API_BASE,
+                "registrationKeyUsed": bool(reg_key),
+                "calculationsAvailable": False,
+            }
+    return out
+
+
+def eia_api_key():
+    """Return EIA API key from environment (never log or persist)."""
+    return os.environ.get(EIA_API_KEY_ENV, "").strip()
+
+
+def eia_redact(text):
+    value = str(text or "")
+    key = eia_api_key()
+    if key:
+        value = value.replace(key, "[REDACTED]")
+        value = value.replace(urllib.parse.quote(key, safe=""), "[REDACTED]")
+    value = re.sub(r"(api_key=)([^&\s\"']+)", r"\1[REDACTED]", value, flags=re.I)
+    return value
+
+
+def eia_period_to_asof(period):
+    """Map EIA API period string to observation asOf. Not a release timestamp."""
+    raw = str(period or "").strip()
+    if not raw:
+        return None
+    # Daily / weekly often YYYY-MM-DD
+    as_of = iso_date(raw)
+    if as_of:
+        return as_of
+    # Accept YYYY-MM (month) → first day
+    if re.match(r"^\d{4}-\d{2}$", raw):
+        return raw + "-01"
+    return None
+
+
+def live_eia(series_id, route, frequency, length=None):
+    """GET one EIA APIv2 series. Requires EIA_API_KEY. No sample fallback."""
+    key = eia_api_key()
+    if not key:
+        raise ValueError("EIA_API_KEY not set")
+    length = length or MAX_OBSERVATIONS
+    params = [
+        ("api_key", key),
+        ("frequency", frequency),
+        ("data[0]", "value"),
+        ("facets[series][]", str(series_id)),
+        ("sort[0][column]", "period"),
+        ("sort[0][direction]", "desc"),
+        ("length", str(length)),
+    ]
+    url = EIA_API_BASE.rstrip("/") + str(route) + "?" + urllib.parse.urlencode(params)
+    request = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "InvestorTwin-Evidence/031",
+            "Accept": "application/json",
+        },
+        method="GET",
+    )
+    last_exc = None
+    text = None
+    http_status = None
+    for insecure in (False, True):
+        try:
+            context = ssl._create_unverified_context() if insecure else None
+            with urllib.request.urlopen(request, timeout=60, context=context) as response:
+                http_status = int(getattr(response, "status", None) or response.getcode())
+                text = response.read().decode("utf-8", errors="replace")
+            break
+        except urllib.error.HTTPError as exc:
+            body = ""
+            try:
+                body = exc.read().decode("utf-8", errors="replace")[:300]
+            except Exception:
+                body = ""
+            last_exc = ValueError("EIA HTTP " + str(exc.code) + " " + eia_redact(body))
+        except Exception as exc:
+            last_exc = ValueError(eia_redact(exc))
+    if text is None:
+        raise last_exc
+    if http_status != 200:
+        raise ValueError("EIA HTTP " + str(http_status))
+    payload = json.loads(text)
+    response = payload.get("response") if isinstance(payload, dict) else None
+    if not isinstance(response, dict):
+        raise ValueError("EIA API response missing response object")
+    data = response.get("data")
+    if not isinstance(data, list):
+        raise ValueError("EIA API response missing data[]")
+    observations = []
+    for row in data:
+        if not isinstance(row, dict):
+            continue
+        value = parse_number(row.get("value"))
+        period = str(row.get("period") or "").strip()
+        as_of = eia_period_to_asof(period)
+        if value is None or as_of is None:
+            continue
+        unit = row.get("unit") or row.get("units") or row.get("unit-short")
+        observations.append({
+            "date": as_of,
+            "value": value,
+            "seriesId": str(series_id),
+            "observationPeriod": period,
+            "unit": str(unit) if unit else None,
+            "frequency": str(row.get("frequency") or frequency),
+            # Timeseries API has no publication timestamp.
+            "releaseDate": None,
+        })
+    observations.sort(key=lambda item: item["date"])
+    return {
+        "observations": observations[-MAX_OBSERVATIONS:],
+        "seriesId": str(series_id),
+        "attribution": EIA_ATTRIBUTION,
+        "source": "eia",
+        "api": EIA_API_BASE + str(route),
+        "frequency": frequency,
+        "httpStatus": http_status,
+    }
 
 
 def live_stooq(symbol):
@@ -602,6 +997,10 @@ def fetch_live(source_id, expected_as_of):
         return live_fred(catalog["fredId"])
     if catalog["source"] == "us-index":
         return fetch_us_index(catalog)
+    if catalog["source"] == "bls":
+        return live_bls(catalog["seriesId"])
+    if catalog["source"] == "eia":
+        return live_eia(catalog["seriesId"], catalog["route"], catalog["frequency"])
     if source_id == "twse-taiex":
         return fetch_twse_session(live_twse_taiex, expected_as_of)
     if source_id == "twse-institutional":
@@ -907,6 +1306,35 @@ def process_source(root, raw_item, expected_as_of, captured_at, run_dir):
             series,
             captured_at,
         )
+        if catalog.get("source") == "bls":
+            record["seriesId"] = catalog.get("seriesId")
+            record["attribution"] = BLS_ATTRIBUTION
+            record["retrievedAt"] = captured_at
+            # Adjacent prior observation delta via existing changeDoD — not a BLS-published MoM %.
+            if record.get("changeDoD") is not None and record.get("changeDoDStatus") == "ok":
+                record["calculationMethod"] = "adjacent-observation-delta"
+            meta = next((row for row in observations if row.get("date") == as_of), None) or {}
+            if "preliminary" in meta:
+                record["preliminary"] = bool(meta.get("preliminary"))
+            if meta.get("observationPeriod"):
+                record["observationPeriod"] = meta.get("observationPeriod")
+            # Explicit: timeseries API has no release datetime.
+            record["releaseDate"] = meta.get("releaseDate")
+            bls_calc = meta.get("blsCalculations")
+            if isinstance(bls_calc, dict):
+                record["blsCalculations"] = bls_calc
+                record["calculationSource"] = bls_calc.get("source") or "bls-api-v2"
+        if catalog.get("source") == "eia":
+            record["seriesId"] = catalog.get("seriesId")
+            record["attribution"] = EIA_ATTRIBUTION
+            record["retrievedAt"] = captured_at
+            meta = next((row for row in observations if row.get("date") == as_of), None) or {}
+            if meta.get("observationPeriod"):
+                record["observationPeriod"] = meta.get("observationPeriod")
+            if meta.get("frequency"):
+                record["frequency"] = meta.get("frequency")
+            # Explicit: EIA timeseries response has no release datetime → UNKNOWN.
+            record["releaseDate"] = None
         write_json(os.path.join(run_dir, "normalized", instrument + ".json"), record, root=root)
         write_history(root, instrument, record)
         produced.append(record)
@@ -929,7 +1357,49 @@ def collect_from_fixture(root, fixture_path, expected_as_of, captured_at):
 
 def collect_live(expected_as_of):
     items = []
+    bls_ids = [
+        source_id for source_id, catalog in SOURCE_CATALOG.items()
+        if catalog.get("source") == "bls"
+    ]
+    bls_payloads = {}
+    bls_error = None
+    if bls_ids:
+        try:
+            if not bls_registration_key():
+                raise ValueError("BLS_REGISTRATION_KEY not set")
+            series_ids = [SOURCE_CATALOG[sid]["seriesId"] for sid in bls_ids]
+            bundled = live_bls_multi(series_ids)
+            for source_id in bls_ids:
+                series_id = SOURCE_CATALOG[source_id]["seriesId"]
+                bls_payloads[source_id] = bundled.get(series_id) or {
+                    "observations": [],
+                    "seriesId": series_id,
+                    "attribution": BLS_ATTRIBUTION,
+                    "source": "bls",
+                }
+        except Exception as exc:
+            bls_error = str(exc)
+
     for source_id in SOURCE_CATALOG:
+        catalog = SOURCE_CATALOG[source_id]
+        if catalog.get("source") == "bls":
+            if bls_error:
+                items.append({
+                    "sourceId": source_id,
+                    "status": "unavailable",
+                    "payload": None,
+                    "error": bls_error,
+                })
+                continue
+            payload = bls_payloads.get(source_id)
+            obs = observations_from_payload(payload)
+            items.append({
+                "sourceId": source_id,
+                "status": "ok" if obs else "missing",
+                "payload": payload,
+                "error": None if obs else "source returned no usable observations",
+            })
+            continue
         try:
             payload = fetch_live(source_id, expected_as_of)
             obs = observations_from_payload(payload)

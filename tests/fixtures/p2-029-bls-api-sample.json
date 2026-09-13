@@ -1,0 +1,62 @@
+{
+  "description": "Sample BLS Public API shaped observations for offline/quota fallback in p2-029 tests. Not live.",
+  "series": {
+    "CUSR0000SA0": {
+      "observations": [
+        {
+          "date": "2026-07-01",
+          "value": 332.812,
+          "seriesId": "CUSR0000SA0",
+          "observationPeriod": "2026-07",
+          "periodName": "July",
+          "preliminary": false,
+          "releaseDate": null
+        },
+        {
+          "date": "2026-08-01",
+          "value": 334.131,
+          "seriesId": "CUSR0000SA0",
+          "observationPeriod": "2026-08",
+          "periodName": "August",
+          "preliminary": false,
+          "releaseDate": null
+        }
+      ]
+    },
+    "CES0000000001": {
+      "observations": [
+        {
+          "date": "2026-07-01",
+          "value": 158913,
+          "seriesId": "CES0000000001",
+          "observationPeriod": "2026-07",
+          "periodName": "July",
+          "preliminary": true,
+          "releaseDate": null
+        },
+        {
+          "date": "2026-08-01",
+          "value": 159075,
+          "seriesId": "CES0000000001",
+          "observationPeriod": "2026-08",
+          "periodName": "August",
+          "preliminary": true,
+          "releaseDate": null
+        }
+      ]
+    },
+    "CES0500000003": {
+      "observations": [
+        {
+          "date": "2026-08-01",
+          "value": 37.75,
+          "seriesId": "CES0500000003",
+          "observationPeriod": "2026-08",
+          "periodName": "August",
+          "preliminary": true,
+          "releaseDate": null
+        }
+      ]
+    }
+  }
+}
