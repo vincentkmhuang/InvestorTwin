@@ -27,7 +27,28 @@ ENTITY_ALIASES = (
     ("other company", "other-company"),
     ("nvda", "nvidia"),
     ("nvidia", "nvidia"),
+    ("輝達", "nvidia"),
+    ("asic", "asic"),
+    ("特殊應用積體電路", "asic"),
+    ("ai server", "ai-server"),
+    ("ai伺服器", "ai-server"),
+    ("vera rubin", "ai-server"),
+    ("奇鋐", "taiwan-cooling"),
+    ("雙鴻", "taiwan-cooling"),
+    ("散熱雙雄", "taiwan-cooling"),
 )
+SUBJECT_DISPLAY = {
+    "nvidia": "NVIDIA",
+    "hugging-face": "Hugging Face",
+    "fomc": "FOMC",
+    "federal-reserve": "Federal Reserve",
+    "other-company": "Other company",
+    "asic": "ASIC",
+    "ai-server": "AI Server",
+    "taiwan-cooling": "Taiwan Cooling",
+    "semiconductor": "Semiconductor",
+    "unknown": "UNKNOWN",
+}
 STATE_MARKERS = (
     ("complete", ("completion", "completed", "complete")),
     ("review", ("regulators begin", "regulator", "reviewing", "review")),
@@ -90,6 +111,15 @@ def extract_entities(text):
     return found
 
 
+def subject_display(entities):
+    labels = []
+    for name in entities:
+        label = SUBJECT_DISPLAY.get(name) or name
+        if label not in labels:
+            labels.append(label)
+    return " / ".join(labels) if labels else "UNKNOWN"
+
+
 def headline_entities(news):
     return extract_entities(blob([news.get("subject"), news.get("title")]))
 
@@ -134,23 +164,35 @@ def analyze(news, evaluate):
     state = event_state(news)
     entities = deal_entities(news, state)
     when = event_time(news)
+    subject = subject_display(entities)
+    draft_event = {
+        "what": state,
+        "when": when,
+        "subject": subject,
+        "eventType": event_type,
+    }
+    what_changed = evaluate.what_changed_bundle(news, draft_event)
+    what_summary = what_changed.get("summary") or state
     return {
         "id": news.get("id") or news.get("url") or news.get("title"),
         "source": news.get("source"),
         "url": news.get("url"),
         "title": news.get("title"),
-        "subject": news.get("subject"),
+        "subject": subject,
         "eventType": event_type,
         "eventTime": when,
         "state": state,
         "entities": sorted(set(entities)),
         "coreFact": state,
+        "whatSummary": what_summary,
+        "whatChanged": what_changed,
     }
 
 
 def canonical_event_id(analysis):
+    type_slug = re.sub(r"[^a-z0-9]+", "-", lower(analysis["eventType"]) or "other").strip("-") or "other"
     return "evt:{type}/{entities}/{state}".format(
-        type=re.sub(r"\s+", "-", lower(analysis["eventType"]) or "other"),
+        type=type_slug,
         entities=",".join(analysis["entities"]) or "unknown",
         state=analysis["state"],
     )
@@ -223,10 +265,11 @@ def link(raw):
         event_id = item["eventRef"]
         event = events.setdefault(event_id, {
             "eventId": event_id,
-            "what": analysis["coreFact"],
+            "what": analysis.get("whatSummary") or analysis["coreFact"],
             "when": analysis["eventTime"],
-            "subject": " / ".join(analysis["entities"]),
+            "subject": analysis["subject"],
             "eventType": analysis["eventType"],
+            "whatChanged": analysis.get("whatChanged"),
             "newsRefs": [],
         })
         event["newsRefs"].append(analysis["id"])
@@ -259,21 +302,33 @@ def link(raw):
         event_id = item["eventRef"]
         event = events.setdefault(event_id, {
             "eventId": event_id,
-            "what": analysis["coreFact"],
+            "what": analysis.get("whatSummary") or analysis["coreFact"],
             "when": analysis["eventTime"],
-            "subject": " / ".join(analysis["entities"]),
+            "subject": analysis["subject"],
             "eventType": analysis["eventType"],
+            "whatChanged": analysis.get("whatChanged"),
             "newsRefs": [],
         })
         if analysis["id"] not in event["newsRefs"]:
             event["newsRefs"].append(analysis["id"])
+        # Prefer richer whatChanged if a later article in the same event adds detail.
+        if analysis.get("whatChanged") and not event.get("whatChanged"):
+            event["whatChanged"] = analysis.get("whatChanged")
+        if analysis.get("whatSummary") and (
+            not event.get("what") or event.get("what") in ("other", "acquire", "review", "complete", "terminate", "partnership")
+        ):
+            event["what"] = analysis.get("whatSummary")
+        if analysis.get("subject"):
+            event["subject"] = analysis["subject"]
+        if analysis.get("eventType"):
+            event["eventType"] = analysis["eventType"]
 
     result = {
         "news": prepared,
         "events": list(events.values()),
         "links": links,
     }
-    leaked = [word for word in RECOMMENDATION_WORDS if word in json.dumps(result, ensure_ascii=False).lower()]
+    leaked = evaluate.recommendation_leak(result)
     if leaked:
         fail("dedup leaked recommendation language: " + ", ".join(leaked))
     return result

@@ -288,10 +288,17 @@ try {
   Add-TestResult 'TEST 128' ($fail128.Count -eq 0) ($fail128 -join "`n")
 
   $fail129 = New-Object System.Collections.Generic.List[string]
+  # Fixture Brief must not invent Bitcoin/Gold without Evidence rows in that fixture.
   if ($mt.PSObject.Properties.Name -contains 'Bitcoin') { $fail129.Add('Bitcoin invented in marketTemperature') }
   if ($mt.PSObject.Properties.Name -contains 'Gold') { $fail129.Add('Gold invented in marketTemperature') }
-  if ($GenerateSrc -match '"Bitcoin"\s*:') { $fail129.Add('Bitcoin mapped without Evidence path') }
+  $CollectSrc = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\collect-evidence.py'), $Utf8NoBom)
+  if ($GenerateSrc -match '"Bitcoin"\s*:') {
+    if ($CollectSrc -notmatch 'CBBTCUSD' -or $CollectSrc -notmatch '"instrument": "Bitcoin"') {
+      $fail129.Add('Bitcoin mapped without Evidence path')
+    }
+  }
   if ($GenerateSrc -match '"Gold"\s*:') { $fail129.Add('Gold mapped without Evidence path') }
+  if ($CollectSrc -match '"instrument": "Gold"') { $fail129.Add('Gold Evidence path invented without reliable source') }
   Add-TestResult 'TEST 129' ($fail129.Count -eq 0) ($fail129 -join "`n")
 
   $fail130 = New-Object System.Collections.Generic.List[string]

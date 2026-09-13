@@ -173,16 +173,50 @@ def evaluate_event(event, group, evaluate, fixture_raw):
         seen.add(marker)
         unique.append(item)
     impact = result["impact"]
-    evaluation = {
+    what_changed = result.get("whatChanged") or event.get("whatChanged")
+    if unique:
+        evaluation_impact_status = evidence_status_from_refs(unique)
+    else:
+        evaluation_impact_status = impact.get("evidenceStatus") or {key: [] for key in SEPARATION_KEYS}
+    if isinstance(what_changed, dict) and isinstance(evaluation_impact_status, dict):
+        for key in SEPARATION_KEYS:
+            existing = list(evaluation_impact_status.get(key) or [])
+            if existing:
+                evaluation_impact_status[key] = existing
+                continue
+            filled = []
+            for claim in what_changed.get(key) or []:
+                claim_text = str(claim).strip()
+                if claim_text:
+                    filled.append({
+                        "claim": claim_text,
+                        "newsRef": news_id(group[0]),
+                        "source": group[0].get("source"),
+                    })
+            evaluation_impact_status[key] = filled
+
+    if event.get("what") in ("acquire", "review", "complete", "terminate", "partnership", "other"):
+        if isinstance(what_changed, dict) and what_changed.get("summary"):
+            event["what"] = what_changed["summary"]
+        else:
+            event["what"] = raw.get("summary") or raw.get("title") or event.get("what")
+    if isinstance(what_changed, dict):
+        event["whatChanged"] = what_changed
+    ev_type = (result.get("event") or {}).get("eventType")
+    if ev_type and event.get("eventType") in (None, "", "Other"):
+        event["eventType"] = ev_type
+
+    return {
         "eventRef": event["eventId"],
         "importance": result["importance"],
         "relevance": result["relevance"],
         "relevanceBasis": result["relevanceBasis"],
+        "whatChanged": what_changed if isinstance(what_changed, dict) else None,
         "impact": {
             "target": impact.get("target"),
             "direction": impact.get("direction"),
             "strength": impact.get("strength"),
-            "evidenceStatus": evidence_status_from_refs(unique) if unique else impact.get("evidenceStatus"),
+            "evidenceStatus": evaluation_impact_status,
         },
         "evidenceRefs": unique,
         "researchCandidate": {
@@ -193,7 +227,6 @@ def evaluate_event(event, group, evaluate, fixture_raw):
             "eventRef": event["eventId"],
         },
     }
-    return evaluation
 
 
 def integrate(raw):
@@ -234,7 +267,7 @@ def integrate(raw):
         "evaluations": evaluations,
         "researchCandidates": research_candidates,
     }
-    leaked = [word for word in RECOMMENDATION_WORDS if word in json.dumps(result, ensure_ascii=False).lower()]
+    leaked = evaluate.recommendation_leak(result)
     if leaked:
         fail("integration leaked recommendation language: " + ", ".join(leaked))
     return result

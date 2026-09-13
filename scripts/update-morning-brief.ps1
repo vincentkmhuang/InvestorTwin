@@ -18,14 +18,18 @@ if (-not $RootPath) {
 $RootPath = [System.IO.Path]::GetFullPath($RootPath)
 
 $CollectScript = Join-Path $PSScriptRoot 'collect-evidence.ps1'
+$NewsCollectPy = Join-Path $PSScriptRoot 'collect-news.py'
 $GenerateScript = Join-Path $PSScriptRoot 'generate-morning-brief.ps1'
 $LockPath = Join-Path $RootPath 'data\morning-brief-update.lock'
 $StatusPath = Join-Path $RootPath 'data\morning-brief-update-status.json'
+$HandoffPath = Join-Path $RootPath 'data\research-candidates-handoff.json'
+$NewsStoreRoot = Join-Path $RootPath 'data\news'
 $script:LockOwned = $false
 $script:StartedAt = $null
 
 if (-not (Test-Path -LiteralPath $CollectScript)) { throw "Missing collector wrapper: $CollectScript" }
 if (-not (Test-Path -LiteralPath $GenerateScript)) { throw "Missing generator wrapper: $GenerateScript" }
+if (-not (Test-Path -LiteralPath $NewsCollectPy)) { throw "Missing news collect pipeline: $NewsCollectPy" }
 
 if ($Live -and $InputPath) {
   throw "Use either -InputPath or -Live, not both."
@@ -231,6 +235,26 @@ try {
   if ($collect.Text -match 'runId=(run-\S+)') { $runId = $Matches[1].Trim() }
   if ($collect.ExitCode -ne 0) {
     Complete-Update -Code $collect.ExitCode -Stage 'collect' -ErrorText $collect.Text -RunId $runId
+  }
+
+  # P2-022 Step 2: News Collect → existing integrate → publish handoff (replace fixture).
+  # Soft-fail: market Evidence Brief still generates if no new news / NI skip.
+  Write-Output 'DAILY_UPDATE_NEWS'
+  $prev = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  try {
+    $newsOut = & $resolvedPython $NewsCollectPy `
+      --store-root $NewsStoreRoot `
+      --publish-handoff $HandoffPath `
+      --replace-handoff 2>&1
+    $newsCode = [int]$LASTEXITCODE
+  } finally {
+    $ErrorActionPreference = $prev
+  }
+  $newsText = (($newsOut | ForEach-Object { "$_" }) -join "`n")
+  Write-Output $newsText
+  if ($newsCode -ne 0) {
+    Write-Output 'DAILY_UPDATE_NEWS_SOFT_FAIL'
   }
 
   Write-Output 'DAILY_UPDATE_GENERATE'

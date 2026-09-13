@@ -1,6 +1,7 @@
 # Investor Twin 031-B — Morning Brief generator with Evidence selection.
 # Reads data/evidence/. Writes data/morning-brief.json only.
 # Never creates Research Cards, Queue, Thesis, Case, Decision, or Playbook.
+import datetime
 import json
 import os
 import re
@@ -21,12 +22,14 @@ CANONICAL_FIELDS = (
     "opportunityRadar",
     "opportunityRadarException",
 )
-# Handbook Market Temperature instruments (Detect). Bitcoin/Gold omitted until Evidence exists.
+# Handbook Market Temperature instruments (Detect).
+# Gold omitted: no reliable daily FRED USD spot series in current Evidence catalog.
 TEMPERATURE_KEYS = {
     "Nasdaq": "Nasdaq",
     "SPX": "S&P 500",
     "DJI": "Dow",
     "SOX": "SOX",
+    "Bitcoin": "Bitcoin",
     "WTI": "WTI",
     "Brent": "Brent",
     "VIX": "VIX",
@@ -39,11 +42,29 @@ EVENT_PREFIX = "事件｜"
 MAX_BRIEF_EVENTS = 3
 MIN_EVENT_IMPORTANCE = 3
 EVENT_RELEVANCE_OK = ("High", "Medium")
+# Event freshness (P2-022 Step 2): keep Brief date-honest; never treat stale as "yesterday".
+MAX_BRIEF_EVENT_AGE_DAYS = 7
+ELEVATE_EVENT_MAX_AGE_DAYS = 2
 HANDOFF_REL = os.path.join("data", "research-candidates-handoff.json")
 TAIWAN_MARKERS = (
     "taiwan", "taiex", "twse", "tpex", "mops",
     "台股", "台灣", "臺灣", "台北", "臺北",
 )
+
+
+def relevance_ok(value):
+    """Accept High/Medium; reject Low and Medium-Low compounds from existing NI labels."""
+    text = str(value or "").strip()
+    if text in EVENT_RELEVANCE_OK:
+        return True
+    lowered = text.lower()
+    if "medium-low" in lowered or lowered.startswith("low"):
+        return False
+    if "high" in lowered:
+        return True
+    if "medium" in lowered and "low" not in lowered:
+        return True
+    return False
 
 # Canonical Research Card ids only. Unmapped instruments stay unselected.
 INSTRUMENT_MAP = {
@@ -95,6 +116,12 @@ INSTRUMENT_MAP = {
         "theme": "commodity",
         "researchId": None,
     },
+    "Bitcoin": {
+        "sections": ["marketTemperature"],
+        "priority": 54,
+        "theme": "commodity",
+        "researchId": None,
+    },
     "SOX": {
         "sections": ["marketTemperature", "aiIndustryHighlights"],
         "priority": 90,
@@ -129,11 +156,26 @@ INSTRUMENT_MAP = {
     },
 }
 THEME_WHY = {
+    # Legacy labels retained for tests that may still reference keys; not used as FACT.
     "macro": "長債利率是高估值與 AI 資產的估值約束。",
     "global": "美股指數反映全球風險偏好，不是個股研究結論。",
     "taiwan": "台股水位與外資流向會改變台灣半導體風險偏好。",
     "ai": "SOX 是半導體風險偏好，對既有 HBM 研究主題有關。",
-    "commodity": "油價與波動率是全球風險與通膨預期的市場狀態訊號。",
+    "commodity": "油價、波動率與 Bitcoin 是全球風險與通膨預期的市場狀態訊號。",
+}
+THEME_INFERENCE = {
+    "macro": "在其他條件不變下，較高長債殖利率可能增加高估值／AI 資產的估值壓力。",
+    "global": "美股指數水位反映風險偏好變化，但不等於個股或產業結論。",
+    "taiwan": "台股水位與外資流向可能改變台灣半導體風險偏好，仍需對照個股與基本面。",
+    "ai": "SOX 變動可能反映半導體風險偏好，與既有 HBM 研究主題相關但非因果證明。",
+    "commodity": "油價／波動率／Bitcoin 變動可能反映風險與通膨預期，但不單獨決定投資結論。",
+}
+THEME_UNKNOWN = {
+    "macro": "尚不足以確認殖利率變動是否導致 AI 資本支出週期轉弱。",
+    "global": "尚不足以由指數 alone 推導個股或主題盈虧。",
+    "taiwan": "尚不足以確認法人流向是否持續或已定調半導體週期。",
+    "ai": "尚不足以由 SOX 單日／近期水位確認 HBM 供需轉折。",
+    "commodity": "尚不足以由單一商品／波動指標推導總體政策路徑。",
 }
 THEME_LABEL = {
     "macro": "美債",
@@ -292,10 +334,15 @@ def load_evidence(root):
                 merged[str(item.get("instrument") or instrument)] = item
     run_items = load_run_normalized(latest_run_dir(root))
     for instrument, row in run_items.items():
+        status = str(row.get("status") or "")
+        # Latest collect unavailable/missing must not keep older history as "current".
+        if status in ("unavailable", "missing"):
+            merged[instrument] = row
+            continue
         current = merged.get(instrument)
         if current is None or not is_valued(current):
             merged[instrument] = row
-        elif is_valued(row) and str(row.get("asOf") or "") > str(current.get("asOf") or ""):
+        elif is_valued(row) and str(row.get("asOf") or "") >= str(current.get("asOf") or ""):
             merged[instrument] = row
     return merged
 
@@ -311,6 +358,8 @@ def fmt_number(value, unit):
         return f"{number:.1f}億"
     if unit == "USD_per_barrel":
         return f"{number:.2f}"
+    if unit == "USD":
+        return f"{number:,.2f}"
     if number >= 100:
         return f"{number:,.2f}"
     return f"{number:.2f}"
@@ -345,6 +394,17 @@ def parse_event_date(value):
     return None
 
 
+def event_age_days(when, brief_date):
+    """Calendar days between event when and Brief date. None if unparseable."""
+    when_day = parse_event_date(when)
+    brief_day = parse_event_date(brief_date)
+    if when_day is None or brief_day is None:
+        return None
+    start = datetime.date.fromisoformat(when_day)
+    end = datetime.date.fromisoformat(brief_day)
+    return (end - start).days
+
+
 def filter_upcoming_events(events, brief_date):
     """Keep only events on/after Brief date. Drop past and unparseable when."""
     kept = []
@@ -377,11 +437,14 @@ def _first_fact_claim(evaluation):
     facts = status.get("FACT") if isinstance(status, dict) else None
     if isinstance(facts, list):
         for row in facts:
-            if not isinstance(row, dict):
-                continue
-            claim = str(row.get("claim") or "").strip()
-            if claim:
-                return claim, str(row.get("source") or "").strip()
+            if isinstance(row, dict):
+                claim = str(row.get("claim") or "").strip()
+                if claim:
+                    return claim, str(row.get("source") or "").strip()
+            else:
+                claim = str(row or "").strip()
+                if claim:
+                    return claim, ""
     refs = evaluation.get("evidenceRefs") if isinstance(evaluation, dict) else None
     if isinstance(refs, list):
         for row in refs:
@@ -393,6 +456,28 @@ def _first_fact_claim(evaluation):
             if claim:
                 return claim, str(row.get("source") or "").strip()
     return "", ""
+
+
+def _what_changed_from(evaluation, event):
+    for source in (evaluation, event):
+        if not isinstance(source, dict):
+            continue
+        block = source.get("whatChanged")
+        if isinstance(block, dict) and block:
+            return block
+    return {}
+
+
+def _claim_texts(rows):
+    out = []
+    for row in rows or []:
+        if isinstance(row, dict):
+            claim = str(row.get("claim") or "").strip()
+        else:
+            claim = str(row or "").strip()
+        if claim:
+            out.append(claim)
+    return out
 
 
 def _event_region(event, news_rows, source):
@@ -447,14 +532,19 @@ def collect_evaluated_events(root, brief_date):
         # Future events must not appear as Yesterday / historical Brief events.
         if when > brief_date:
             continue
+        age = event_age_days(when, brief_date)
+        if age is None or age > MAX_BRIEF_EVENT_AGE_DAYS:
+            # Stale vs Brief date: do not hard-insert old fixture/events as current news.
+            continue
         try:
             importance = int(evaluation.get("importance"))
         except (TypeError, ValueError):
             continue
         relevance = str(evaluation.get("relevance") or "").strip()
-        if importance < MIN_EVENT_IMPORTANCE:
+        # High-relevance events may still have thin importance from evaluate heuristics.
+        if importance < MIN_EVENT_IMPORTANCE and "high" not in relevance.lower():
             continue
-        if relevance not in EVENT_RELEVANCE_OK:
+        if not relevance_ok(relevance):
             continue
 
         news_rows = []
@@ -466,8 +556,17 @@ def collect_evaluated_events(root, brief_date):
         subject = str(event.get("subject") or "").strip()
         what = str(event.get("what") or "").strip()
         event_type = str(event.get("eventType") or "").strip()
-        if fact_claim:
+        what_changed = _what_changed_from(evaluation, event)
+        wc_summary = str(what_changed.get("summary") or "").strip()
+        # Prefer structured understanding over subject:other.
+        if subject and event_type and wc_summary:
+            fact_title = f"{subject}｜{event_type}｜{wc_summary}"
+        elif subject and event_type and what and what.lower() not in ("other", "unknown"):
+            fact_title = f"{subject}｜{event_type}｜{what}"
+        elif fact_claim:
             fact_title = fact_claim
+            if subject and event_type and fact_claim == what:
+                fact_title = f"{subject}｜{event_type}｜{fact_claim}"
         elif subject and what:
             fact_title = f"{subject}：{what}"
             if event_type:
@@ -491,19 +590,32 @@ def collect_evaluated_events(root, brief_date):
             source = str(news_rows[0].get("source") or "").strip()
         if not source:
             source = "Event"
+        # Production must not promote Acceptance Fixture rows as live news.
+        if source.strip().lower() == "acceptance fixture":
+            continue
+
+        url = ""
+        published_time = ""
+        if news_rows:
+            url = str(news_rows[0].get("url") or "").strip()
+            published_time = str(news_rows[0].get("publishedTime") or "").strip()
 
         # Candidate eligibility is intentionally ignored — Event ≠ Candidate.
         packets.append({
             "eventId": event_ref,
             "when": when,
+            "ageDays": age,
             "subject": subject,
             "what": what,
             "eventType": event_type,
+            "whatChanged": what_changed,
             "importance": importance,
             "relevance": relevance,
             "why": why,
             "factTitle": fact_title,
             "source": source,
+            "url": url or None,
+            "publishedTime": published_time or None,
             "region": _event_region(event, news_rows, source),
             "impact": evaluation.get("impact") if isinstance(evaluation.get("impact"), dict) else {},
         })
@@ -514,7 +626,7 @@ def collect_evaluated_events(root, brief_date):
 
 def event_brief_item(packet):
     """Honest Event item — never quote-as-news; never Candidate researchQuestion as what."""
-    return {
+    item = {
         "title": EVENT_PREFIX + packet["factTitle"],
         "source": packet["source"],
         "researchId": None,
@@ -525,6 +637,11 @@ def event_brief_item(packet):
         "importance": packet["importance"],
         "relevance": packet["relevance"],
     }
+    if packet.get("url"):
+        item["url"] = packet["url"]
+    if packet.get("publishedTime"):
+        item["publishedTime"] = packet["publishedTime"]
+    return item
 
 
 def event_macro_lens_line(packet):
@@ -715,6 +832,350 @@ def as_of_stamp(item):
     return f"asOf {as_of}，非最新"
 
 
+def fact_instrument_line(item):
+    """FACT line for one Evidence instrument — value + asOf + source only."""
+    row = item.get("row") if isinstance(item.get("row"), dict) else {}
+    instrument = item.get("instrument") or row.get("instrument") or "UNKNOWN"
+    unit = row.get("unit") or "index"
+    number = fmt_number(row.get("value"), unit)
+    if number is None:
+        return None
+    source = str(row.get("sourceId") or "UNKNOWN").strip() or "UNKNOWN"
+    as_of = str(row.get("asOf") or "UNKNOWN").strip() or "UNKNOWN"
+    line = f"FACT｜{instrument}={number}（asOf {as_of}；source {source}"
+    if not item.get("latest"):
+        line += "；非 Brief 日最新"
+    line += "）"
+    change = row.get("changeDoD")
+    if change is not None:
+        try:
+            line += f"；changeDoD={float(change):.4g}"
+        except (TypeError, ValueError):
+            pass
+    return line
+
+
+def item_change_dod(item):
+    row = item.get("row") if isinstance(item.get("row"), dict) else {}
+    try:
+        return float(row.get("changeDoD"))
+    except (TypeError, ValueError):
+        return None
+
+
+def change_direction(item):
+    value = item_change_dod(item)
+    if value is None:
+        return "unknown"
+    if value > 0:
+        return "up"
+    if value < 0:
+        return "down"
+    return "flat"
+
+
+def pick_items(by_id, instruments):
+    out = []
+    for name in instruments:
+        hit = by_id.get(name)
+        if hit and is_valued(hit.get("row") or {}):
+            out.append(hit)
+    return out
+
+
+def relationship_score(left_items, right_items):
+    if not left_items or not right_items:
+        return 0.0
+    total = 0.0
+    any_change = False
+    for item in list(left_items) + list(right_items):
+        change = item_change_dod(item)
+        if change is None:
+            continue
+        any_change = True
+        total += abs(change)
+    return total if any_change else 0.5
+
+
+def describe_dirs(items):
+    dirs = [change_direction(item) for item in items]
+    if not dirs or all(d == "unknown" for d in dirs):
+        return "方向 UNKNOWN"
+    known = [d for d in dirs if d != "unknown"]
+    if known and all(d == "up" for d in known):
+        return "上升"
+    if known and all(d == "down" for d in known):
+        return "回落"
+    if "up" in dirs and "down" in dirs:
+        return "分化"
+    return "持平／混合"
+
+
+def interpret_cross_relationship(name, left_items, right_items, left_label, right_label):
+    """FACT/INFERENCE/UNKNOWN for paired Evidence. Never asserts unproven causation."""
+    if not left_items or not right_items:
+        return {
+            "id": name,
+            "score": 0.0,
+            "text": f"UNKNOWN｜{left_label}×{right_label} 缺少一側 Evidence，無法建立關係解讀。",
+            "ok": False,
+        }
+    facts = []
+    for item in list(left_items) + list(right_items):
+        line = fact_instrument_line(item)
+        if line:
+            facts.append(line)
+    score = relationship_score(left_items, right_items)
+    left_dir = describe_dirs(left_items)
+    right_dir = describe_dirs(right_items)
+    if left_dir == "上升" and right_dir == "上升":
+        inference = (
+            f"INFERENCE｜{left_label}與{right_label}同期皆偏強／上升；"
+            f"目前資料未顯示一方主導另一方全面惡化，因果未證。"
+        )
+    elif left_dir == "上升" and right_dir == "回落":
+        inference = (
+            f"INFERENCE｜{left_label}上升與{right_label}回落同期出現；"
+            f"可能存在壓力並陳，但不足以證明因果。"
+        )
+    elif left_dir == "回落" and right_dir == "上升":
+        inference = (
+            f"INFERENCE｜{left_label}回落與{right_label}上升同期出現；"
+            f"市場尚未呈現單向一致的風險偏好惡化，因果未證。"
+        )
+    elif left_dir == "回落" and right_dir == "回落":
+        inference = (
+            f"INFERENCE｜{left_label}與{right_label}同期偏弱；"
+            f"風險偏好可能同步降溫，仍非因果證明。"
+        )
+    else:
+        inference = (
+            f"INFERENCE｜{left_label}（{left_dir}）與{right_label}（{right_dir}）並陳；"
+            f"關係可觀察，因果未證。"
+        )
+    unknown = (
+        f"UNKNOWN｜尚不足以確認{left_label}與{right_label}之間是否存在穩定因果，"
+        f"亦不足以判定市場 regime 已改變。"
+    )
+    text = f"{left_label}×{right_label}：" + "；".join(facts) + "。" + inference + unknown
+    return {"id": name, "score": score, "text": text, "ok": True, "facts": facts}
+
+
+def build_cross_relationships(by_id):
+    specs = [
+        ("rates_equity", ["US10Y", "US30Y"], ["Nasdaq", "SPX", "SOX"], "美債利率", "美股／半導體"),
+        ("sox_rates", ["SOX", "Nasdaq"], ["US10Y", "US30Y"], "半導體／Nasdaq", "美債利率"),
+        ("taiwan_sox", ["TAIEX"], ["SOX"], "台股", "SOX"),
+        ("oil_rates", ["WTI", "Brent"], ["US10Y"], "油價", "美債利率"),
+        ("vix_equity", ["VIX"], ["Nasdaq", "SPX"], "VIX", "美股"),
+        ("btc_risk", ["Bitcoin"], ["VIX", "Nasdaq"], "Bitcoin", "風險偏好（VIX／Nasdaq）"),
+    ]
+    out = []
+    for name, left_names, right_names, left_label, right_label in specs:
+        left = pick_items(by_id, left_names)[:2]
+        right = pick_items(by_id, right_names)[:2]
+        out.append(interpret_cross_relationship(name, left, right, left_label, right_label))
+    return out
+
+
+def interpret_taiwan_cross(by_id):
+    taiex = pick_items(by_id, ["TAIEX"])
+    sox = pick_items(by_id, ["SOX"])
+    flow = pick_items(by_id, ["TW_FOREIGN_NET"])
+    if not taiex:
+        return "UNKNOWN｜缺少 TAIEX Evidence，無法形成台股關係解讀。"
+    if not sox:
+        facts = [fact_instrument_line(item) for item in taiex + flow]
+        facts = [line for line in facts if line]
+        return "；".join(facts) + "。UNKNOWN｜缺少 SOX Evidence，無法判斷台股與全球半導體同步程度。"
+    text = interpret_cross_relationship("taiwan_sox", taiex, sox, "台股", "SOX")["text"]
+    if flow:
+        flow_facts = [fact_instrument_line(item) for item in flow]
+        flow_facts = [line for line in flow_facts if line]
+        flow_dir = describe_dirs(flow)
+        if flow_facts:
+            text += " " + "；".join(flow_facts) + "。"
+        text += (
+            f"INFERENCE｜外資流向（{flow_dir}）可作為台股風險偏好的輔助訊號，非持續性證明。"
+            f"UNKNOWN｜外資單日／近期淨額是否代表持續風險偏好變化仍不明。"
+        )
+    else:
+        text += "UNKNOWN｜缺少外資／三大法人 Evidence，流向解讀不可用。"
+    return text
+
+
+def interpret_global_cross(relationships):
+    preferred = ["rates_equity", "vix_equity", "oil_rates", "btc_risk"]
+    by_name = {row["id"]: row for row in relationships if row.get("ok")}
+    bits = []
+    for name in preferred:
+        row = by_name.get(name)
+        if row:
+            bits.append(row["text"])
+        if len(bits) >= 2:
+            break
+    if not bits:
+        return "UNKNOWN｜全球跨 Evidence 關係不足，僅能參考市場狀態數值。"
+    return " ".join(bits)
+
+
+def interpret_constraint_lens(by_id, relationships):
+    rates = pick_items(by_id, ["US10Y", "US30Y"])
+    equity = pick_items(by_id, ["Nasdaq", "SPX", "SOX"])
+    oil = pick_items(by_id, ["WTI", "Brent"])
+    vix = pick_items(by_id, ["VIX"])
+    facts = []
+    for item in rates[:2] + equity[:2] + oil[:1] + vix[:1]:
+        line = fact_instrument_line(item)
+        if line:
+            facts.append(line[5:] if line.startswith("FACT｜") else line)
+    if not facts:
+        return ["UNKNOWN｜缺少 Rates／Equity／Oil／VIX Evidence，無法判斷主要 constraint。"]
+    rates_dir = describe_dirs(rates) if rates else "UNKNOWN"
+    equity_dir = describe_dirs(equity) if equity else "UNKNOWN"
+    vix_dir = describe_dirs(vix) if vix else "UNKNOWN"
+    oil_dir = describe_dirs(oil) if oil else "UNKNOWN"
+    if rates and equity and rates_dir == "上升" and equity_dir == "上升":
+        constraint = (
+            "INFERENCE｜目前最大 constraint 傾向為高／上升的長債利率；"
+            "但美股／半導體同期仍偏強，顯示約束存在卻未必已主導風險偏好。"
+        )
+    elif rates and equity and rates_dir == "上升" and equity_dir == "回落":
+        constraint = (
+            "INFERENCE｜長債上升與股市回落同期，利率約束可能正在被定價；"
+            "仍不足以稱為已確認的 regime 切換。"
+        )
+    elif rates:
+        constraint = (
+            "INFERENCE｜目前最清晰的估值約束來自長債利率水準"
+            f"（美債方向 {rates_dir}）；這是約束條件，不是已實現的全面殺估值證明。"
+        )
+    else:
+        constraint = "UNKNOWN｜尚不足以指出單一最大 constraint。"
+    regime = (
+        "UNKNOWN｜目前 Evidence 不足以確認市場 regime 是否已改變"
+        f"（VIX {vix_dir}；油價 {oil_dir}）。"
+    )
+    lens = [
+        "FACT｜Constraint 檢視：" + "；".join(facts[:6]) + "。",
+        constraint,
+        regime,
+    ]
+    return lens
+
+
+def when_relative_note(when, brief_date):
+    """Honest relative timing from Brief date + when. Never invent 昨天 for old events."""
+    age = event_age_days(when, brief_date)
+    when_day = parse_event_date(when) or "UNKNOWN"
+    if age is None:
+        return f"when {when_day}"
+    if age == 0:
+        return f"when {when_day}（Brief 當日）"
+    if age == 1:
+        return f"when {when_day}（Brief 前一日）"
+    return f"when {when_day}（距 Brief {age} 日）"
+
+
+def interpret_market_block(theme, items):
+    """Evidence-based market interpretation with explicit labels."""
+    label = THEME_LABEL.get(theme) or theme
+    facts = []
+    for item in items[:2]:
+        line = fact_instrument_line(item)
+        if line:
+            facts.append(line)
+    if not facts:
+        return (
+            f"{label}｜UNKNOWN｜沒有可用數值 Evidence 可形成市場解讀。",
+            "UNKNOWN",
+        )
+    inference = THEME_INFERENCE.get(theme) or "市場狀態可能影響風險偏好，但因果未證。"
+    unknown = THEME_UNKNOWN.get(theme) or "尚不足以形成投資結論。"
+    rid = None
+    for item in items:
+        if item.get("researchId"):
+            rid = item["researchId"]
+            break
+    link = f" 既有研究卡 {rid}。" if rid else ""
+    text = (
+        f"{label}重要變化：{'；'.join(facts)}。"
+        f"INFERENCE｜{inference}{link}"
+        f"UNKNOWN｜{unknown}"
+    )
+    return text, "INFERENCE"
+
+
+def interpret_event_block(packet, brief_date, by_id=None):
+    """Event interpretation: subject/type/whatChanged + FACT/INFERENCE/UNKNOWN."""
+    when_note = when_relative_note(packet.get("when"), brief_date)
+    fact_title = str(packet.get("factTitle") or "").strip() or "UNKNOWN"
+    source = str(packet.get("source") or "Event").strip()
+    subject = str(packet.get("subject") or "").strip()
+    event_type = str(packet.get("eventType") or "").strip()
+    bits = [
+        f"重要變化：{EVENT_PREFIX}{fact_title}（{when_note}；Event {packet.get('eventId')}）。",
+        f"FACT｜來源 {source}",
+    ]
+    if subject:
+        bits.append(f"FACT｜subject {subject}")
+    if event_type:
+        bits.append(f"FACT｜eventType {event_type}")
+    if packet.get("url"):
+        bits.append("FACT｜url 已記錄")
+    if packet.get("publishedTime"):
+        bits.append(f"FACT｜publishedTime {packet.get('publishedTime')}")
+
+    what_changed = packet.get("whatChanged") if isinstance(packet.get("whatChanged"), dict) else {}
+    impact = packet.get("impact") if isinstance(packet.get("impact"), dict) else {}
+    status = impact.get("evidenceStatus") if isinstance(impact.get("evidenceStatus"), dict) else {}
+
+    fact_bits = _claim_texts(what_changed.get("FACT")) or _claim_texts(status.get("FACT"))
+    for claim in fact_bits[:2]:
+        bits.append(f"FACT｜{claim}")
+    wc_summary = str(what_changed.get("summary") or "").strip()
+    if wc_summary:
+        bits.append(f"FACT｜What Changed：{wc_summary}")
+
+    why = str(packet.get("why") or "").strip()
+    if why:
+        bits.append(f"INFERENCE｜為什麼重要：{why}")
+    else:
+        bits.append("UNKNOWN｜缺少 relevanceBasis，無法說明為何重要。")
+    target = str(impact.get("target") or "").strip()
+    direction = str(impact.get("direction") or "").strip()
+    strength = str(impact.get("strength") or "").strip()
+    if target and direction:
+        strength_bit = strength or "UNKNOWN"
+        bits.append(
+            f"INFERENCE｜投資意涵：對「{target}」方向 {direction}（強度 {strength_bit}）；非買賣建議。"
+        )
+    else:
+        bits.append("UNKNOWN｜缺少 impact target／direction，投資意涵不明。")
+
+    inf_bits = _claim_texts(what_changed.get("INFERENCE")) or _claim_texts(status.get("INFERENCE"))
+    for claim in inf_bits[:1]:
+        bits.append(f"INFERENCE｜{claim}")
+    unk_bits = _claim_texts(what_changed.get("UNKNOWN")) or _claim_texts(status.get("UNKNOWN"))
+    for claim in unk_bits[:2]:
+        bits.append(f"UNKNOWN｜{claim}")
+    if not unk_bits:
+        bits.append("UNKNOWN｜單則／少數新聞不足以確認產業趨勢或資本支出週期轉折。")
+
+    by_id = by_id or {}
+    related = pick_items(by_id, ["SOX", "Nasdaq", "US10Y"])
+    if related:
+        for item in related[:3]:
+            line = fact_instrument_line(item)
+            if line:
+                bits.append(line)
+        bits.append(
+            "INFERENCE｜事件與 SOX／Nasdaq／利率 Evidence 並陳，僅作背景；"
+            "subject 不足以自動升級為 AI 產業重大事件。"
+        )
+    return " ".join(bits)
+
+
 def today_item(title, why, source, evidence_ids, research_id, evidence_note=""):
     # Attention-first: why is primary; quotes are supporting evidence.
     primary = (why or title or "").strip()
@@ -732,103 +1193,80 @@ def today_item(title, why, source, evidence_ids, research_id, evidence_note=""):
     }
 
 
-def build_executive_summary(selected):
-    signals = []
-    groups = [
-        ("macro", theme_items(selected, "macro"), "percent"),
-        ("taiwan", theme_items(selected, "taiwan"), None),
-        ("ai", theme_items(selected, "ai"), "index"),
-        ("global", theme_items(selected, "global"), "index"),
-    ]
-    for theme, items, unit in groups:
-        if len(signals) >= MAX_EXEC_SIGNALS:
+def build_executive_summary(selected, elevate_packets=None, brief_date=None, relationships=None):
+    """At most 3 messages; do not pad. Prefer cross-evidence relationships."""
+    blocks = []
+    elevate_packets = elevate_packets or []
+    relationships = relationships or []
+    by_id = selected_map(selected)
+
+    if elevate_packets and brief_date:
+        blocks.append(interpret_event_block(elevate_packets[0], brief_date, by_id=by_id))
+
+    ok_rows = [row for row in relationships if row.get("ok") and float(row.get("score") or 0) > 0]
+    ok_rows.sort(key=lambda row: -float(row.get("score") or 0))
+    seen_ids = set()
+    for row in ok_rows:
+        if len(blocks) >= MAX_EXEC_SIGNALS:
             break
-        if not items:
+        if row["id"] in seen_ids:
             continue
-        why = THEME_WHY.get(theme) or ""
-        if not why:
+        if row["id"] == "sox_rates" and "rates_equity" in seen_ids:
             continue
-        fallback = unit or (items[0]["row"].get("unit") or "index")
-        stamp = evidence_stamp(items, fallback, max_bits=2)
-        ids = "/".join(item["instrument"] for item in items)
-        label = THEME_LABEL.get(theme) or theme
-        rid = None
-        for item in items:
-            if item.get("researchId"):
-                rid = item["researchId"]
-                break
-        link = f" 對既有研究卡 {rid}。" if rid else ""
-        evidence_bit = f"Evidence {ids}"
-        if stamp:
-            line = f"{label}：{why}{link}（{evidence_bit}；{stamp}）。"
-        else:
-            line = f"{label}：{why}{link}（{evidence_bit}）。"
-        signals.append(line)
+        if row["id"] == "rates_equity" and "sox_rates" in seen_ids:
+            continue
+        seen_ids.add(row["id"])
+        blocks.append(row["text"])
 
-    signals = signals[:MAX_EXEC_SIGNALS]
-    if not signals:
-        return "今日沒有足夠的 investment-relevant Evidence。", []
-    lines = [f"{index}. {text}" for index, text in enumerate(signals, start=1)]
-    return "\n".join(lines), signals
+    blocks = blocks[:MAX_EXEC_SIGNALS]
+    if not blocks:
+        return "UNKNOWN｜今日沒有足夠的 investment-relevant Evidence 可形成跨資料解讀。", []
+    lines = [f"{index}. {text}" for index, text in enumerate(blocks, start=1)]
+    return "\n".join(lines), blocks
 
 
-def build_today_things(selected):
+def build_today_things(selected, elevate_packets=None, brief_date=None, interpretation_blocks=None):
+    """Reuse Executive / cross interpretations — no second engine."""
     things = []
-    groups = [
-        ("macro", theme_items(selected, "macro"), "percent"),
-        ("taiwan", theme_items(selected, "taiwan"), None),
-        ("ai", theme_items(selected, "ai"), "index"),
-        ("global", theme_items(selected, "global"), "index"),
-    ]
-    for theme, items, unit in groups:
+    for block in interpretation_blocks or []:
         if len(things) >= MAX_TODAY_THINGS:
             break
-        if not items:
+        text = str(block or "").strip()
+        if not text:
             continue
-        why = THEME_WHY.get(theme) or ""
-        if not why:
-            continue
-        fallback = unit or (items[0]["row"].get("unit") or "index")
-        stamp = evidence_stamp(items, fallback, max_bits=2)
-        sources = []
-        for item in items:
-            source_id = item["row"].get("sourceId")
-            if source_id and source_id not in sources:
-                sources.append(source_id)
-        rid = None
-        for item in items:
-            if item.get("researchId"):
-                rid = item["researchId"]
-                break
         things.append(today_item(
-            why,
-            why,
-            "；".join(sources),
-            [item["instrument"] for item in items],
-            rid,
-            evidence_note=stamp,
+            text, text, "Morning Brief interpretation", [], None, evidence_note=""
+        ))
+    if things:
+        return things[:MAX_TODAY_THINGS]
+    elevate_packets = elevate_packets or []
+    if elevate_packets and brief_date:
+        by_id = selected_map(selected)
+        text = interpret_event_block(elevate_packets[0], brief_date, by_id=by_id)
+        things.append(today_item(
+            text, text, elevate_packets[0].get("source") or "Event",
+            [elevate_packets[0].get("eventId")], None, evidence_note=""
         ))
     return things[:MAX_TODAY_THINGS]
 
 
-def build_macro_lens(selected):
-    """Why-oriented lens with Evidence ids — not a third raw-quote wall."""
-    lens = []
-    groups = [
-        ("macro", theme_items(selected, "macro")),
-        ("taiwan", theme_items(selected, "taiwan")),
-        ("ai", theme_items(selected, "ai")),
-    ]
-    for theme, items in groups:
-        if not items:
-            continue
-        why = THEME_WHY.get(theme) or ""
-        if not why:
-            continue
-        ids = [item["instrument"] for item in items]
-        label = THEME_LABEL.get(theme) or theme
-        lens.append(f"{label}｜{why}（Evidence {'/'.join(ids)}）。")
-    return lens[:MAX_EXEC_SIGNALS]
+def build_macro_lens(selected, elevate_packets=None, brief_date=None, relationships=None):
+    """Constraint-focused lens from Rates×Equity×Oil×VIX — not fixed THEME_WHY."""
+    by_id = selected_map(selected)
+    relationships = relationships or build_cross_relationships(by_id)
+    # Always keep FACT + constraint answer + regime UNKNOWN (do not truncate for exec cap).
+    lens = list(interpret_constraint_lens(by_id, relationships))
+    elevate_packets = elevate_packets or []
+    if elevate_packets and brief_date:
+        packet = elevate_packets[0]
+        when_note = when_relative_note(packet.get("when"), brief_date)
+        lens.insert(
+            0,
+            f"INFERENCE｜事件背景（{when_note}；{packet.get('eventId')}）"
+            f"可納入觀察，但不可單獨定義 regime。"
+            f"UNKNOWN｜事件與利率／股市關係的因果未證。",
+        )
+    return lens
 
 
 def load_latest_run_meta(root):
@@ -878,13 +1316,23 @@ def build_brief(root, evidence, previous):
                 "asOf": as_of,
             }
 
-    lens = build_macro_lens(selected)
-
-    # Sprint 012: thin read-only evaluated Event adapter (handoff). Candidate not required.
+    # Sprint 012 / P2-022 / P2-023: events + cross-evidence relationships.
     event_packets = collect_evaluated_events(root, date)
+    elevate_packets = [
+        packet for packet in event_packets
+        if int(packet.get("ageDays") or 999) <= ELEVATE_EVENT_MAX_AGE_DAYS
+    ]
     elevated_ids = set()
-    if event_packets:
-        elevated_ids.add(event_packets[0]["eventId"])
+    if elevate_packets:
+        elevated_ids.add(elevate_packets[0]["eventId"])
+
+    relationships = build_cross_relationships(by_id)
+    lens = build_macro_lens(
+        selected,
+        elevate_packets=elevate_packets,
+        brief_date=date,
+        relationships=relationships,
+    )
 
     # Global: rates remain market-status context; equities/oil/VIX live in Temperature.
     global_hits = [item for item in selected if in_section(item, "globalMarketAndNews")]
@@ -896,7 +1344,7 @@ def build_brief(root, evidence, previous):
             "Global",
             None,
         ))
-    temp_owned = [label for label in ("Nasdaq", "S&P 500", "Dow", "SOX", "WTI", "Brent", "VIX") if label in temperature]
+    temp_owned = [label for label in ("Nasdaq", "S&P 500", "Dow", "SOX", "Bitcoin", "WTI", "Brent", "VIX") if label in temperature]
     if temp_owned:
         global_items.append(market_status_item(
             "指數／油價／波動詳見市場溫度（" + "、".join(temp_owned) + "）",
@@ -918,9 +1366,10 @@ def build_brief(root, evidence, previous):
         global_summary = MARKET_STATUS_PREFIX + "美股／油價／波動數值見市場溫度。"
     else:
         global_summary = "全球市場沒有可選入 Brief 的最新 Evidence。"
+    cross_global = interpret_global_cross(relationships)
+    global_summary = (global_summary.rstrip("。") + "。" + cross_global) if global_summary else cross_global
     if any(packet["region"] == "global" for packet in event_packets):
-        global_summary = (global_summary.rstrip("。") + "；含已評估事件。"
-                          if global_summary else "含已評估全球事件。")
+        global_summary = global_summary.rstrip("。") + "；含已評估事件。"
 
     taiwan_hits = [item for item in selected if in_section(item, "taiwanMarketAndNews")]
     taiwan_items = []
@@ -951,6 +1400,7 @@ def build_brief(root, evidence, previous):
         MARKET_STATUS_PREFIX + "；".join(taiwan_bits)
         if taiwan_bits else "台股沒有可選入 Brief 的 Evidence。"
     )
+    taiwan_summary = taiwan_summary.rstrip("。") + "。" + interpret_taiwan_cross(by_id)
     if any(packet["region"] == "taiwan" for packet in event_packets):
         taiwan_summary = taiwan_summary.rstrip("。") + "；含已評估事件。"
 
@@ -966,16 +1416,10 @@ def build_brief(root, evidence, previous):
             })
 
     prev = previous if isinstance(previous, dict) else {}
-    carried_ai = carry_linked_items(prev.get("aiIndustryHighlights"), root)
-    # Prefer non-quote narrative leftovers when available.
-    narrative_ai = [
-        item for item in carried_ai
-        if not str(item.get("title") or "").strip().startswith("SOX ")
-    ]
-    if narrative_ai:
-        ai_items.extend(narrative_ai)
-    else:
-        ai_items.extend(carried_ai)
+    # P2-023: do not carry stale narrative AI stories as if they were today's evidence.
+    # Keep only current SOX Evidence line already added above.
+    carried_ai = []
+    ai_items.extend(carried_ai)
 
     events = filter_upcoming_events(
         carry_linked_items(prev.get("upcomingEvents"), root),
@@ -990,52 +1434,18 @@ def build_brief(root, evidence, previous):
         seen_titles.add(key)
         deduped_ai.append(item)
 
-    things = build_today_things(selected)
-    # Event attention for Today's 3 Things (why-first; what happened as evidence note).
-    event_things = []
-    for packet in event_packets:
-        event_things.append(today_item(
-            packet["why"],
-            packet["why"],
-            packet["source"],
-            [packet["eventId"]],
-            None,
-            evidence_note=EVENT_PREFIX + packet["factTitle"],
-        ))
-    if event_things:
-        merged = []
-        seen_why = set()
-        for item in event_things + things:
-            key = str(item.get("whyItMatters") or item.get("title") or "")
-            if key in seen_why:
-                continue
-            seen_why.add(key)
-            merged.append(item)
-        things = merged[:MAX_TODAY_THINGS]
-
-    summary, signals = build_executive_summary(selected)
-    if event_packets:
-        top = event_packets[0]
-        # Executive = what happened + why important (factTitle + why).
-        event_line = (
-            f"{EVENT_PREFIX}{top['factTitle']}。"
-            f"注意理由：{top['why']}"
-            f"（Event {top['eventId']}；when {top['when']}）。"
-        )
-        combined = [event_line] + list(signals)
-        combined = combined[:MAX_EXEC_SIGNALS]
-        summary = "\n".join(f"{index}. {text}" for index, text in enumerate(combined, start=1))
-        # Macro Decision Lens = distinct investment observation; omit if not distinct.
-        lens_event = event_macro_lens_line(top)
-        kept_lens = [
-            line for line in lens
-            if "事件｜" not in str(line) and not str(line).startswith("觀察角度：")
-        ]
-        if lens_event:
-            lens = [lens_event] + kept_lens
-        else:
-            lens = kept_lens
-        lens = lens[:MAX_EXEC_SIGNALS]
+    summary, exec_blocks = build_executive_summary(
+        selected,
+        elevate_packets=elevate_packets,
+        brief_date=date,
+        relationships=relationships,
+    )
+    things = build_today_things(
+        selected,
+        elevate_packets=elevate_packets,
+        brief_date=date,
+        interpretation_blocks=exec_blocks,
+    )
 
     return {
         "date": date,

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- FIXTURE ONLY — fictional Federal Reserve-shaped RSS for p2-026 tests. -->
+<rss version="2.0">
+  <channel>
+    <title>[FIXTURE] FRB Press Release - All Releases</title>
+    <link>https://www.federalreserve.gov/feeds/feeds.htm</link>
+    <description>p2-026 Fed Press RSS fixture</description>
+    <language>en</language>
+    <item>
+      <title>[FIXTURE] Federal Reserve issues FOMC statement</title>
+      <link><![CDATA[https://www.federalreserve.gov/newsevents/pressreleases/monetary20260901a.htm]]></link>
+      <guid><![CDATA[https://www.federalreserve.gov/newsevents/pressreleases/monetary20260901a.htm]]></guid>
+      <description><![CDATA[The Federal Open Market Committee decided to maintain the target range for the federal funds rate.]]></description>
+      <category>Monetary Policy</category>
+      <pubDate><![CDATA[Mon, 01 Sep 2026 18:00:00 GMT]]></pubDate>
+    </item>
+    <item>
+      <title>[FIXTURE] Agencies seek comment on proposed guidance</title>
+      <link><![CDATA[https://www.federalreserve.gov/newsevents/pressreleases/bcreg20260902a.htm]]></link>
+      <guid><![CDATA[https://www.federalreserve.gov/newsevents/pressreleases/bcreg20260902a.htm]]></guid>
+      <description><![CDATA[Agencies seek comment on proposed third-party risk management guidance.]]></description>
+      <category>Banking and Consumer Regulatory Policy</category>
+      <pubDate><![CDATA[Tue, 02 Sep 2026 14:00:00 GMT]]></pubDate>
+    </item>
+  </channel>
+</rss>

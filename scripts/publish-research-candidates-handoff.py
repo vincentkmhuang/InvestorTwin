@@ -141,13 +141,14 @@ def load_handoff(path):
     return out
 
 
-def publish_handoff(payload, handoff_path):
+def publish_handoff(payload, handoff_path, replace=False):
     """
     Merge integrate-shaped payload into handoff_path.
+    replace=True: overwrite handoff with incoming only (drop prior fixture / stale rows).
     Never writes candidate-gate ledger / queue / cards / brief.
     """
     incoming = normalize_payload(payload)
-    existing = load_handoff(handoff_path)
+    existing = empty_handoff() if replace else load_handoff(handoff_path)
 
     # Skip incoming news/events/evals without identity (fail closed for candidates already).
     news_in = [item for item in incoming["news"] if news_identity(item) is not None]
@@ -193,6 +194,7 @@ def publish_handoff(payload, handoff_path):
 def main(argv):
     input_path = None
     handoff_path = None
+    replace = False
     i = 1
     while i < len(argv):
         if argv[i] == "--input" and i + 1 < len(argv):
@@ -202,6 +204,10 @@ def main(argv):
         if argv[i] == "--handoff" and i + 1 < len(argv):
             handoff_path = os.path.abspath(argv[i + 1])
             i += 2
+            continue
+        if argv[i] == "--replace":
+            replace = True
+            i += 1
             continue
         fail("unknown argument: " + argv[i])
 
@@ -222,7 +228,7 @@ def main(argv):
     else:
         payload = json.load(sys.stdin)
 
-    summary = publish_handoff(payload, handoff_path)
+    summary = publish_handoff(payload, handoff_path, replace=replace)
     json.dump(summary, sys.stdout, ensure_ascii=False, indent=2)
     sys.stdout.write("\n")
     return 0

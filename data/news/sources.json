@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0",
-  "description": "News Collect Foundation source registry. CNA enabled by default; FSC/TWSE/MOPS adapters registered (enable when ready).",
+  "description": "News Collect Foundation source registry. Fed Press RSS and NVIDIA Newsroom RSS registered disabled until First-Enable.",
   "sources": [
     {
       "sourceId": "cna-finance-rss",
@@ -29,6 +29,28 @@
       "enabled": true,
       "adapter": "collect-mops-material-openapi.py",
       "feedUrl": "https://openapi.twse.com.tw/v1/opendata/t187ap04_L"
+    },
+    {
+      "sourceId": "fed-press-rss",
+      "name": "Federal Reserve Press RSS",
+      "label": "Federal Reserve Press RSS",
+      "type": "rss",
+      "official": true,
+      "url": "https://www.federalreserve.gov/feeds/press_all.xml",
+      "feedUrl": "https://www.federalreserve.gov/feeds/press_all.xml",
+      "enabled": false,
+      "adapter": "collect-fed-press-rss.py"
+    },
+    {
+      "sourceId": "nvidia-newsroom-rss",
+      "name": "NVIDIA Newsroom RSS",
+      "label": "NVIDIA Newsroom RSS",
+      "type": "rss",
+      "official": true,
+      "url": "https://nvidianews.nvidia.com/rss.xml",
+      "feedUrl": "https://nvidianews.nvidia.com/rss.xml",
+      "enabled": true,
+      "adapter": "collect-nvidia-newsroom-rss.py"
     }
   ]
 }

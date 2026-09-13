@@ -1,7 +1,10 @@
-# Investor Twin 014 / 031-M-2A / 031-M-5 — Evidence collector (Live + fixture).
+# Investor Twin 014 / 031-M-2A / 031-M-5 / P2-022 — Evidence collector (Live + fixture).
 # Writes Raw + Normalized evidence only. Never writes Morning Brief files.
 # Live default expectedAsOf is capturedAt's calendar date, not last_weekday.
-# Brent / WTI / VIX: existing live_fred series (DCOILBRENTEU / DCOILWTICO / VIXCLS).
+# Brent / WTI / VIX / Bitcoin: live_fred (DCOILBRENTEU / DCOILWTICO / VIXCLS / CBBTCUSD).
+# US indices: Stooq primary, FRED fallback (NASDAQCOM / SP500 / DJIA / NASDAQSOX).
+# TWSE: previous-session weekday lookback (weekends / missing sessions).
+# Gold: no reliable daily FRED USD series currently available (LBMA series removed).
 import csv
 import datetime
 import io
@@ -15,6 +18,7 @@ import urllib.request
 
 DATE_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
 MAX_OBSERVATIONS = 30
+TWSE_LOOKBACK_WEEKDAYS = 8
 FORBIDDEN_WRITES = (
     os.path.join("data", "morning-brief.json"),
     os.path.join("data", "morning-brief", "latest.json"),
@@ -58,12 +62,20 @@ SOURCE_CATALOG = {
         "asOfKind": "close",
         "fredId": "VIXCLS",
     },
+    "fred-bitcoin": {
+        "source": "fred",
+        "instrument": "Bitcoin",
+        "unit": "USD",
+        "asOfKind": "close",
+        "fredId": "CBBTCUSD",
+    },
     "us-index-nasdaq": {
         "source": "us-index",
         "instrument": "Nasdaq",
         "unit": "index",
         "asOfKind": "close",
         "stooq": "ndq.us",
+        "fredId": "NASDAQCOM",
     },
     "us-index-spx": {
         "source": "us-index",
@@ -71,6 +83,7 @@ SOURCE_CATALOG = {
         "unit": "index",
         "asOfKind": "close",
         "stooq": "^spx",
+        "fredId": "SP500",
     },
     "us-index-dji": {
         "source": "us-index",
@@ -78,6 +91,7 @@ SOURCE_CATALOG = {
         "unit": "index",
         "asOfKind": "close",
         "stooq": "^dji",
+        "fredId": "DJIA",
     },
     "us-index-sox": {
         "source": "us-index",
@@ -85,6 +99,7 @@ SOURCE_CATALOG = {
         "unit": "index",
         "asOfKind": "close",
         "stooq": "^sox",
+        "fredId": "NASDAQSOX",
     },
     "twse-taiex": {
         "source": "twse",
@@ -421,6 +436,70 @@ def live_stooq(symbol):
     return {"observations": rows[-MAX_OBSERVATIONS:]}
 
 
+def fetch_us_index(catalog):
+    """Stooq primary; FRED fallback. Never rewrite observation asOf."""
+    stooq_symbol = catalog.get("stooq")
+    fred_id = catalog.get("fredId")
+    stooq_error = None
+    if stooq_symbol:
+        try:
+            payload = live_stooq(stooq_symbol)
+            if observations_from_payload(payload):
+                out = dict(payload)
+                out["provider"] = "stooq"
+                return out
+            stooq_error = "stooq returned no usable observations"
+        except Exception as exc:
+            stooq_error = str(exc)
+    else:
+        stooq_error = "stooq symbol missing"
+    if not fred_id:
+        raise ValueError(stooq_error or "us-index unavailable")
+    try:
+        payload = live_fred(fred_id)
+        if not observations_from_payload(payload):
+            raise ValueError("fred returned no usable observations")
+        out = dict(payload)
+        out["provider"] = "fred"
+        return out
+    except Exception as exc:
+        raise ValueError(
+            "stooq: " + (stooq_error or "unavailable") + "; fred: " + str(exc)
+        )
+
+
+def twse_session_dates(expected_as_of, max_sessions=TWSE_LOOKBACK_WEEKDAYS):
+    """Weekday session candidates: expected day first, weekends skipped, no future dates."""
+    day = parse_date(expected_as_of)
+    if day is None:
+        return []
+    dates = []
+    current = day
+    guard = 0
+    while len(dates) < max_sessions and guard < 40:
+        if current.weekday() < 5:
+            dates.append(current.isoformat())
+        current = current - datetime.timedelta(days=1)
+        guard += 1
+    return dates
+
+
+def fetch_twse_session(fetcher, expected_as_of):
+    """Try expected session day, then prior weekdays. Preserve source asOf."""
+    last_error = None
+    for day in twse_session_dates(expected_as_of):
+        try:
+            payload = fetcher(day)
+            if observations_from_payload(payload):
+                return payload
+            last_error = "empty observations for " + day
+        except Exception as exc:
+            last_error = str(exc)
+            continue
+    detail = ("; last=" + last_error) if last_error else ""
+    raise ValueError("no session in lookback for " + str(expected_as_of) + detail)
+
+
 def twse_date(value):
     day = parse_date(value)
     return day.strftime("%Y%m%d") if day else None
@@ -522,11 +601,11 @@ def fetch_live(source_id, expected_as_of):
     if catalog["source"] == "fred":
         return live_fred(catalog["fredId"])
     if catalog["source"] == "us-index":
-        return live_stooq(catalog["stooq"])
+        return fetch_us_index(catalog)
     if source_id == "twse-taiex":
-        return live_twse_taiex(expected_as_of)
+        return fetch_twse_session(live_twse_taiex, expected_as_of)
     if source_id == "twse-institutional":
-        return live_twse_institutional(expected_as_of)
+        return fetch_twse_session(live_twse_institutional, expected_as_of)
     raise ValueError("unknown live source")
 
 

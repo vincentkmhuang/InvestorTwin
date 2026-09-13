@@ -137,11 +137,13 @@ ADAPTER_BY_SOURCE = {
     "fsc-press-rss": ("collect-fsc-press-rss.py", "collect_fsc_press_rss"),
     "twse-news-openapi": ("collect-twse-news-openapi.py", "collect_twse_news_openapi"),
     "mops-material-openapi": ("collect-mops-material-openapi.py", "collect_mops_material_openapi"),
+    "fed-press-rss": ("collect-fed-press-rss.py", "collect_fed_press_rss"),
+    "nvidia-newsroom-rss": ("collect-nvidia-newsroom-rss.py", "collect_nvidia_newsroom_rss"),
 }
 
 
 def fixture_applies_to_source(source_id, fixture_path):
-    """Fixture files are adapter-specific; do not cross-feed CNA/FSC/TWSE/MOPS fixtures."""
+    """Fixture files are adapter-specific; do not cross-feed CNA/FSC/TWSE/MOPS/Fed/NVIDIA fixtures."""
     if not fixture_path:
         return True
     name = os.path.basename(str(fixture_path)).lower()
@@ -151,6 +153,10 @@ def fixture_applies_to_source(source_id, fixture_path):
         return source_id == "twse-news-openapi"
     if "fsc" in name:
         return source_id == "fsc-press-rss"
+    if "nvidia" in name:
+        return source_id == "nvidia-newsroom-rss"
+    if "fed" in name:
+        return source_id == "fed-press-rss"
     if "cna" in name:
         return source_id == "cna-finance-rss"
     # Unknown fixture naming: only CNA (historical default).
@@ -179,6 +185,8 @@ def pipeline(
     publish_handoff_path=None,
     skip_collect=False,
     run_id=None,
+    replace_handoff=False,
+    ignore_pipeline_seen=False,
 ):
     store_root = store_root or DEFAULT_STORE_ROOT
     started_at = utc_now_iso()
@@ -248,7 +256,10 @@ def pipeline(
             normalized.extend(load_normalized_news(run_dir))
         pipeline_seen_path = ensure_pipeline_seen(store_root)
         pipeline_seen = read_json(pipeline_seen_path, {"schemaVersion": "1.0", "byUrl": {}})
-        pipeline_news, skipped = filter_new_for_pipeline(normalized, pipeline_seen)
+        if ignore_pipeline_seen:
+            pipeline_news, skipped = normalized, []
+        else:
+            pipeline_news, skipped = filter_new_for_pipeline(normalized, pipeline_seen)
         news_for_integrate = strip_collect_meta_for_integrate(pipeline_news)
         primary_run_id = collect_run_ids[-1]
 
@@ -274,7 +285,11 @@ def pipeline(
                         "publish-research-candidates-handoff.py",
                         "publish_research_candidates_handoff",
                     )
-                    publisher.publish_handoff(integrate_result, publish_handoff_path)
+                    publisher.publish_handoff(
+                        integrate_result,
+                        publish_handoff_path,
+                        replace=replace_handoff,
+                    )
                 # Only mark pipeline-seen after successful integrate.
                 pipeline_seen = mark_pipeline_seen(
                     pipeline_seen, pipeline_news, primary_run_id, started_at
@@ -306,8 +321,11 @@ def pipeline(
         "newsInRun": len(pipeline_news) + len([s for s in skipped if s.get("reason") == "pipeline_seen"]),
         "newsSentToIntegrate": len(news_for_integrate),
         "pipelineSkipped": skipped,
-        "publishHandoff": bool(publish_handoff_path),
+        "publishHandoff": bool(publish_handoff_path and integrate_result is not None),
         "publishHandoffPath": publish_handoff_path,
+        "replaceHandoff": bool(
+            replace_handoff and publish_handoff_path and integrate_result is not None
+        ),
         "writesBrief": False,
         "writesEvidence": False,
         "usesExistingIntegrate": True,
@@ -338,6 +356,8 @@ def main(argv):
     publish_handoff_path = None
     skip_collect = False
     run_id = None
+    replace_handoff = False
+    ignore_pipeline_seen = False
     i = 1
     while i < len(argv):
         if argv[i] == "--store-root" and i + 1 < len(argv):
@@ -351,6 +371,14 @@ def main(argv):
         if argv[i] == "--publish-handoff" and i + 1 < len(argv):
             publish_handoff_path = os.path.abspath(argv[i + 1])
             i += 2
+            continue
+        if argv[i] == "--replace-handoff":
+            replace_handoff = True
+            i += 1
+            continue
+        if argv[i] == "--ignore-pipeline-seen":
+            ignore_pipeline_seen = True
+            i += 1
             continue
         if argv[i] == "--skip-collect":
             skip_collect = True
@@ -373,6 +401,8 @@ def main(argv):
         publish_handoff_path=publish_handoff_path,
         skip_collect=skip_collect,
         run_id=run_id,
+        replace_handoff=replace_handoff,
+        ignore_pipeline_seen=ignore_pipeline_seen,
     )
     sys.stdout.write(json.dumps(summary, ensure_ascii=False, indent=2) + "\n")
     if summary.get("status") == "failed":

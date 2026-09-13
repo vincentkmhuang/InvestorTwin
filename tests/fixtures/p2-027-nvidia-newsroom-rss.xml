@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- FIXTURE ONLY — fictional NVIDIA Newsroom-shaped RSS for p2-027 tests. -->
+<rss version="2.0">
+  <channel>
+    <title>[FIXTURE] NVIDIA Newsroom</title>
+    <link>https://nvidianews.nvidia.com/</link>
+    <description>p2-027 NVIDIA Newsroom RSS fixture</description>
+    <language>en</language>
+    <item>
+      <title>[FIXTURE] NVIDIA Launches New Blackwell GPU Product Line | NVIDIA Blog</title>
+      <link><![CDATA[https://blogs.nvidia.com/blog/fixture-blackwell-product-20260901/]]></link>
+      <guid><![CDATA[https://blogs.nvidia.com/blog/fixture-blackwell-product-20260901/]]></guid>
+      <description><![CDATA[NVIDIA announces a product launch for its Blackwell AI server GPU lineup.]]></description>
+      <pubDate><![CDATA[Mon, 01 Sep 2026 16:00:00 GMT]]></pubDate>
+    </item>
+    <item>
+      <title>[FIXTURE] NVIDIA and Partner Sign Strategic Partnership on AI Compute Demand</title>
+      <link><![CDATA[https://blogs.nvidia.com/blog/fixture-partnership-compute-20260902/]]></link>
+      <guid><![CDATA[https://blogs.nvidia.com/blog/fixture-partnership-compute-20260902/]]></guid>
+      <description><![CDATA[NVIDIA signs a partnership to expand AI compute demand and GPU server capacity.]]></description>
+      <pubDate><![CDATA[Tue, 02 Sep 2026 15:00:00 GMT]]></pubDate>
+    </item>
+    <item>
+      <title>[FIXTURE] NVIDIA Reports Quarterly Earnings and Guidance</title>
+      <link><![CDATA[https://nvidianews.nvidia.com/news/fixture-earnings-guidance-20260903]]></link>
+      <guid><![CDATA[https://nvidianews.nvidia.com/news/fixture-earnings-guidance-20260903]]></guid>
+      <description><![CDATA[NVIDIA publishes quarterly earnings results and updates fiscal guidance.]]></description>
+      <pubDate><![CDATA[Wed, 03 Sep 2026 21:00:00 GMT]]></pubDate>
+    </item>
+    <item>
+      <title>[FIXTURE] Brief NVIDIA note</title>
+      <link><![CDATA[https://blogs.nvidia.com/blog/fixture-vague-note-20260904/]]></link>
+      <guid><![CDATA[https://blogs.nvidia.com/blog/fixture-vague-note-20260904/]]></guid>
+      <description><![CDATA[A short NVIDIA company update without further detail.]]></description>
+      <pubDate><![CDATA[Thu, 04 Sep 2026 12:00:00 GMT]]></pubDate>
+    </item>
+  </channel>
+</rss>

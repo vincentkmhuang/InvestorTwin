@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- FIXTURE ONLY — same as p2-026-fed-press-rss.xml plus one NEW item. -->
+<rss version="2.0">
+  <channel>
+    <title>[FIXTURE] FRB Press Release - All Releases + one</title>
+    <link>https://www.federalreserve.gov/feeds/feeds.htm</link>
+    <description>p2-026 Fed Press RSS fixture plus one</description>
+    <language>en</language>
+    <item>
+      <title>[FIXTURE] Federal Reserve issues FOMC statement</title>
+      <link><![CDATA[https://www.federalreserve.gov/newsevents/pressreleases/monetary20260901a.htm]]></link>
+      <guid><![CDATA[https://www.federalreserve.gov/newsevents/pressreleases/monetary20260901a.htm]]></guid>
+      <description><![CDATA[The Federal Open Market Committee decided to maintain the target range for the federal funds rate.]]></description>
+      <category>Monetary Policy</category>
+      <pubDate><![CDATA[Mon, 01 Sep 2026 18:00:00 GMT]]></pubDate>
+    </item>
+    <item>
+      <title>[FIXTURE] Agencies seek comment on proposed guidance</title>
+      <link><![CDATA[https://www.federalreserve.gov/newsevents/pressreleases/bcreg20260902a.htm]]></link>
+      <guid><![CDATA[https://www.federalreserve.gov/newsevents/pressreleases/bcreg20260902a.htm]]></guid>
+      <description><![CDATA[Agencies seek comment on proposed third-party risk management guidance.]]></description>
+      <category>Banking and Consumer Regulatory Policy</category>
+      <pubDate><![CDATA[Tue, 02 Sep 2026 14:00:00 GMT]]></pubDate>
+    </item>
+    <item>
+      <title>[FIXTURE] NEW Federal Reserve announces discount rate approval</title>
+      <link><![CDATA[https://www.federalreserve.gov/newsevents/pressreleases/other20260903a.htm]]></link>
+      <guid><![CDATA[https://www.federalreserve.gov/newsevents/pressreleases/other20260903a.htm]]></guid>
+      <description><![CDATA[The Federal Reserve Board approved actions by Federal Reserve Banks.]]></description>
+      <category>Other Announcements</category>
+      <pubDate><![CDATA[Wed, 03 Sep 2026 16:00:00 GMT]]></pubDate>
+    </item>
+  </channel>
+</rss>
