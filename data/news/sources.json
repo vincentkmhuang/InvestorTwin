@@ -38,7 +38,7 @@
       "official": true,
       "url": "https://www.federalreserve.gov/feeds/press_all.xml",
       "feedUrl": "https://www.federalreserve.gov/feeds/press_all.xml",
-      "enabled": false,
+      "enabled": true,
       "adapter": "collect-fed-press-rss.py"
     },
     {

@@ -140,12 +140,12 @@ try:
         str(inc),
     )
 
-    # Registry still disabled
+    # Registry enabled after P2-033 Formal Enable
     sources = json.load(open(os.path.join(ROOT, "data", "news", "sources.json"), encoding="utf-8"))
     fed_row = next((row for row in sources.get("sources") or [] if row.get("sourceId") == "fed-press-rss"), None)
     record(
-        "T-registry-disabled",
-        fed_row is not None and fed_row.get("enabled") is False
+        "T-registry-enabled",
+        fed_row is not None and fed_row.get("enabled") is True
         and fed_row.get("official") is True
         and "press_all.xml" in str(fed_row.get("url") or fed_row.get("feedUrl") or ""),
         str(fed_row),
@@ -198,12 +198,15 @@ def run_py(path):
     return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
 
 
-# T11 News Collect regression: dispatch registry loads; enabled sources exclude Fed
+# T11 News Collect regression: dispatch registry loads; enabled sources include Fed after P2-033
 enabled = [
     row for row in json.load(open(os.path.join(ROOT, "data", "news", "sources.json"), encoding="utf-8")).get("sources") or []
     if row.get("enabled") is True
 ]
-record("T11-news-collect-regression", all(row.get("sourceId") != "fed-press-rss" for row in enabled) and len(enabled) >= 1)
+record(
+    "T11-news-collect-regression",
+    any(row.get("sourceId") == "fed-press-rss" for row in enabled) and len(enabled) >= 1,
+)
 
 code12, out12 = run_py(os.path.join(ROOT, "tests", "p2-024-event-understanding.py"))
 record("T12-ni-regression", code12 == 0, out12[-400:])

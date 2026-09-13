@@ -214,7 +214,7 @@ for label, rel in (
 sources = json.load(open(os.path.join(ROOT, "data", "news", "sources.json"), encoding="utf-8-sig"))
 by_id = {row.get("sourceId"): row for row in sources.get("sources") or []}
 record("registry-nvidia-enabled", by_id.get("nvidia-newsroom-rss", {}).get("enabled") is True)
-record("registry-fed-disabled", by_id.get("fed-press-rss", {}).get("enabled") is False)
+record("registry-fed-enabled", by_id.get("fed-press-rss", {}).get("enabled") is True)
 
 if fails:
     sys.stderr.write("FAIL " + "; ".join(fails) + "\n")

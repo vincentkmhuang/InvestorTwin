@@ -313,7 +313,7 @@ def run_py(path):
     return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
 
 
-# Enabled sources must include NVIDIA after P2-027E; Fed remains disabled
+# Enabled sources must include NVIDIA after P2-027E and Fed after P2-033
 enabled = [
     row for row in json.load(open(os.path.join(ROOT, "data", "news", "sources.json"), encoding="utf-8")).get("sources") or []
     if row.get("enabled") is True
@@ -321,7 +321,7 @@ enabled = [
 enabled_ids = {row.get("sourceId") for row in enabled}
 record(
     "T-enabled-includes-nvidia",
-    "nvidia-newsroom-rss" in enabled_ids and "fed-press-rss" not in enabled_ids and len(enabled) >= 1,
+    "nvidia-newsroom-rss" in enabled_ids and "fed-press-rss" in enabled_ids and len(enabled) >= 1,
 )
 
 code11, out11 = run_py(os.path.join(ROOT, "tests", "p2-024-event-understanding.py"))

@@ -62,6 +62,37 @@ def item_identity(adapter, item):
     return url, guid
 
 
+def merge_bootstrap_state(store_root, entry):
+    """Merge one source entry into shared bootstrap-state.json (preserve bySource)."""
+    state_path = os.path.join(store_root, "bootstrap-state.json")
+    existing = read_json(state_path, {}) or {}
+    by_source = {}
+    if isinstance(existing.get("bySource"), dict):
+        by_source = dict(existing["bySource"])
+    elif existing.get("sourceId"):
+        legacy_id = str(existing.get("sourceId"))
+        by_source[legacy_id] = {
+            k: v for k, v in existing.items() if k not in ("description", "bySource")
+        }
+    by_source[entry["sourceId"]] = entry
+    payload = {
+        "schemaVersion": "1.0",
+        "mode": "seen-only",
+        "lastSourceId": entry["sourceId"],
+        "completedAt": entry["completedAt"],
+        "bySource": by_source,
+        "sourceId": entry["sourceId"],
+        "seededCount": entry.get("seededCount"),
+        "alreadySeenCount": entry.get("alreadySeenCount"),
+        "fetchedCount": entry.get("fetchedCount"),
+        "feedUrl": entry.get("feedUrl"),
+        "normalizedCount": 0,
+        "integrateCount": 0,
+    }
+    write_json(state_path, payload)
+    return state_path
+
+
 def bootstrap(feed_url=None, fixture_path=None, store_root=None):
     adapter = load_fed_adapter()
     store_root = store_root or DEFAULT_STORE_ROOT
@@ -200,7 +231,7 @@ def bootstrap(feed_url=None, fixture_path=None, store_root=None):
     write_json(seen_path, seen)
 
     finished_at = utc_now_iso()
-    bootstrap_state = {
+    entry = {
         "schemaVersion": "1.0",
         "sourceId": adapter.SOURCE_ID,
         "mode": "seen-only",
@@ -215,8 +246,7 @@ def bootstrap(feed_url=None, fixture_path=None, store_root=None):
         "normalizedCount": 0,
         "integrateCount": 0,
     }
-    state_path = os.path.join(store_root, "bootstrap-state.json")
-    write_json(state_path, bootstrap_state)
+    state_path = merge_bootstrap_state(store_root, entry)
 
     runs_after = set()
     if os.path.isdir(runs_root):
