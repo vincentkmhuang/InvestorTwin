@@ -596,9 +596,11 @@ def collect_evaluated_events(root, brief_date):
 
         url = ""
         published_time = ""
+        news_title = ""
         if news_rows:
             url = str(news_rows[0].get("url") or "").strip()
             published_time = str(news_rows[0].get("publishedTime") or "").strip()
+            news_title = str(news_rows[0].get("title") or "").strip()
 
         # Candidate eligibility is intentionally ignored — Event ≠ Candidate.
         packets.append({
@@ -613,6 +615,7 @@ def collect_evaluated_events(root, brief_date):
             "relevance": relevance,
             "why": why,
             "factTitle": fact_title,
+            "newsTitle": news_title or None,
             "source": source,
             "url": url or None,
             "publishedTime": published_time or None,
@@ -620,27 +623,174 @@ def collect_evaluated_events(root, brief_date):
             "impact": evaluation.get("impact") if isinstance(evaluation.get("impact"), dict) else {},
         })
 
-    packets.sort(key=lambda row: (-row["importance"], row["when"], row["eventId"]))
+    packets.sort(key=lambda row: (
+        -_event_rank_score(row),
+        -int(row.get("importance") or 0),
+        row.get("when") or "",
+        row.get("eventId") or "",
+    ))
     return packets[:MAX_BRIEF_EVENTS]
 
 
-def event_brief_item(packet):
+def _event_rank_score(packet):
+    """Investment relevance × evidence strength × freshness for Brief selection."""
+    importance = int(packet.get("importance") or 0)
+    relevance = str(packet.get("relevance") or "").strip().lower()
+    rel_w = 3 if "high" in relevance else (2 if "medium" in relevance else 1)
+    age = int(packet.get("ageDays") if packet.get("ageDays") is not None else 99)
+    fresh_w = 3 if age <= 1 else (2 if age <= 3 else 1)
+    return importance * rel_w * fresh_w
+
+
+def _reportage_fact(claim):
+    """Downgrade outcome-sounding claims to reportage FACT (media said X)."""
+    text = str(claim or "").strip()
+    if not text:
+        return None
+    lower = text.lower()
+    outcome_markers = (
+        "已經", "已確認", "營收", "訂單", "成長", "需求增加", "confirm", "confirmed",
+        "revenue", "order", "grew", "growth",
+    )
+    if any(marker in text or marker in lower for marker in outcome_markers):
+        return f"該報導提及／主張：{text}（屬報導內容，非已驗證商業結果）"
+    if text.startswith("報導") or text.startswith("該報導") or "新聞提及" in text:
+        return text
+    return f"該報導提及：{text}"
+
+
+def build_event_intelligence(packet, brief_date, by_id=None):
+    """Structured event interpretation for Brief (Event ≠ Candidate)."""
+    by_id = by_id or {}
+    what_changed = packet.get("whatChanged") if isinstance(packet.get("whatChanged"), dict) else {}
+    impact = packet.get("impact") if isinstance(packet.get("impact"), dict) else {}
+    status = impact.get("evidenceStatus") if isinstance(impact.get("evidenceStatus"), dict) else {}
+
+    evidence_rows = []
+    source = str(packet.get("source") or "").strip() or None
+    if source:
+        evidence_rows.append({"type": "FACT", "text": f"來源為 {source} 的已評估新聞事件。"})
+    title = str(packet.get("newsTitle") or "").strip()
+    if title:
+        evidence_rows.append({
+            "type": "FACT",
+            "text": f"報導標題為「{title}」（標題本身不是投資結論）。",
+        })
+    if packet.get("url"):
+        evidence_rows.append({"type": "FACT", "text": f"url={packet.get('url')}"})
+    else:
+        evidence_rows.append({"type": "UNKNOWN", "text": "url 未知。"})
+    if packet.get("publishedTime"):
+        evidence_rows.append({"type": "FACT", "text": f"publishedTime={packet.get('publishedTime')}"})
+    else:
+        evidence_rows.append({"type": "UNKNOWN", "text": "publishedTime 未知。"})
+
+    for claim in (_claim_texts(what_changed.get("FACT")) or _claim_texts(status.get("FACT")) or [])[:2]:
+        framed = _reportage_fact(claim)
+        if framed:
+            evidence_rows.append({"type": "FACT", "text": framed})
+    wc_summary = str(what_changed.get("summary") or "").strip()
+    if wc_summary:
+        evidence_rows.append({
+            "type": "FACT",
+            "text": f"報導所稱的變化：{wc_summary}（非已驗證營收／訂單結果）。",
+        })
+
+    inferences = []
+    why = str(packet.get("why") or "").strip()
+    if why:
+        inferences.append(f"為什麼值得注意：{why}")
+    target = str(impact.get("target") or "").strip()
+    direction = str(impact.get("direction") or "").strip()
+    strength = str(impact.get("strength") or "").strip()
+    investment = None
+    if target and direction:
+        strength_bit = strength or "UNKNOWN"
+        investment = (
+            f"對「{target}」方向 {direction}（強度 {strength_bit}）；非買賣建議。"
+        )
+        inferences.append(f"投資意涵：{investment}")
+    for claim in (_claim_texts(what_changed.get("INFERENCE")) or _claim_texts(status.get("INFERENCE")) or [])[:1]:
+        inferences.append(claim)
+
+    unknowns = []
+    for claim in (_claim_texts(what_changed.get("UNKNOWN")) or _claim_texts(status.get("UNKNOWN")) or [])[:2]:
+        unknowns.append(claim)
+    if not unknowns:
+        unknowns.append("目前尚無營收／訂單／財報資料確認實際商業結果。")
+    if not why:
+        unknowns.append("缺少 relevanceBasis，無法完整說明投資相關性。")
+
+    related_ids = []
+    related = pick_items(by_id, ["SOX", "Nasdaq", "US10Y", "TAIEX"])
+    if related:
+        for item in related[:3]:
+            line = fact_instrument_line(item)
+            if line:
+                evidence_rows.append({"type": "FACT", "text": line[5:] if line.startswith("FACT｜") else line})
+                related_ids.append(item.get("instrument"))
+        inferences.append(
+            "事件與相關 Market Evidence 並陳，僅作背景；不得視為已證實因果。"
+        )
+        unknowns.append("事件與市場數值之間的穩定因果仍 UNKNOWN。")
+
+    when_note = when_relative_note(packet.get("when"), brief_date)
+    return {
+        "event": {
+            "eventId": packet.get("eventId"),
+            "source": source,
+            "title": title or None,
+            "url": packet.get("url"),
+            "publishedTime": packet.get("publishedTime"),
+            "eventType": packet.get("eventType") or None,
+            "subject": packet.get("subject") or None,
+            "importance": packet.get("importance"),
+            "relevance": packet.get("relevance"),
+            "when": packet.get("when"),
+            "whenNote": when_note,
+        },
+        "whatChanged": wc_summary or None,
+        "evidence": evidence_rows,
+        "inference": inferences,
+        "unknown": unknowns,
+        "investmentRelevance": investment,
+        "relatedEvidence": related_ids,
+    }
+
+
+def event_brief_item(packet, compact=False, intelligence=None):
     """Honest Event item — never quote-as-news; never Candidate researchQuestion as what."""
+    title = str(packet.get("newsTitle") or "").strip()
+    fact_title = str(packet.get("factTitle") or "").strip()
+    display = title or fact_title or "UNKNOWN"
+    why = str(packet.get("why") or "").strip()
+    if compact:
+        # Compact section reference: what + why, not full executive narrative.
+        item_title = EVENT_PREFIX + display
+        if why:
+            item_title = f"{EVENT_PREFIX}{display}｜為何注意：{why}"
+    else:
+        item_title = EVENT_PREFIX + (fact_title or display)
     item = {
-        "title": EVENT_PREFIX + packet["factTitle"],
-        "source": packet["source"],
+        "title": item_title,
+        "source": packet.get("source"),
         "researchId": None,
-        "eventRef": packet["eventId"],
+        "eventRef": packet.get("eventId"),
         "kind": "event",
-        "when": packet["when"],
-        "whyItMatters": packet["why"],
-        "importance": packet["importance"],
-        "relevance": packet["relevance"],
+        "when": packet.get("when"),
+        "whyItMatters": why or None,
+        "importance": packet.get("importance"),
+        "relevance": packet.get("relevance"),
+        "eventType": packet.get("eventType") or None,
+        "subject": packet.get("subject") or None,
+        "newsTitle": packet.get("newsTitle"),
     }
     if packet.get("url"):
         item["url"] = packet["url"]
     if packet.get("publishedTime"):
         item["publishedTime"] = packet["publishedTime"]
+    if intelligence:
+        item["intelligence"] = intelligence
     return item
 
 
@@ -1071,10 +1221,12 @@ def when_relative_note(when, brief_date):
     if age is None:
         return f"when {when_day}"
     if age == 0:
-        return f"when {when_day}（Brief 當日）"
+        return f"when {when_day}（Brief 當日／Today）"
     if age == 1:
-        return f"when {when_day}（Brief 前一日）"
-    return f"when {when_day}（距 Brief {age} 日）"
+        return f"when {when_day}（Brief 前一日／Previous trading day）"
+    if age <= 3:
+        return f"when {when_day}（Recent；距 Brief {age} 日）"
+    return f"when {when_day}（Background；距 Brief {age} 日）"
 
 
 def interpret_market_block(theme, items):
@@ -1107,83 +1259,46 @@ def interpret_market_block(theme, items):
 
 
 def interpret_event_block(packet, brief_date, by_id=None):
-    """Event interpretation: subject/type/whatChanged + FACT/INFERENCE/UNKNOWN."""
-    when_note = when_relative_note(packet.get("when"), brief_date)
-    fact_title = str(packet.get("factTitle") or "").strip() or "UNKNOWN"
-    source = str(packet.get("source") or "Event").strip()
-    subject = str(packet.get("subject") or "").strip()
-    event_type = str(packet.get("eventType") or "").strip()
+    """Event interpretation prose: reportage FACT + INFERENCE + UNKNOWN (no outcome FACT)."""
+    intel = build_event_intelligence(packet, brief_date, by_id=by_id)
+    ev = intel.get("event") or {}
+    when_note = ev.get("whenNote") or when_relative_note(packet.get("when"), brief_date)
+    subject = str(ev.get("subject") or "").strip()
+    event_type = str(ev.get("eventType") or "").strip()
+    display = str(ev.get("title") or packet.get("factTitle") or "UNKNOWN").strip()
     bits = [
-        f"重要變化：{EVENT_PREFIX}{fact_title}（{when_note}；Event {packet.get('eventId')}）。",
-        f"FACT｜來源 {source}",
+        f"重要變化：{EVENT_PREFIX}{display}（{when_note}；Event {ev.get('eventId')}）。",
     ]
+    for row in intel.get("evidence") or []:
+        kind = str(row.get("type") or "FACT").upper()
+        text = str(row.get("text") or "").strip()
+        if not text:
+            continue
+        if kind == "UNKNOWN":
+            bits.append(f"UNKNOWN｜{text}")
+        elif kind == "INFERENCE":
+            bits.append(f"INFERENCE｜{text}")
+        else:
+            bits.append(f"FACT｜{text}")
     if subject:
         bits.append(f"FACT｜subject {subject}")
     if event_type:
         bits.append(f"FACT｜eventType {event_type}")
-    if packet.get("url"):
-        bits.append("FACT｜url 已記錄")
-    if packet.get("publishedTime"):
-        bits.append(f"FACT｜publishedTime {packet.get('publishedTime')}")
-
-    what_changed = packet.get("whatChanged") if isinstance(packet.get("whatChanged"), dict) else {}
-    impact = packet.get("impact") if isinstance(packet.get("impact"), dict) else {}
-    status = impact.get("evidenceStatus") if isinstance(impact.get("evidenceStatus"), dict) else {}
-
-    fact_bits = _claim_texts(what_changed.get("FACT")) or _claim_texts(status.get("FACT"))
-    for claim in fact_bits[:2]:
-        bits.append(f"FACT｜{claim}")
-    wc_summary = str(what_changed.get("summary") or "").strip()
-    if wc_summary:
-        bits.append(f"FACT｜What Changed：{wc_summary}")
-
-    why = str(packet.get("why") or "").strip()
-    if why:
-        bits.append(f"INFERENCE｜為什麼重要：{why}")
-    else:
-        bits.append("UNKNOWN｜缺少 relevanceBasis，無法說明為何重要。")
-    target = str(impact.get("target") or "").strip()
-    direction = str(impact.get("direction") or "").strip()
-    strength = str(impact.get("strength") or "").strip()
-    if target and direction:
-        strength_bit = strength or "UNKNOWN"
-        bits.append(
-            f"INFERENCE｜投資意涵：對「{target}」方向 {direction}（強度 {strength_bit}）；非買賣建議。"
-        )
-    else:
-        bits.append("UNKNOWN｜缺少 impact target／direction，投資意涵不明。")
-
-    inf_bits = _claim_texts(what_changed.get("INFERENCE")) or _claim_texts(status.get("INFERENCE"))
-    for claim in inf_bits[:1]:
+    for claim in intel.get("inference") or []:
         bits.append(f"INFERENCE｜{claim}")
-    unk_bits = _claim_texts(what_changed.get("UNKNOWN")) or _claim_texts(status.get("UNKNOWN"))
-    for claim in unk_bits[:2]:
+    for claim in intel.get("unknown") or []:
         bits.append(f"UNKNOWN｜{claim}")
-    if not unk_bits:
-        bits.append("UNKNOWN｜單則／少數新聞不足以確認產業趨勢或資本支出週期轉折。")
-
-    by_id = by_id or {}
-    related = pick_items(by_id, ["SOX", "Nasdaq", "US10Y"])
-    if related:
-        for item in related[:3]:
-            line = fact_instrument_line(item)
-            if line:
-                bits.append(line)
-        bits.append(
-            "INFERENCE｜事件與 SOX／Nasdaq／利率 Evidence 並陳，僅作背景；"
-            "subject 不足以自動升級為 AI 產業重大事件。"
-        )
     return " ".join(bits)
 
 
-def today_item(title, why, source, evidence_ids, research_id, evidence_note=""):
+def today_item(title, why, source, evidence_ids, research_id, evidence_note="", intelligence=None):
     # Attention-first: why is primary; quotes are supporting evidence.
     primary = (why or title or "").strip()
     support = (evidence_note or title or "").strip()
     text = primary
     if support and support != primary:
         text = primary.rstrip("。") + "。" + "證據：" + support
-    return {
+    item = {
         "title": primary,
         "text": text,
         "whyItMatters": why or primary,
@@ -1191,17 +1306,32 @@ def today_item(title, why, source, evidence_ids, research_id, evidence_note=""):
         "evidence": evidence_ids,
         "researchId": research_id,
     }
+    if intelligence:
+        item["intelligence"] = intelligence
+        # Next research implication without buy/sell.
+        next_bits = []
+        for claim in intelligence.get("unknown") or []:
+            next_bits.append(claim)
+        if intelligence.get("investmentRelevance"):
+            next_bits.append("下一步：核對相關 Evidence 是否同方向，非買賣訊號。")
+        if next_bits:
+            item["nextResearchImplication"] = next_bits[0]
+    return item
 
 
 def build_executive_summary(selected, elevate_packets=None, brief_date=None, relationships=None):
-    """At most 3 messages; do not pad. Prefer cross-evidence relationships."""
+    """At most 3 messages; do not pad. Rank by relevance × evidence × impact × freshness."""
     blocks = []
     elevate_packets = elevate_packets or []
     relationships = relationships or []
     by_id = selected_map(selected)
 
-    if elevate_packets and brief_date:
-        blocks.append(interpret_event_block(elevate_packets[0], brief_date, by_id=by_id))
+    ranked_events = sorted(
+        elevate_packets,
+        key=lambda row: (-_event_rank_score(row), -int(row.get("importance") or 0)),
+    )
+    if ranked_events and brief_date:
+        blocks.append(interpret_event_block(ranked_events[0], brief_date, by_id=by_id))
 
     ok_rows = [row for row in relationships if row.get("ok") and float(row.get("score") or 0) > 0]
     ok_rows.sort(key=lambda row: -float(row.get("score") or 0))
@@ -1226,26 +1356,49 @@ def build_executive_summary(selected, elevate_packets=None, brief_date=None, rel
 
 
 def build_today_things(selected, elevate_packets=None, brief_date=None, interpretation_blocks=None):
-    """Reuse Executive / cross interpretations — no second engine."""
+    """Reuse Executive / cross interpretations — no second engine. No padding to 3."""
     things = []
+    by_id = selected_map(selected)
+    elevate_packets = elevate_packets or []
+    elevate_by_id = {p.get("eventId"): p for p in elevate_packets}
+
     for block in interpretation_blocks or []:
         if len(things) >= MAX_TODAY_THINGS:
             break
         text = str(block or "").strip()
         if not text:
             continue
+        evidence_ids = []
+        intelligence = None
+        source = "Morning Brief interpretation"
+        # Prefer linking the primary elevated event when exec block is event prose.
+        for eid, packet in elevate_by_id.items():
+            if eid and eid in text:
+                evidence_ids.append(eid)
+                source = packet.get("source") or source
+                if brief_date:
+                    intelligence = build_event_intelligence(packet, brief_date, by_id=by_id)
+                    evidence_ids.extend(intelligence.get("relatedEvidence") or [])
+                break
+        # Cross-evidence blocks: attach mentioned instruments when present.
+        for instrument in ("SOX", "Nasdaq", "US10Y", "US30Y", "TAIEX", "SPX", "VIX", "WTI"):
+            if instrument in text and instrument not in evidence_ids:
+                evidence_ids.append(instrument)
         things.append(today_item(
-            text, text, "Morning Brief interpretation", [], None, evidence_note=""
+            text, text, source, evidence_ids, None,
+            evidence_note="", intelligence=intelligence,
         ))
     if things:
         return things[:MAX_TODAY_THINGS]
-    elevate_packets = elevate_packets or []
     if elevate_packets and brief_date:
-        by_id = selected_map(selected)
-        text = interpret_event_block(elevate_packets[0], brief_date, by_id=by_id)
+        packet = elevate_packets[0]
+        intelligence = build_event_intelligence(packet, brief_date, by_id=by_id)
+        text = interpret_event_block(packet, brief_date, by_id=by_id)
+        evidence_ids = [packet.get("eventId")] + list(intelligence.get("relatedEvidence") or [])
         things.append(today_item(
-            text, text, elevate_packets[0].get("source") or "Event",
-            [elevate_packets[0].get("eventId")], None, evidence_note=""
+            text, text, packet.get("source") or "Event",
+            [eid for eid in evidence_ids if eid], None,
+            evidence_note="", intelligence=intelligence,
         ))
     return things[:MAX_TODAY_THINGS]
 
@@ -1316,12 +1469,16 @@ def build_brief(root, evidence, previous):
                 "asOf": as_of,
             }
 
-    # Sprint 012 / P2-022 / P2-023: events + cross-evidence relationships.
+    # Sprint 012 / P2-022 / P2-023 / P2-036: events + cross-evidence relationships.
     event_packets = collect_evaluated_events(root, date)
     elevate_packets = [
         packet for packet in event_packets
         if int(packet.get("ageDays") or 999) <= ELEVATE_EVENT_MAX_AGE_DAYS
     ]
+    elevate_packets = sorted(
+        elevate_packets,
+        key=lambda row: (-_event_rank_score(row), -int(row.get("importance") or 0)),
+    )
     elevated_ids = set()
     if elevate_packets:
         elevated_ids.add(elevate_packets[0]["eventId"])
@@ -1354,10 +1511,13 @@ def build_brief(root, evidence, previous):
     for packet in event_packets:
         if packet["region"] != "global":
             continue
-        if packet["eventId"] in elevated_ids:
-            # Elevated into Yesterday/exec — avoid full duplicate in Global.
-            continue
-        global_items.append(event_brief_item(packet))
+        intel = build_event_intelligence(packet, date, by_id=by_id)
+        # Elevated events also appear here as compact refs (not full exec narrative).
+        global_items.append(event_brief_item(
+            packet,
+            compact=(packet["eventId"] in elevated_ids),
+            intelligence=intel if packet["eventId"] in elevated_ids else None,
+        ))
     if macro_hits:
         global_summary = MARKET_STATUS_PREFIX + "；".join(format_group(macro_hits, "percent"))
         if temp_owned:
@@ -1392,9 +1552,12 @@ def build_brief(root, evidence, previous):
     for packet in event_packets:
         if packet["region"] != "taiwan":
             continue
-        if packet["eventId"] in elevated_ids:
-            continue
-        taiwan_items.append(event_brief_item(packet))
+        intel = build_event_intelligence(packet, date, by_id=by_id)
+        taiwan_items.append(event_brief_item(
+            packet,
+            compact=(packet["eventId"] in elevated_ids),
+            intelligence=intel if packet["eventId"] in elevated_ids else None,
+        ))
     taiwan_bits = format_group(taiwan_hits, "index")
     taiwan_summary = (
         MARKET_STATUS_PREFIX + "；".join(taiwan_bits)

@@ -1,0 +1,141 @@
+{
+  "news": [
+    {
+      "id": "https://example.test/p2-036/nvidia-cooling",
+      "source": "CNA Finance RSS",
+      "title": "輝達與 ASIC 雙引擎推動台灣散熱需求",
+      "url": "https://example.test/p2-036/nvidia-cooling",
+      "publishedTime": "2026-09-12T00:30:01Z",
+      "summary": "報導提及 NVIDIA、ASIC、AI Server 與台灣散熱供應鏈；未提供營收或訂單數據。",
+      "subject": "NVIDIA / ASIC / AI Server / Taiwan Cooling",
+      "eventRef": "evt:ai-server/p2-036-nvidia-cooling"
+    },
+    {
+      "id": "https://example.test/p2-036/acceptance",
+      "source": "Acceptance Fixture",
+      "title": "old fixture should not enter brief",
+      "url": "https://example.test/p2-036/acceptance",
+      "publishedTime": "2026-09-03T00:00:00Z",
+      "summary": "fixture",
+      "subject": "fixture",
+      "eventRef": "evt:other/fixture/old"
+    },
+    {
+      "id": "https://example.test/p2-036/stale-bg",
+      "source": "CNA Finance RSS",
+      "title": "舊背景新聞",
+      "url": "https://example.test/p2-036/stale-bg",
+      "publishedTime": "2026-09-03T00:00:00Z",
+      "summary": "background only",
+      "subject": "Background",
+      "eventRef": "evt:other/background/stale"
+    }
+  ],
+  "events": [
+    {
+      "eventId": "evt:ai-server/p2-036-nvidia-cooling",
+      "what": "reportage",
+      "when": "2026-09-12",
+      "subject": "NVIDIA / ASIC / AI Server / Taiwan Cooling",
+      "eventType": "AI / Server",
+      "newsRefs": ["https://example.test/p2-036/nvidia-cooling"],
+      "whatChanged": {
+        "summary": "報導新增主體／主題提及（NVIDIA／ASIC／Taiwan cooling suppliers／AI server）",
+        "FACT": [
+          {"claim": "新聞提及：NVIDIA／ASIC／Taiwan cooling suppliers／AI server"}
+        ],
+        "INFERENCE": [
+          {"claim": "若其他 Evidence 同方向，值得進一步研究散熱需求"}
+        ],
+        "UNKNOWN": [
+          {"claim": "目前尚無營收／訂單資料確認實際需求增幅"}
+        ]
+      }
+    },
+    {
+      "eventId": "evt:other/fixture/old",
+      "what": "fixture",
+      "when": "2026-09-03",
+      "subject": "fixture",
+      "eventType": "Other",
+      "newsRefs": ["https://example.test/p2-036/acceptance"],
+      "whatChanged": {"summary": "fixture"}
+    },
+    {
+      "eventId": "evt:other/background/stale",
+      "what": "stale",
+      "when": "2026-09-03",
+      "subject": "Background",
+      "eventType": "Other",
+      "newsRefs": ["https://example.test/p2-036/stale-bg"],
+      "whatChanged": {"summary": "stale background"}
+    }
+  ],
+  "links": [],
+  "evaluations": [
+    {
+      "eventRef": "evt:ai-server/p2-036-nvidia-cooling",
+      "importance": 4,
+      "relevance": "High",
+      "relevanceBasis": "與 NVIDIA、AI Infrastructure 及台灣供應鏈研究高度相關",
+      "impact": {
+        "target": "NVIDIA / ASIC / AI Server / Taiwan Cooling",
+        "direction": "Unclear",
+        "strength": "Medium",
+        "evidenceStatus": {
+          "FACT": [
+            {"claim": "新聞提及：NVIDIA／ASIC／Taiwan cooling suppliers／AI server", "source": "CNA Finance RSS"}
+          ],
+          "INFERENCE": [
+            {"claim": "若其他 Evidence 同方向，值得進一步研究散熱需求"}
+          ],
+          "UNKNOWN": [
+            {"claim": "目前尚無營收／訂單資料確認實際需求增幅"}
+          ]
+        }
+      },
+      "whatChanged": {
+        "summary": "報導新增主體／主題提及（NVIDIA／ASIC／Taiwan cooling suppliers／AI server）",
+        "FACT": [
+          {"claim": "新聞提及：NVIDIA／ASIC／Taiwan cooling suppliers／AI server"}
+        ],
+        "UNKNOWN": [
+          {"claim": "目前尚無營收／訂單資料確認實際需求增幅"}
+        ]
+      },
+      "researchCandidate": {
+        "eligible": false,
+        "reason": "測試用：eligible false 不影響 Brief 消費"
+      }
+    },
+    {
+      "eventRef": "evt:other/fixture/old",
+      "importance": 5,
+      "relevance": "High",
+      "relevanceBasis": "fixture",
+      "impact": {
+        "target": "fixture",
+        "direction": "Mixed",
+        "strength": "High",
+        "evidenceStatus": {
+          "FACT": [{"claim": "fixture", "source": "Acceptance Fixture"}]
+        }
+      }
+    },
+    {
+      "eventRef": "evt:other/background/stale",
+      "importance": 4,
+      "relevance": "High",
+      "relevanceBasis": "stale background",
+      "impact": {
+        "target": "Background",
+        "direction": "Mixed",
+        "strength": "Low",
+        "evidenceStatus": {
+          "FACT": [{"claim": "stale", "source": "CNA Finance RSS"}]
+        }
+      }
+    }
+  ],
+  "researchCandidates": []
+}
